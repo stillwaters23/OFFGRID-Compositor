@@ -133,7 +133,8 @@ class TerminalPanel @JvmOverloads constructor(
         style = Paint.Style.STROKE
         blendMode = BlendMode.PLUS
     }
-    private var rippleShader: RadialGradient? = null
+    private var rippleBloom: RadialGradient? = null
+    private var rippleLight: RadialGradient? = null
     private var rippleColor = 0
     private val rippleMatrix = Matrix()
 
@@ -412,13 +413,8 @@ class TerminalPanel @JvmOverloads constructor(
         return glassBox.contains(event.getX(0), event.getY(0)) && glassBox.contains(event.getX(1), event.getY(1))
     }
 
-    /** Two fingers: the panel's buttons let go, and the pinch takes over until both fingers lift. */
+    /** Two fingers: the pinch takes over until both fingers lift, and the panel's buttons let go. */
     private fun startPinch(event: MotionEvent) {
-        val cancel = MotionEvent.obtain(event)
-        cancel.action = MotionEvent.ACTION_CANCEL
-        super.dispatchTouchEvent(cancel)
-        cancel.recycle()
-        hideKeyboard()
         stopCentering()
         val glassWidth = (width - margin * 2).toFloat()
         val glassHeight = (height - margin * 2).toFloat()
@@ -430,6 +426,12 @@ class TerminalPanel @JvmOverloads constructor(
             centerX = translationX + margin + glassWidth / 2f,
             centerY = userY + margin + glassHeight / 2f,
         )
+        // The pinch is set first, so a corner drag that lets go here does not save a size of its own.
+        val cancel = MotionEvent.obtain(event)
+        cancel.action = MotionEvent.ACTION_CANCEL
+        super.dispatchTouchEvent(cancel)
+        cancel.recycle()
+        hideKeyboard()
         glass.holdMasks = true
     }
 
@@ -538,21 +540,27 @@ class TerminalPanel @JvmOverloads constructor(
     private fun drawRipples(canvas: Canvas) {
         if (ripples.isEmpty()) return
         val color = look.edge
-        if (rippleShader == null || rippleColor != color) {
+        if (rippleBloom == null || rippleLight == null || rippleColor != color) {
             rippleColor = color
-            rippleShader = RadialGradient(
+            fun gradient() = RadialGradient(
                 0f, 0f, 1f,
                 intArrayOf(Hud.withAlpha(Hud.lighten(color, 0.6f), 0.9f), Hud.withAlpha(color, 0.5f), Hud.withAlpha(color, 0f)),
                 floatArrayOf(0f, 0.35f, 1f),
                 Shader.TileMode.CLAMP,
             )
+            rippleBloom = gradient()
+            rippleLight = gradient()
         }
-        val shader = rippleShader ?: return
+        val bloom = rippleBloom ?: return
+        val light = rippleLight ?: return
+        ripplePaint.shader = bloom
+        rippleEdge.shader = light
+        rippleEdge.strokeWidth = dp(2.4f)
+        val corner = chromeRadius(context, look) * 3f
         glassArea(glassBox)
         for (ripple in ripples) {
             val fade = (1f - ripple.progress)
             val radius = dp(12f) + dp(52f) * ripple.progress
-            ripplePaint.shader = shader
             ripplePaint.alpha = (255f * fade * fade * 0.85f).toInt()
             canvas.save()
             canvas.translate(ripple.x, ripple.y)
@@ -561,13 +569,9 @@ class TerminalPanel @JvmOverloads constructor(
             canvas.restore()
             rippleMatrix.setScale(radius * 1.6f, radius * 1.6f)
             rippleMatrix.postTranslate(ripple.x, ripple.y)
-            shader.setLocalMatrix(rippleMatrix)
-            rippleEdge.shader = shader
-            rippleEdge.strokeWidth = dp(2.4f)
+            light.setLocalMatrix(rippleMatrix)
             rippleEdge.alpha = (255f * fade).toInt()
-            val corner = chromeRadius(context, look) * 3f
             canvas.drawRoundRect(glassBox, corner, corner, rippleEdge)
-            shader.setLocalMatrix(null)
         }
     }
 
@@ -616,13 +620,13 @@ class TerminalPanel @JvmOverloads constructor(
             styled(TextRole.TITLE, 12.5f)
         }
         header.addView(title, LinearLayout.LayoutParams(0, WRAP, 1f))
-        header.addView(widthBox, LinearLayout.LayoutParams(WRAP, WRAP).apply { marginStart = dpi(6f) })
-        header.addView(heightBox, LinearLayout.LayoutParams(WRAP, WRAP).apply { marginStart = dpi(5f) })
+        header.addView(widthBox, LinearLayout.LayoutParams(WRAP, WRAP).apply { marginStart = dpi(4f) })
+        header.addView(heightBox, LinearLayout.LayoutParams(WRAP, WRAP).apply { marginStart = dpi(4f) })
         val shrink = ShrinkButton(context).apply {
             contentDescription = context.getString(R.string.terminal_shrink)
             setOnClickListener { showMinimized(true, animate = true) }
         }
-        header.addView(shrink, LinearLayout.LayoutParams(dpi(42f), dpi(36f)).apply { marginStart = dpi(2f) })
+        header.addView(shrink, LinearLayout.LayoutParams(dpi(48f), dpi(48f)).apply { marginStart = dpi(2f) })
         header.setOnTouchListener(dragHandle())
         return header
     }

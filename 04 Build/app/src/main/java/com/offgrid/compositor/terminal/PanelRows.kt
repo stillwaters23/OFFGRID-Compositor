@@ -5,6 +5,7 @@ import android.content.res.ColorStateList
 import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
@@ -20,6 +21,7 @@ import android.text.TextWatcher
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.HapticFeedbackConstants
+import android.view.TouchDelegate
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
@@ -396,11 +398,11 @@ internal class NumberBox(
         val number = typed.toIntOrNull()
         when {
             number == null -> {
-                show(value)
+                revert()
                 onProblem(context.getString(R.string.terminal_number_empty))
             }
             number > 100 -> {
-                show(value)
+                revert()
                 onProblem(context.getString(R.string.terminal_number_too_big, number))
             }
             else -> {
@@ -420,6 +422,16 @@ internal class NumberBox(
                 }
             }
         }
+    }
+
+    /**
+     * Puts back the last saved number. Part of a wrong number, like 15 on the way to 150,
+     * was already tried while typing, so that is undone too. Nothing changes.
+     */
+    private fun revert() {
+        val tried = value
+        show(announced)
+        if (tried != announced) onChange(announced, false)
     }
 
     override fun applyLook(look: PanelLook) {
@@ -884,7 +896,13 @@ internal class SizeBox(
         addView(name, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply {
             bottomMargin = Hud.dpi(context, 2f)
         })
-        addView(box, LayoutParams(Hud.dpi(context, 44f), Hud.dpi(context, 30f)))
+        addView(box, LayoutParams(Hud.dpi(context, 48f), Hud.dpi(context, 36f)))
+    }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        // A tap on the name above the box opens the box too, so the whole spot is easy to hit.
+        touchDelegate = TouchDelegate(Rect(0, 0, w, h), box)
     }
 
     override fun applyLook(look: PanelLook) {

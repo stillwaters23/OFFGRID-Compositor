@@ -81,6 +81,11 @@ internal class LaserTypeView(context: Context) : AppCompatTextView(context) {
     private var cacheKey = 0
     private val lineLayouts = SparseArray<StaticLayout>()
 
+    /** The line being typed right now, kept until the next letter shows. */
+    private var partial: StaticLayout? = null
+    private var partialLine = -1
+    private var partialEnd = -1
+
     private val blink = object : Runnable {
         override fun run() {
             if (!blinking) return
@@ -287,11 +292,25 @@ internal class LaserTypeView(context: Context) : AppCompatTextView(context) {
     private fun lineLayout(textLayout: Layout, line: Int, start: Int, end: Int): StaticLayout {
         val finished = end == textLayout.getLineEnd(line)
         if (finished) lineLayouts.get(line)?.let { return it }
+        if (line == partialLine && end == partialEnd) partial?.let { return it }
         val built = StaticLayout.Builder.obtain(text, start, end, laserPaint, LINE_WIDTH)
             .setIncludePad(false)
             .build()
-        if (finished) lineLayouts.put(line, built)
+        if (finished) {
+            lineLayouts.put(line, built)
+        } else {
+            partial = built
+            partialLine = line
+            partialEnd = end
+        }
         return built
+    }
+
+    private fun forgetLines() {
+        lineLayouts.clear()
+        partial = null
+        partialLine = -1
+        partialEnd = -1
     }
 
     /** The picture of finished lines. It starts over when the text, its size, or its colors change. */
@@ -314,12 +333,12 @@ internal class LaserTypeView(context: Context) : AppCompatTextView(context) {
             glowCanvas = Canvas(cache)
             cacheKey = key
             cachedLines = 0
-            lineLayouts.clear()
+            forgetLines()
         } else if (key != cacheKey) {
             cache.eraseColor(0)
             cacheKey = key
             cachedLines = 0
-            lineLayouts.clear()
+            forgetLines()
         }
         return cache
     }
@@ -329,7 +348,7 @@ internal class LaserTypeView(context: Context) : AppCompatTextView(context) {
         glowCache = null
         glowCanvas = null
         cachedLines = 0
-        lineLayouts.clear()
+        forgetLines()
     }
 
     /** One solid block in one color. A soft glow is drawn around it only when Cursor glow is above 0. */
