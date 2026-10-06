@@ -19,6 +19,12 @@
 
 ---
 
+## Terminal communication rule
+
+Everything the terminal says to Royalty, including guidance lines, IP leak alerts, status messages, and spoken text, is written like it's talking to a 13-year-old who's new to the cyber world. That means simple words, short sentences, and acronyms spelled out with a one-line meaning. For example, instead of "WebRTC leak detected," it says "Your real internet address is showing. Turn on Stealth mode now." The full rule is in `06 Prompts and Skills/Terminal Plain Language Rule.md`.
+
+---
+
 ## Ongoing feature list
 
 1. **Drawing effects.** Draw on yourself during a live stream. The ink can stay fixed on the screen or be pinned to the face so it moves with you. It has to be baked into the outgoing video so the PK opponent and viewers see it.
