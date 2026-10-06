@@ -39,7 +39,7 @@
 16. **Audio-reactive terminal UI (new).** The terminal's folders, toggles, and glow pulse to music and voices, baked into the outgoing video so viewers see it, with a typed 0 to 100 sensitivity.
 17. **Traveling glow border (new).** A glowing border loops around the video box, synced to Royalty's heartbeat or the audio pulse.
 18. **Fireworks bursts (new).** Fireworks burst when a toggle flips or a gift lands.
-19. **Platform status prompt (new).** Each platform folder shows a read-only line: app or web only, the exact web address, and which Android browser to use.
+19. **Folder guidance panel (new).** Every platform and effect folder shows a laser typewriter guidance panel: what you can do, app or web, browser, VPN setup, and which phone to use.
 20. **Portals and wormholes (new).** A swirling portal or wormhole opens inside Royalty's video box.
 21. **Flying superheroes (new).** Original animated heroes fly around inside the video box, picked from a set.
 22. **Roller coaster (new).** An animated coaster track and cars ride through the video box.
@@ -212,17 +212,19 @@ Related design references are in `03 Design/References`. The toggles there shoul
 - On/off toggle. Burst size, count, and duration are typed numbers from 0 to 100, never sliders.
 - Scope only. Nothing is built yet.
 
-## 19. Platform status prompt
+## 19. Folder guidance panel (expanded from the platform status prompt)
 
-**What it does:** when Royalty opens a platform folder in the terminal panel, the folder shows a clear status line. It's read-only guidance, not a control.
+**What it does:** every platform folder and every effect folder in the terminal panel shows a guidance panel in the OFFGRID laser typewriter font, typed out letter by letter with the same hard block cursor. It's read-only guidance, not a control.
 
-- Folders: Bigo Live, Tagged, MeetMe, SuperLive, TikTok, Twitch, Kick, YouTube Live, Trovo, Telegram, and Tango.
-- Each status line says:
-  1. Whether the platform works through its native app or only through the web.
-  2. Which exact web address to use. For example, meetme.com belongs to the MeetMe app's company, but meetme.video is a separate browser-only site, so the prompt makes clear which one is right.
-  3. Which Android browser to use, if the effects feed needs a specific one.
-- The values come from the research in `02 Research` and the results of the platform test toggles (feature 15), so the prompts are filled in only after testing confirms them.
-- Browser note: Kiwi Browser was reportedly discontinued in early 2025, so confirm a browser is still maintained before listing it.
+- Platform folders: Bigo Live, Tagged, MeetMe, SuperLive, TikTok, Twitch, Kick, YouTube Live, Trovo, Telegram, and Tango. Every effect folder gets one too.
+- Each guidance panel tells Royalty:
+  1. **What you can and can't do** in that folder.
+  2. **Where you can and can't do it:** the native app or the website only, with the exact web address. For example, meetme.com belongs to the MeetMe app's company, but meetme.video is a separate browser-only site.
+  3. **Which Android browser to use** (Chrome, Firefox, Brave, or Kiwi Browser) and where to download it. Kiwi Browser was reportedly discontinued in early 2025, so confirm it's still maintained and safe before listing it.
+  4. **VPN setup required:** ProtonVPN in Stealth mode, with a Philippines exit server for PH streams. Order matters: create the Cloaked number with the VPN off first, then turn on Stealth mode before opening the app.
+  5. **Which phone to use:** dummy phone 1, dummy phone 2, S24, S25 Ultra, or A37.
+- The values come from the research in `02 Research` and the results of the platform test toggles (feature 15), so each panel is filled in only after testing confirms it.
+- The full per-folder template is in `06 Prompts and Skills/Folder Guidance Panel.md`.
 - Scope only. Nothing is built yet.
 
 ## 20. Portals and wormholes
