@@ -4,7 +4,7 @@
 **Owner:** Royalty  
 **Status:** Scope only. Nothing is built yet.  
 **Target:** Royalty's private Android build first (Galaxy S25 Ultra and Galaxy A37). A PC and OBS version can come later.  
-**Updated:** 2026-10-06 (America/Chicago). Features up to 31. ElevenLabs removed from all voice options.
+**Updated:** 2026-10-06 (America/Chicago). Features up to 33. ElevenLabs removed from all voice options.
 
 ---
 
@@ -59,6 +59,8 @@ Everything the terminal says to Royalty, including guidance lines, IP leak alert
 29. **Red sweep kick animation (new).** An extra-long red carpet-style sweep rolls across Royalty's video box when the kick toggle flips, in all 11 platform folders.
 30. **Depth shift (new).** Royalty's video seems to burst out of the screen toward the viewer, then snaps back.
 31. **Laser calligraphy writing (new).** A laser beam writes Royalty's typed words in calligraphy across the video box in real time.
+32. **Radar sweep (new).** A security-scanner radar beam rotates around Royalty's video box, pinging as it goes.
+33. **Echo trail (new).** Fading copies of Royalty's movements trail behind for about a second, then dissolve.
 
 Related design references are in `03 Design/References`. The toggles there should all look exactly the same as each other, and the typewriter style follows the Grok Bot Laser Typewriter UI Spec.
 
@@ -380,6 +382,24 @@ Related design references are in `03 Design/References`. The toggles there shoul
 - It's baked into the outgoing video, following the core design rule, so viewers see it. Following Royalty's rule, if viewers can't see it on their phone, it's rejected. It has to pass the viewer-side success code check before HR can mark it PASS.
 - Text is typed into the terminal panel. Message length, writing speed, letter size, glow strength, and how long the words stay are typed numbers, never sliders. Laser color is a picker.
 - An optional laser buzz sound comes from the soundboard (feature 6).
+- Scope only. Nothing is built yet.
+
+## 32. Radar sweep
+
+**What it does:** a radar beam rotates around Royalty's video box like a security scanner, with a glowing sweep line and fading trail, pinging as it goes.
+
+- Each pass can light up small blips. The ping is mixed into the outgoing stream audio so viewers hear it, and it can be muted.
+- It's baked into the outgoing video, following the core design rule, and it has to pass the viewer-side success code check before HR can mark it PASS.
+- On/off toggle. Sweep speed, size, glow strength, and ping volume are typed numbers from 0 to 100, never sliders. The beam color is a picker.
+- Scope only. Nothing is built yet.
+
+## 33. Echo trail
+
+**What it does:** as Royalty moves, fading copies of Royalty trail behind for about a second, then dissolve.
+
+- Royalty is cut out from the background, and the last moments of movement are layered behind as see-through copies that fade out.
+- It's baked into the outgoing video, following the core design rule, and it has to pass the viewer-side success code check before HR can mark it PASS.
+- On/off toggle. Trail length (default about 1 second), number of copies, and fade strength are typed numbers, never sliders.
 - Scope only. Nothing is built yet.
 
 ## Potential future feature: floating text overlay on calls
