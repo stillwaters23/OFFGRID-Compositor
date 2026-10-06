@@ -3,8 +3,19 @@
 **Project:** OFFGRID-Compositor  
 **Owner:** Royalty  
 **Status:** Scope only. Nothing is built yet.  
-**Target:** Royalty's private Android build first (Galaxy S25 Ultra and Galaxy A37). A PC and OBS version can come later.  
-**Updated:** 2026-10-06 (America/Chicago). Features up to 37. Platform folders: 19. ElevenLabs removed from all voice options.
+**Target:** Royalty's private Android build only (Galaxy S25 Ultra and Galaxy A37). Android-only is a hard rule; there's no PC or OBS version.  
+**Updated:** 2026-10-06 (America/Chicago). Features up to 37. Platform folders: 18. Android-only. ElevenLabs removed from all voice options.
+
+---
+
+## Android-only rule (hard rule)
+
+OFFGRID-Compositor is Android-only. Royalty has no computer and won't use one. Every feature, platform folder, test toggle, guidance panel, and build step must work entirely on Android phones.
+
+- Anything that needs a PC is marked **not applicable (needs a computer)** and stays off the Android build path. That includes OBS, stream keys you can only get from a computer, virtual cameras on a computer, and desktop or computer-browser versions of apps.
+- Stream keys are allowed only if Royalty can get them on the phone, and OFFGRID sends the stream itself, from the phone.
+- On the phone, calling apps carry OFFGRID's effects only through screen share (OFFGRID shown full screen) or through an official developer kit that runs inside OFFGRID (like Zoom's).
+- Web routes use a browser on the phone, never a computer.
 
 ---
 
@@ -18,7 +29,7 @@ No API keys, passwords, tokens, stream keys, or other sensitive credentials go i
 
 **Every effect is seen by the other side.**
 
-- In every platform folder (Bigo Live, Tagged, MeetMe, SuperLive, TikTok, Twitch, Kick, YouTube Live, Trovo, Telegram, Tango, Instagram, Messenger, WhatsApp, Zoom, Google Meet, Discord, Microsoft Teams, and Desktop-Only Apps), every effect must render into the outgoing video so the other person sees it on their end. Nothing in those folders stays local-only.
+- In every platform folder (Bigo Live, Tagged, MeetMe, SuperLive, TikTok, Twitch, Kick, YouTube Live, Trovo, Telegram, Tango, Instagram, Messenger, WhatsApp, Zoom, Google Meet, Discord, and Microsoft Teams), every effect must render into the outgoing video so the other person sees it on their end. Nothing in those folders stays local-only.
 - Each platform folder is its own lane, with only what that platform allows.
 - **If viewers can't see it on their phone, it's rejected.** Every effect must pass the viewer-side success code check (see `06 Prompts and Skills/Agent Lanes and HR Review.md`) before it's accepted.
 - **OFFGRID-to-OFFGRID calling is the exception and the premium lane.** There, everything is visible to everyone on both sides: all effects, toggles, the terminal UI, audio-reactive pulses, everything.
@@ -46,7 +57,7 @@ Everything the terminal says to Royalty, including guidance lines, IP leak alert
 10. **Cloaking effect (new).** Predator-style cloak. Royalty's video box looks like empty void to the other person.
 11. **Camera blackout and cloaking modes (new).** Pick solid black, the cloak void, or a status label like "CLOAKED."
 12. **Screen takeover and flip-flop switch (new).** Make Royalty's video fill the screen, and swap who's big and who's small.
-13. **Terminal panel (new).** The draggable, see-through master control panel with platform folders for Bigo Live, Tagged, MeetMe, SuperLive, TikTok, Twitch, Kick, YouTube Live, Trovo, Telegram, Tango, Instagram, Messenger, WhatsApp, Zoom, Google Meet, Discord, Microsoft Teams, and Desktop-Only Apps.
+13. **Terminal panel (new).** The draggable, see-through master control panel with platform folders for Bigo Live, Tagged, MeetMe, SuperLive, TikTok, Twitch, Kick, YouTube Live, Trovo, Telegram, Tango, Instagram, Messenger, WhatsApp, Zoom, Google Meet, Discord, and Microsoft Teams.
 14. **Self-call and secure handshake (new, folder 8).** Phones swap 300-character codes before an OFFGRID call. The codes rotate after every call, and blocked people's codes stop working.
 15. **Platform test toggles (new, private).** Test toggles in every platform folder that check what each platform allows.
 16. **Audio-reactive terminal UI (new).** The terminal's folders, toggles, and glow pulse to music and voices, baked into the outgoing video so viewers see it, with a typed 0 to 100 sensitivity.
@@ -193,8 +204,7 @@ Related design references are in `03 Design/References`. The toggles there shoul
   16. Google Meet (new)
   17. Discord (new)
   18. Microsoft Teams (new)
-  19. Desktop-Only Apps: Viber, LINE, and Signal (new)
-- The new folders 12 to 19 are detailed in "New platform folders (calling apps)" below.
+- The new folders 12 to 18 are detailed in "New platform folders (calling apps)" below.
 - **Real time:** tapping a folder item or flipping a switch triggers that effect right away on the outgoing stream.
 - The folder style follows feature 5 (Termux-style nested folders with bioluminescent glow-stick folders) and the identical toggles in `03 Design/References`.
 - Each platform's research is in `02 Research` or on Rex's computer, and that research decides what goes in its folder.
@@ -206,26 +216,25 @@ These folders are built the same way as the original 11. Each one gets its own l
 
 The research is in `02 Research/Messenger Instagram WhatsApp Research.md` and `02 Research/Other Android Video Call Apps Research.md`.
 
-Two limits apply to every calling app. Stock Android has no virtual camera, so OFFGRID can't act as a camera inside these apps on the phone. Voice effects in calls are unproven, so audio has to be tested first.
+These are Android-only routes (see the Android-only rule). Two limits apply to every calling app. Stock Android has no virtual camera, so OFFGRID can't act as a camera inside these apps. That leaves screen share, with OFFGRID shown full screen, or an official developer kit inside OFFGRID. Voice effects in calls are unproven, so audio has to be tested first.
 
 | Folder | Rating | Best route | App or web | Browser | Phone |
 |---|---|---|---|---|---|
-| Instagram | Works for Live, partial for calls | Live Producer stream key into OFFGRID's stream output or OBS. Calls use screen share. | Stream key from instagram.com on a computer. Calls in the app. | Chrome (computer, for the key) | Dummy phone 1 or 2 |
-| Messenger | Partial | Screen share during a call on the phone, or a virtual camera at facebook.com/messages on a computer. Broadcasts go through Facebook Live instead. | App for screen share, web for the virtual camera | Chrome | Dummy phone 1 or 2 |
-| WhatsApp | Partial | Screen share during a video call on the phone. A virtual camera on WhatsApp Desktop or Web is untested. | App | Chrome (WhatsApp Web, untested) | Dummy phone 1 or 2 |
-| Zoom | Works (best) | OFFGRID's own Zoom Meeting SDK client sends its finished video into meetings Royalty hosts. Fallback is screen share. | OFFGRID app (SDK), or the Zoom app or app.zoom.us | Chrome | Dummy phone 1 or 2 (dummy Zoom account) |
-| Google Meet | Works through screen share | Screen share in the Meet app, or meet.google.com with a virtual camera on a computer | App or web | Chrome | Dummy phone 1 or 2 |
-| Discord | Works through screen share | Go Live screen share in the Android app, or discord.com/app on a computer | App or web | Chrome | Dummy phone 1 or 2 |
-| Microsoft Teams (Free) | Works through screen share | Screen share in the app, or teams.live.com with a virtual camera on a computer. Free meetings cap at 60 minutes. | App or web | Edge or Chrome | Dummy phone 1 or 2 |
-| Desktop-Only Apps (Viber, LINE, Signal) | Partial | Screen share from each app's computer version. None has web calling, and their developer tools don't touch calls. | Computer app only | None | Computer, later PC version |
+| Instagram | Partial: Live stream key not available | Calls use screen share during a video call in the app. **Not applicable (needs a computer):** the Live Producer stream key, since it's only copied from instagram.com on a computer, plus OBS. | App | None needed | Dummy phone 1 or 2 |
+| Messenger | Partial | Screen share during a call in the app. **Not applicable (needs a computer):** the virtual camera at facebook.com/messages. | App | None needed | Dummy phone 1 or 2 |
+| WhatsApp | Partial | Screen share during a video call in the app. **Not applicable (needs a computer):** a virtual camera on WhatsApp Desktop or Web. | App | None needed | Dummy phone 1 or 2 |
+| Zoom | Works (best) | OFFGRID's own Zoom Meeting SDK client on the phone sends its finished video into meetings Royalty hosts. Fallback is screen share in the Zoom app. | OFFGRID app (SDK), or the Zoom app | None needed | Dummy phone 1 or 2 (dummy Zoom account) |
+| Google Meet | Works through screen share | Screen share in the Meet app. **Not applicable (needs a computer):** meet.google.com with a virtual camera. | App | None needed | Dummy phone 1 or 2 |
+| Discord | Works through screen share | Go Live screen share in the Android app. **Not applicable (needs a computer):** discord.com/app with a virtual camera. | App | None needed | Dummy phone 1 or 2 |
+| Microsoft Teams (Free) | Works through screen share | Screen share in the app. Free meetings cap at 60 minutes. **Not applicable (needs a computer):** teams.live.com with a virtual camera. | App | None needed | Dummy phone 1 or 2 |
 
 **Folder notes**
-- **Instagram:** Live Producer needs a public Creator or Business account with at least 1,000 followers, and access is still limited, so check that the option shows up. The key changes every session and is never saved in the repo or chat. Instagram's developer tools can read your own live comments into the terminal panel, but they can't send video.
-- **Messenger:** the Messenger desktop apps and messenger.com are gone. Use facebook.com/messages. There are reports that the virtual camera sometimes freezes on a still frame. Meta's business calling tools don't cover the US.
+- **Instagram:** the Instagram Live stream key (Live Producer) is **unavailable for Royalty's Android-only setup**, because the key can only be copied from instagram.com on a computer. It also needs a public Creator or Business account with at least 1,000 followers. If Instagram ever offers the key on the phone, it can be re-researched. Instagram's developer tools can read your own live comments into the terminal panel, but they can't send video.
+- **Messenger:** use the Android app with screen share. The computer routes don't apply. Meta's business calling tools don't cover the US. For broadcasts, the Facebook Live stream key works only if it can be gotten on the phone, so that's `UNCONFIRMED` until tested.
 - **WhatsApp:** never touch or modify the WhatsApp app itself. Modified apps like GB WhatsApp get accounts banned. The business calling tools need a separate business number and verification, so they're not used here.
-- **Zoom:** joining meetings hosted by other accounts needs Zoom's app review and a sign-in token, as of March 2, 2026. Stream-key output needs a paid Pro plan and the desktop app.
+- **Zoom:** joining meetings hosted by other accounts needs Zoom's app review and a sign-in token, as of March 2, 2026. Zoom's stream-key output needs the desktop app, so it's not applicable.
 - **Microsoft Teams (Free):** Skype was retired on May 5, 2025 and replaced by Teams Free, so there's no Skype folder.
-- **Skipped:** FaceTime (iOS-only), Skype (retired), and WeChat (its video tools are limited to approved Chinese businesses). Telegram already has a folder.
+- **Skipped:** FaceTime (iOS-only), Skype (retired), WeChat (its video tools are limited to approved Chinese businesses), and Viber, LINE, and Signal (screen share in calls only exists in their computer versions, so they're not applicable for Android-only). Telegram already has a folder.
 
 ## 14. Self-call and secure handshake (folder 8)
 
@@ -244,7 +253,7 @@ Two limits apply to every calling app. Stock Android has no virtual camera, so O
 
 **What it does:** every platform folder in the terminal panel gets a set of test toggles that check what that platform allows. They're for Royalty's private testing only and don't ship as user-facing features.
 
-- Folders: Bigo Live, Tagged, MeetMe, SuperLive, TikTok, Twitch, Kick, YouTube Live, Trovo, Telegram, Tango, Instagram, Messenger, WhatsApp, Zoom, Google Meet, Discord, Microsoft Teams, and Desktop-Only Apps.
+- Folders: Bigo Live, Tagged, MeetMe, SuperLive, TikTok, Twitch, Kick, YouTube Live, Trovo, Telegram, Tango, Instagram, Messenger, WhatsApp, Zoom, Google Meet, Discord, and Microsoft Teams.
 - Example tests in each folder:
   - Does burned-in video work?
   - Does the site or app accept an outside video feed?
@@ -288,7 +297,7 @@ Two limits apply to every calling app. Stock Android has no virtual camera, so O
 
 **What it does:** every platform folder and every effect folder in the terminal panel shows a guidance panel in the OFFGRID laser typewriter font, typed out letter by letter with the same hard block cursor. It's read-only guidance, not a control.
 
-- Platform folders: Bigo Live, Tagged, MeetMe, SuperLive, TikTok, Twitch, Kick, YouTube Live, Trovo, Telegram, Tango, Instagram, Messenger, WhatsApp, Zoom, Google Meet, Discord, Microsoft Teams, and Desktop-Only Apps. Every effect folder gets one too.
+- Platform folders: Bigo Live, Tagged, MeetMe, SuperLive, TikTok, Twitch, Kick, YouTube Live, Trovo, Telegram, Tango, Instagram, Messenger, WhatsApp, Zoom, Google Meet, Discord, and Microsoft Teams. Every effect folder gets one too.
 - Each guidance panel tells Royalty:
   1. **What you can and can't do** in that folder.
   2. **Where you can and can't do it:** the native app or the website only, with the exact web address. For example, meetme.com belongs to the MeetMe app's company, but meetme.video is a separate browser-only site.
@@ -492,7 +501,7 @@ Two limits apply to every calling app. Stock Android has no virtual camera, so O
 - **Flagged for research:** every failed item is automatically flagged for more research later.
 - **Screenshots:** Royalty screenshots failed results and brings them back in a future session to review. The failed list is laid out so one screenshot shows the folder, the test, the date, and the note.
 - **Where it shows:** next to each test toggle in its folder, plus a `RESULTS` line in that folder's guidance panel (feature 19).
-- **Which folders:** every platform folder. That's the original 11 (Bigo Live, Tagged, MeetMe, SuperLive, TikTok, Twitch, Kick, YouTube Live, Trovo, Telegram, and Tango), plus the new Instagram, Messenger, WhatsApp, Zoom, Google Meet, Discord, Microsoft Teams, and Desktop-Only Apps folders.
+- **Which folders:** every platform folder. That's the original 11 (Bigo Live, Tagged, MeetMe, SuperLive, TikTok, Twitch, Kick, YouTube Live, Trovo, Telegram, and Tango), plus the new Instagram, Messenger, WhatsApp, Zoom, Google Meet, Discord, and Microsoft Teams folders.
 - **Private:** this is a testing tool, not an effect, so it never appears in the outgoing video.
 - Results stay on the phone. They hold no logins, numbers, or keys.
 - All text follows the Terminal Plain Language Rule.
@@ -522,7 +531,7 @@ Two limits apply to every calling app. Stock Android has no virtual camera, so O
 
 ## Rules carried over
 
-- Android first. PC and OBS come later.
+- Android only. There's no PC or OBS version (hard rule).
 - Test with a dummy account and protect the paid big-gifter account.
 - Credentials never go in chat or in this repo.
 - Don't build anything until Royalty says go.
