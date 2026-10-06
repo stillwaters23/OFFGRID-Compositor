@@ -9,6 +9,19 @@ Read `06 Prompts and Skills/Bootstrap.md` first. This is the full pipeline from 
 
 Each step goes to one lane (Agent 01, 02, or 03). **Agent 04** is the HR Manager and oversees Agents 01, 02, and 03. (`Agent Lanes and HR Review.md` calls this role the HR Manager. It's the same agent.) Every step ends with an Agent 04 review: **PASS**, **FAIL**, or **BLOCKED**, with evidence. A step is done only on PASS. See `Agent Lanes and HR Review.md`.
 
+## Read everything first (read only)
+
+Before starting any task, each agent (01, 02, and 03) must read **all** documents in the repo:
+- `06 Prompts and Skills/Bootstrap.md`
+- `06 Prompts and Skills/Bootloader.md`
+- `06 Prompts and Skills/Agent Lanes and HR Review.md`
+- `06 Prompts and Skills/Folder Guidance Panel.md`
+- `06 Prompts and Skills/Terminal Plain Language Rule.md`
+- `01 Brainstorm/Feature Scope.md`
+- Every research doc in `02 Research`
+
+This is **reading only**. Reading about other features never means working on them. Each agent works only on its assigned step and never starts, changes, or fixes any other task or feature.
+
 ## The build loop
 
 1. **Start.** Royalty says go once to start the loop.
@@ -16,8 +29,9 @@ Each step goes to one lane (Agent 01, 02, or 03). **Agent 04** is the HR Manager
 3. **Build until it's right.** Each agent works its step until the code is right. On **FAIL**, Agent 04 sends it back to the same agent with a fix list, and the agent fixes it. An agent never moves on until its step passes.
 4. **Review.** Agent 04 reviews the step against the brief and the step's acceptance checks, including the viewer-side success code.
 5. **Pause.** When a step gets **PASS**, the system says **"pause."** During the pause, the agent stops and Agent 04 logs the result in `05 Docs/Build Log.md`.
-6. **Next task.** After the pause, that agent automatically gets the next open step. Royalty doesn't need to say go each time.
-7. **Repeat.** The loop repeats until every step is done.
+6. **Next task.** After Agent 04 says PASS and the pause, the agents move on to the next open steps automatically. Royalty doesn't need to say go each time.
+7. **Agent scaling.** Only as many agents work as there are open steps. If only two steps are left, only two agents work. If only one is left, only one agent works. Any agent without an assigned step stays idle and doesn't touch the code.
+8. **Repeat.** The loop repeats until every step is done.
 
 **When the loop stops:**
 - Royalty says **stop**.
