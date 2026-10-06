@@ -32,7 +32,7 @@ internal class ToggleItem(
 /** A button that does one thing, like Reset all. */
 internal class ActionItem(val action: PanelAction, val label: String, val help: String) : PanelItem()
 
-internal enum class PanelAction { RESET_ALL }
+internal enum class PanelAction { RESET_ALL, CENTER_PANEL }
 
 /** One ready-made theme. Tapping it applies it. */
 internal class ThemeItem(val theme: Theme) : PanelItem()
@@ -125,18 +125,65 @@ internal object PanelTree {
         return PanelFolder(id = "home", title = "HOME", tag = null, kind = FolderKind.SETTINGS, folders = top)
     }
 
-    /** Panel settings, with the theme office inside it. */
+    /**
+     * Panel settings. Every control sits inside a folder. Nothing is loose here.
+     * The theme office is the Themes, Colors, Glow effects, and Toggle style folders.
+     */
     private fun settingsFolder() = PanelFolder(
         id = "panel_settings",
         title = "Panel settings",
         tag = null,
         kind = FolderKind.SETTINGS,
-        folders = listOf(themesFolder(), colorsFolder(), glowFolder(), toggleStyleFolder()),
+        folders = listOf(
+            sizeFolder(),
+            displayFolder(),
+            themesFolder(),
+            colorsFolder(),
+            glowFolder(),
+            toggleStyleFolder(),
+            resetFolder(),
+        ),
+        notes = listOf(
+            "Every setting is in a folder. Tap a folder to open it.",
+            "Type a number from 0 to 100. Then tap Done.",
+            "Green toggle means on. Red toggle means off.",
+            "No sliders here. Only typed numbers and toggles.",
+        ),
+    )
+
+    private fun sizeFolder() = PanelFolder(
+        id = "size",
+        title = "📁 Size",
+        tag = null,
+        kind = FolderKind.OFFICE,
         items = listOf(
+            NumberItem(LookKeys.WIDTH, "Width", "0 is the narrowest panel. 100 is the widest."),
+            NumberItem(LookKeys.HEIGHT, "Height", "0 is the shortest panel. 100 is the tallest."),
+            ActionItem(PanelAction.CENTER_PANEL, "Center panel", "Moves the panel to the middle of the screen."),
+            ToggleItem(
+                LookKeys.CENTER_GUIDE,
+                "Center guide",
+                "A soft cross shows the middle while you drag.",
+                true,
+                isTest = false,
+            ),
             NumberItem(LookKeys.OPACITY, "Opacity", "How solid the panel looks. 0 is clear. 100 is solid."),
             NumberItem(LookKeys.FONT_SIZE, "Font size", "How big the words are. 50 is normal."),
             NumberItem(LookKeys.CORNERS, "Corner roundness", "0 is square. 100 is very round."),
             NumberItem(LookKeys.TYPING, "Typing speed", "How fast the laser types."),
+        ),
+        notes = listOf(
+            "Width and Height are also at the top of the panel.",
+            "Pinch with two fingers, or drag the corner lines, to resize.",
+        ),
+    )
+
+    private fun displayFolder() = PanelFolder(
+        id = "display",
+        title = "📁 Display",
+        tag = null,
+        kind = FolderKind.OFFICE,
+        items = listOf(
             ToggleItem(
                 LookKeys.TEST_DIAMOND,
                 "Test diamond",
@@ -154,13 +201,39 @@ internal object PanelTree {
                 true,
                 isTest = false,
             ),
+            ToggleItem(
+                LookKeys.TITANIUM_FRAME,
+                "Titanium frame",
+                "Dark titanium and carbon fiber around the glass.",
+                true,
+                isTest = false,
+            ),
+            ToggleItem(
+                LookKeys.SAPPHIRE_GLASS,
+                "Sapphire glass",
+                "Thick, deep glass behind open folders.",
+                true,
+                isTest = false,
+            ),
+            ToggleItem(LookKeys.TICK, "Tick when saved", "Your phone ticks softly when a number is saved.", true, isTest = false),
+        ),
+        notes = listOf(
+            "These change what the panel shows.",
+            "The tick follows your phone's own touch feel setting.",
+        ),
+    )
+
+    private fun resetFolder() = PanelFolder(
+        id = "reset",
+        title = "📁 Reset",
+        tag = null,
+        kind = FolderKind.OFFICE,
+        items = listOf(
             ActionItem(PanelAction.RESET_ALL, "Reset all to default", "Puts every panel setting back to the start."),
         ),
         notes = listOf(
-            "Type a number from 0 to 100. Then tap Done.",
-            "Green toggle means on. Red toggle means off.",
-            "The theme office folders: Themes, Colors, Glow effects, and Toggle style.",
-            "No sliders here. Only typed numbers and toggles.",
+            "Reset all asks first. Nothing changes until you say yes.",
+            "Your private test marks stay.",
         ),
     )
 
@@ -194,7 +267,7 @@ internal object PanelTree {
         title = "📁 ${part.title}",
         tag = null,
         kind = FolderKind.COLOR,
-        items = listOf(ColorItem(part)),
+        items = listOf(ColorItem(part)) + PART_EXTRAS[part].orEmpty(),
         notes = listOf(
             PART_HELP.getValue(part),
             "Type a hex code like #00FF66, then tap Done.",
@@ -203,12 +276,19 @@ internal object PanelTree {
         ),
     )
 
+    /** Extra settings that live next to a color. The cursor's soft glow is off at the start. */
+    private val PART_EXTRAS = mapOf(
+        ColorPart.CURSOR to listOf(
+            NumberItem(LookKeys.CURSOR_GLOW, "Cursor glow", "A soft glow around the cursor. 0 is a solid block only."),
+        ),
+    )
+
     private val PART_HELP = mapOf(
         ColorPart.SKIN to "This colors the panel glass.",
         ColorPart.EDGE to "This colors the thin line around the panel.",
         ColorPart.OUTER_GLOW to "This colors the soft glow outside the panel.",
         ColorPart.TEXT to "This colors the typed guidance text.",
-        ColorPart.CURSOR to "This colors the laser cursor's glow.",
+        ColorPart.CURSOR to "This colors the laser cursor. It is one solid color.",
         ColorPart.TOGGLE_GLOW to "This colors the swirl inside each toggle.",
         ColorPart.FOLDER to "This colors the folder icons.",
         ColorPart.SIDE_TEXT to "This colors the folder names.",
@@ -234,6 +314,8 @@ internal object PanelTree {
                 isTest = false,
             ),
             NumberItem(LookKeys.SWIRL_SPEED, "Swirl speed", "How fast all the liquid light moves."),
+            ToggleItem(LookKeys.TOUCH_GLOW, "Touch glow", "Light ripples where you touch the panel's edge.", true, isTest = false),
+            ToggleItem(LookKeys.TYPING_GLOW, "Typing glow", "The box you are typing in glows softly.", true, isTest = false),
         ),
         notes = listOf(
             "Bioluminescent means it glows like living sea light.",

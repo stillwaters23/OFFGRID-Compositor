@@ -4,9 +4,11 @@ on:
   push:
     branches:
       - ccr-c441a76e-hgt5wa
+      - step-2-2-premium-panel
   pull_request:
     branches:
       - main
+      - ccr-c441a76e-hgt5wa
 
 permissions:
   contents: write
@@ -130,15 +132,17 @@ jobs:
           if-no-files-found: error
 
       - name: Attach the app file to the preview release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/ccr-c441a76e-hgt5wa'
+        if: >-
+          github.event_name == 'push' &&
+          (github.ref == 'refs/heads/ccr-c441a76e-hgt5wa' || github.ref == 'refs/heads/step-2-2-premium-panel')
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           cat > /tmp/release-notes.txt << 'EOF'
-          This is the Step 2.1 test build of OFFGRID.
-          It polishes the terminal panel and adds the theme office.
-          The yellow test diamond is now off until you turn it on.
+          This is the Step 2.2 test build of OFFGRID. Step 2.3 is in it too.
+          The terminal panel is now premium: dark titanium, carbon fiber, and thick sapphire glass.
+          Every panel setting now lives in a folder.
           The mic stays off.
 
           Sign in to GitHub in your phone browser first. This project is private.
@@ -153,40 +157,47 @@ jobs:
           5. Open OFFGRID. Tap Allow so the front camera can turn on.
 
           What to look for first
-          1. The panel is true black glass. No blue or gold is built in.
-          2. The edge and the outer glow use your phone's color palette.
-          3. The glow breathes in and out slowly, like living light.
-          4. Watch the typed words. Only typed letters show. Nothing waits behind them.
-          5. The laser cursor is very bright, with a glow around it.
-          6. Look inside the ball of any toggle. Soft light swirls inside it.
+          1. The panel opens in the exact middle of the screen.
+          2. A dark titanium frame, a carbon fiber top bar, and deep sapphire glass inside.
+          3. Titles and typed words are bright laser teal with a strong glow.
+          4. The laser cursor is one solid white block. No soft glow around it.
+          5. The corners are sharp. Corner roundness starts at 4.
+          6. Look inside the ball of any toggle. The red or green light flows inside the glass.
 
           How to test the panel
-          1. Drag the three short lines in the bottom right corner.
-             The panel gets bigger or smaller.
-             Swipe OFFGRID away from your recent apps. Open it again.
-             The panel keeps its new size and place.
-          2. Tap Panel settings. Find Test diamond. It is red, so it is off.
-             Tap it. The yellow diamond shows on the camera. Tap it again to hide it.
-          3. Tap 📁 Themes. Tap Termux Black. The panel turns plain black and green.
-             Tap Holo Classic for the Step 2 look. Tap OLED Bioluminescent to go back.
-          4. Tap BACK. Tap 📁 Colors. Tap 📁 Edge color.
-          5. In HEX CODE, type #00FF66. Tap Done. The edge turns green.
-          6. Type abc. Tap Done. The panel says the code won't work. Nothing changes.
-          7. Under MIX SIX COLORS, type 150 in Red. Tap Done.
-             The panel says the number is too big. Nothing changes.
-          8. Type 100 in Red. Tap Done. The swatch and the hex code change.
-          9. Turn on Use system color. The edge follows your phone again.
-          10. Tap BACK twice. Scroll down. Tap Reset all to default.
-              Read the question. Tap Yes, reset all. Everything goes back to the start.
-          11. In your phone's Settings, search for Remove animations. Turn it on.
-              The glow stops breathing and the toggle swirl stops.
+          1. At the top, tap the WIDTH box. Type 30. Tap Done. The panel gets narrower.
+             Type 150. Tap Done. The panel says the number is too big. Nothing changes.
+          2. Tap the HEIGHT box. Type 60. Tap Done. The panel gets taller.
+          3. Put two fingers on the panel and spread them sideways. The panel gets wider.
+             Spread them up and down. It gets taller. Spread them on a slant. Both change.
+             Watch the WIDTH and HEIGHT numbers change while you pinch.
+          4. Drag the top bar. A soft cross shows the middle of the screen.
+             Near the middle, the panel clicks into place.
+          5. Tap Panel settings. Every setting is in a folder now.
+          6. Tap 📁 Size. Width and Height here match the top boxes.
+             Tap Center panel. The panel glides to the middle.
+          7. Tap any number box. The box glows while you type.
+             If touch vibration is on, your phone ticks when the number is saved.
+          8. Touch the edge of the panel. Light ripples where your finger is.
+          9. Tap BACK. Tap 📁 Themes. Tap Titanium Sapphire for the full teal look.
+             Tap OLED Bioluminescent to go back.
+          10. Tap BACK. Tap 📁 Colors, then 📁 Laser cursor color.
+              In HEX CODE, type #00FF66. Tap Done. The cursor turns solid green.
+              Type 40 in Cursor glow. A soft glow shows. Type 0 to turn it off.
+          11. Tap BACK twice. Tap 📁 Display. Test diamond is red, so it is off.
+          12. Tap BACK. Tap 📁 Reset. Tap Reset all to default. Tap Yes, reset all.
+              The cursor is solid white again. The panel goes back to its start size.
+          13. Swipe OFFGRID away from your recent apps. Open it again.
+              Your size, place, and settings are kept.
+          14. In your phone's Settings, search for Remove animations. Turn it on.
+              The glow, the toggle swirl, and the touch ripples stop. The cursor glow stays off.
               Turn Remove animations off again when you are done.
 
           How to check the video
           1. Tap Record 5 seconds.
           2. Tap Play last video.
           3. The panel is not in the video. That is on purpose.
-          4. To see the diamond in a video, turn on Test diamond first.
+          4. To see the diamond in a video, turn on Test diamond in 📁 Display first.
           EOF
           if gh release view step-2-preview >/dev/null 2>&1; then
             gh release delete step-2-preview --yes --cleanup-tag

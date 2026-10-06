@@ -6,13 +6,19 @@ import android.animation.ObjectAnimator
 import android.animation.PropertyValuesHolder
 import android.animation.ValueAnimator
 import android.content.Context
+import android.graphics.BlendMode
 import android.graphics.Canvas
+import android.graphics.Matrix
+import android.graphics.Paint
+import android.graphics.RadialGradient
 import android.graphics.RectF
+import android.graphics.Shader
 import android.graphics.drawable.GradientDrawable
 import android.text.TextUtils
 import android.util.AttributeSet
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
@@ -35,15 +41,20 @@ import com.offgrid.compositor.R
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.hypot
+import kotlin.math.roundToInt
 
 /**
- * The floating terminal panel (Step 2, polished in Step 2.1).
+ * The floating terminal panel (Step 2, polished in Steps 2.1 and 2.2).
  *
- * True black glass with a soft living glow in the phone's own colors. A side list and
- * a grid of big glowing folders. Folders unfold like holograms. Text is laser typed.
- * Panel settings holds the theme office: themes, colors, glow effects, and toggle style.
+ * True black glass in a dark titanium frame, with a title bar on carbon fiber and a soft
+ * living glow. A side list and a grid of big glowing folders. Folders unfold like holograms
+ * onto thick sapphire glass. Titles and typed text are Laser Jet Bright.
+ * Panel settings holds only folders: Size, Display, Themes, Colors, Glow effects,
+ * Toggle style, and Reset.
  *
- * Drag the top bar to move it. Drag the bottom right corner to resize it.
+ * Drag the top bar to move it. A soft cross shows the middle while you drag.
+ * Type Width and Height at the top, from 0 to 100, pinch with two fingers, or drag the
+ * bottom right corner to resize. All three stay in step and are saved.
  * Every setting is a typed number from 0 to 100 or a toggle. There are no sliders.
  * It is Royalty's private control, so it is never painted into the saved video.
  */
@@ -65,6 +76,7 @@ class TerminalPanel @JvmOverloads constructor(
 
     private val focusSink = View(context)
     private val expanded = LinearLayout(context)
+    private val header = LinearLayout(context)
     private val statusLine = LaserTypeView(context)
     private val sideList = ScrollView(context)
     private val sideRule = GlowRule(context, vertical = true, decor = false)
@@ -77,10 +89,15 @@ class TerminalPanel @JvmOverloads constructor(
     private val pill = LinearLayout(context)
     private val pillRing = HoloRingView(context, special = true)
     private val resizeGrip = ResizeGrip(context)
+    private val widthBox: SizeBox
+    private val heightBox: SizeBox
 
     private val gridTiles = HashMap<String, FolderTile>()
     private val listRows = HashMap<String, SideRow>()
     private val themeRows = ArrayList<ThemeRow>()
+
+    /** Width and Height boxes inside the open Size folder, kept in step with the top boxes. */
+    private val sizeRows = ArrayList<Pair<String, NumberBox>>()
     private var headingRing: HoloRingView? = null
     private var guidance: LaserTypeView? = null
     private var openFolder: PanelFolder? = null
@@ -88,6 +105,7 @@ class TerminalPanel @JvmOverloads constructor(
         ?: home.folders.first().id
     private var detailAnim: Animator? = null
     private var panelAnim: Animator? = null
+    private var centerAnim: ValueAnimator? = null
     private var minimized = prefs.minimized
 
     private var placed = false
@@ -96,11 +114,30 @@ class TerminalPanel @JvmOverloads constructor(
     private var keyboardHeight = 0
     private var keyboardCover = 0
 
-    /** The glass size in dp, once Royalty drags the corner. Null means the start size. */
-    private var chosenSize: Pair<Float, Float>? = prefs.size()
+    /** The glass size in pixels while a finger is resizing. Otherwise the saved Width and Height decide. */
+    private var liveSize: Pair<Float, Float>? = null
+    private var pinch: Pinch? = null
+    private var pinchDone = false
     private var shownOnScreen = false
     private var ticking = false
     private val glassBox = RectF()
+
+    /** The row that glows while its box is typed in, and the box. */
+    private var focusHost: View? = null
+    private var focusBox: EditText? = null
+
+    /** Light ripples where a finger touched the edge. */
+    private val ripples = ArrayList<Ripple>()
+    private val ripplePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { blendMode = BlendMode.PLUS }
+    private val rippleEdge = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        blendMode = BlendMode.PLUS
+    }
+    private var rippleShader: RadialGradient? = null
+    private var rippleColor = 0
+    private val rippleMatrix = Matrix()
+
+    private var guides: SnapGuideView? = null
 
     private val barViews = ArrayList<View>()
     private val barTexts = ArrayList<TextView>()
@@ -118,7 +155,22 @@ class TerminalPanel @JvmOverloads constructor(
     }
 
     private val focusWatcher = ViewTreeObserver.OnGlobalFocusChangeListener { _, now ->
+        showTypingGlow(now)
         if (now is EditText && keyboardHeight > 0) post { keepFocusAboveKeyboard() }
+    }
+
+    /** A two finger pinch, from where it started. */
+    private class Pinch(
+        val spanX: Float,
+        val spanY: Float,
+        val width: Float,
+        val height: Float,
+        val centerX: Float,
+        val centerY: Float,
+    )
+
+    private class Ripple(val x: Float, val y: Float) {
+        var progress = 0f
     }
 
     init {
@@ -131,10 +183,27 @@ class TerminalPanel @JvmOverloads constructor(
         focusSink.importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
         addView(focusSink, LayoutParams(1, 1))
 
+        widthBox = SizeBox(
+            context,
+            context.getString(R.string.terminal_width_caption),
+            context.getString(R.string.terminal_width),
+            store.number(LookKeys.WIDTH),
+            onChange = { value, announce -> setSizePercent(LookKeys.WIDTH, value, announce) },
+            onProblem = { say(it) },
+        )
+        heightBox = SizeBox(
+            context,
+            context.getString(R.string.terminal_height_caption),
+            context.getString(R.string.terminal_height),
+            store.number(LookKeys.HEIGHT),
+            onChange = { value, announce -> setSizePercent(LookKeys.HEIGHT, value, announce) },
+            onProblem = { say(it) },
+        )
+
         expanded.orientation = LinearLayout.VERTICAL
         expanded.addView(buildHeader(), LinearLayout.LayoutParams(MATCH, WRAP))
         statusLine.minLines = 2
-        statusLine.setPadding(dpi(14f), 0, dpi(12f), dpi(6f))
+        statusLine.setPadding(dpi(14f), dpi(4f), dpi(12f), dpi(6f))
         expanded.addView(statusLine, LinearLayout.LayoutParams(MATCH, WRAP))
         expanded.addView(
             GlowRule(context, vertical = false, decor = true),
@@ -196,6 +265,12 @@ class TerminalPanel @JvmOverloads constructor(
         RecordBarLook.apply(look, barViews, barTexts, barButtons)
     }
 
+    /** The full-screen view that draws the soft center cross while the panel is dragged. */
+    fun useGuides(view: SnapGuideView) {
+        guides = view
+        view.applyLook(look)
+    }
+
     /** Lifts the panel above the keyboard while a number or color code is typed. */
     fun onKeyboardInset(bottomInset: Int) {
         keyboardHeight = bottomInset
@@ -211,6 +286,30 @@ class TerminalPanel @JvmOverloads constructor(
         backCallback.isEnabled = !hidden && !minimized && openFolder != null
     }
 
+    /** The widths the glass may take on this screen, in pixels: smallest readable, then widest. */
+    private fun widthRange(areaWidth: Int): Pair<Int, Int> {
+        val most = (areaWidth - dpi(EDGE_DP) * 2).coerceAtLeast(0)
+        return minOf(dpi(MIN_WIDTH_DP), most) to most
+    }
+
+    /** The heights the glass may take. The tallest still leaves some camera picture showing. */
+    private fun heightRange(areaHeight: Int): Pair<Int, Int> {
+        val most = (areaHeight * MAX_HEIGHT_SHARE).toInt().coerceAtLeast(0)
+        return minOf(dpi(MIN_HEIGHT_DP), most) to most
+    }
+
+    private fun sizeFor(percent: Int, range: Pair<Int, Int>): Int =
+        range.first + ((range.second - range.first) * percent.coerceIn(0, 100) / 100f).roundToInt()
+
+    private fun percentFor(size: Float, range: Pair<Int, Int>): Int {
+        if (range.second <= range.first) return 100
+        return ((size - range.first) / (range.second - range.first) * 100f).roundToInt().coerceIn(0, 100)
+    }
+
+    private fun areaWidth(): Int = (parent as? View)?.width ?: 0
+
+    private fun areaHeight(): Int = (parent as? View)?.height ?: 0
+
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         if (minimized) {
             super.onMeasure(widthMeasureSpec, heightMeasureSpec)
@@ -218,19 +317,17 @@ class TerminalPanel @JvmOverloads constructor(
         }
         val areaWidth = MeasureSpec.getSize(widthMeasureSpec)
         val areaHeight = MeasureSpec.getSize(heightMeasureSpec)
-        val edges = dpi(EDGE_DP) * 2
-        val saved = chosenSize
+        val widths = widthRange(areaWidth)
+        val heights = heightRange(areaHeight)
+        val live = liveSize
         val glassWidth: Int
         val glassHeight: Int
-        if (saved != null) {
-            glassWidth = dpi(saved.first).coerceIn(minOf(dpi(MIN_WIDTH_DP), areaWidth), areaWidth.coerceAtLeast(0))
-            glassHeight = dpi(saved.second).coerceIn(minOf(dpi(MIN_HEIGHT_DP), areaHeight), areaHeight.coerceAtLeast(0))
+        if (live != null) {
+            glassWidth = live.first.roundToInt().coerceIn(widths.first, widths.second)
+            glassHeight = live.second.roundToInt().coerceIn(heights.first, heights.second)
         } else {
-            glassWidth = minOf(areaWidth - edges, dpi(START_MAX_WIDTH_DP)).coerceAtLeast(0)
-            glassHeight = (areaHeight * START_HEIGHT_SHARE).toInt()
-                .coerceIn(dpi(START_MIN_HEIGHT_DP), dpi(START_MAX_HEIGHT_DP))
-                .coerceAtMost(areaHeight - edges)
-                .coerceAtLeast(0)
+            glassWidth = sizeFor(store.number(LookKeys.WIDTH), widths)
+            glassHeight = sizeFor(store.number(LookKeys.HEIGHT), heights)
         }
         // The side list shrinks a little with the panel, so the open folder keeps its room.
         // A very narrow panel hides it. The big folders still show every top folder.
@@ -249,19 +346,24 @@ class TerminalPanel @JvmOverloads constructor(
 
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         super.onLayout(changed, left, top, right, bottom)
+        glass.headerHeight = if (minimized) 0f else header.height.toFloat()
         val area = parent as? View ?: return
         if (area.width == 0 || area.height == 0) return
+        val glassWidth = width - margin * 2
+        val glassHeight = height - margin * 2
+        val pinching = pinch
         if (!placed) {
             placed = true
             val saved = prefs.position()
             if (saved != null) {
                 moveGlassTo(saved.first * area.width, saved.second * area.height)
             } else {
-                // Start low in the middle, above the record bar, so the face stays easy to see.
-                val glassWidth = width - margin * 2
-                val glassHeight = height - margin * 2
-                moveGlassTo((area.width - glassWidth) / 2f, area.height * START_BOTTOM_SHARE - glassHeight - dp(EDGE_DP))
+                // The first time, the panel opens in the exact middle of the screen.
+                moveGlassTo((area.width - glassWidth) / 2f, (area.height - glassHeight) / 2f)
             }
+        } else if (pinching != null) {
+            // A pinch grows and shrinks the panel around its middle.
+            moveGlassTo(pinching.centerX - glassWidth / 2f, pinching.centerY - glassHeight / 2f)
         } else {
             moveGlassTo(translationX + margin, userY + margin)
         }
@@ -269,21 +371,96 @@ class TerminalPanel @JvmOverloads constructor(
     }
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
-        val down = event.actionMasked == MotionEvent.ACTION_DOWN
-        if (down) {
-            glass.glassRect(glassBox)
-            if (!glassBox.contains(event.x, event.y)) {
-                // A tap on the glow, outside the glass, goes to whatever is under the panel.
-                return false
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                pinch = null
+                pinchDone = false
+                glassArea(glassBox)
+                if (!glassBox.contains(event.x, event.y)) {
+                    // A tap on the glow, outside the glass, goes to whatever is under the panel.
+                    return false
+                }
+                val focused = findFocus()
+                if (focused is EditText && !isInside(focused, event)) {
+                    hideKeyboard()
+                }
+                touchGlow(event.x, event.y)
             }
-            val focused = findFocus()
-            if (focused is EditText && !isInside(focused, event)) {
-                hideKeyboard()
+            MotionEvent.ACTION_POINTER_DOWN -> {
+                if (pinch == null && !pinchDone && !minimized && event.pointerCount == 2 && bothOnGlass(event)) {
+                    startPinch(event)
+                    return true
+                }
             }
+        }
+        if (pinch != null || pinchDone) {
+            handlePinch(event)
+            return true
         }
         val handled = super.dispatchTouchEvent(event)
         // The glass keeps its own taps, so they never press the record bar under it.
-        return handled || down
+        return handled || event.actionMasked == MotionEvent.ACTION_DOWN
+    }
+
+    /** The glass edges inside this view. They follow the size at once, before the next frame is drawn. */
+    private fun glassArea(out: RectF) {
+        out.set(margin.toFloat(), margin.toFloat(), (width - margin).toFloat(), (height - margin).toFloat())
+    }
+
+    private fun bothOnGlass(event: MotionEvent): Boolean {
+        glassArea(glassBox)
+        return glassBox.contains(event.getX(0), event.getY(0)) && glassBox.contains(event.getX(1), event.getY(1))
+    }
+
+    /** Two fingers: the panel's buttons let go, and the pinch takes over until both fingers lift. */
+    private fun startPinch(event: MotionEvent) {
+        val cancel = MotionEvent.obtain(event)
+        cancel.action = MotionEvent.ACTION_CANCEL
+        super.dispatchTouchEvent(cancel)
+        cancel.recycle()
+        hideKeyboard()
+        stopCentering()
+        val glassWidth = (width - margin * 2).toFloat()
+        val glassHeight = (height - margin * 2).toFloat()
+        pinch = Pinch(
+            spanX = kotlin.math.abs(event.getX(1) - event.getX(0)),
+            spanY = kotlin.math.abs(event.getY(1) - event.getY(0)),
+            width = glassWidth,
+            height = glassHeight,
+            centerX = translationX + margin + glassWidth / 2f,
+            centerY = userY + margin + glassHeight / 2f,
+        )
+        glass.holdMasks = true
+    }
+
+    /** Sideways pinch changes width, up and down changes height, and a slant changes both. */
+    private fun handlePinch(event: MotionEvent) {
+        val started = pinch
+        when (event.actionMasked) {
+            MotionEvent.ACTION_MOVE -> {
+                if (started == null || event.pointerCount < 2) return
+                val spanX = kotlin.math.abs(event.getX(1) - event.getX(0))
+                val spanY = kotlin.math.abs(event.getY(1) - event.getY(0))
+                val widths = widthRange(areaWidth())
+                val heights = heightRange(areaHeight())
+                val newWidth = (started.width + spanX - started.spanX).coerceIn(widths.first.toFloat(), widths.second.toFloat())
+                val newHeight = (started.height + spanY - started.spanY).coerceIn(heights.first.toFloat(), heights.second.toFloat())
+                liveSize = newWidth to newHeight
+                showSizeNumbers(percentFor(newWidth, widths), percentFor(newHeight, heights))
+                requestLayout()
+            }
+            MotionEvent.ACTION_POINTER_UP -> if (started != null) finishPinch()
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                if (started != null) finishPinch()
+                pinchDone = false
+            }
+        }
+    }
+
+    private fun finishPinch() {
+        pinch = null
+        pinchDone = true
+        finishLiveSize()
     }
 
     /** Sets the breathing glow and the swirl for this moment, then draws. */
@@ -294,6 +471,11 @@ class TerminalPanel @JvmOverloads constructor(
         glass.breath = if (live && current.pulse) breathAt(seconds, current.pulseSpeed) else STILL_BREATH
         glass.swirlAngle = if (live && current.swirl) (seconds * swirlDegreesPerSecond(current.swirlSpeed)) % 360f else 0f
         super.draw(canvas)
+    }
+
+    override fun dispatchDraw(canvas: Canvas) {
+        super.dispatchDraw(canvas)
+        drawRipples(canvas)
     }
 
     override fun onVisibilityAggregated(isVisible: Boolean) {
@@ -311,6 +493,7 @@ class TerminalPanel @JvmOverloads constructor(
         viewTreeObserver.removeOnGlobalFocusChangeListener(focusWatcher)
         shownOnScreen = false
         refreshClock()
+        stopCentering()
         super.onDetachedFromWindow()
     }
 
@@ -322,30 +505,124 @@ class TerminalPanel @JvmOverloads constructor(
         return x >= spot[0] && x <= spot[0] + view.width && y >= spot[1] && y <= spot[1] + view.height
     }
 
+    /**
+     * Touch glow: a touch on the frame, the title bar, or near the edge lights that spot
+     * with a short ripple of living light, then fades. Never with less motion asked for.
+     */
+    private fun touchGlow(x: Float, y: Float) {
+        if (!look.touchGlow || !ValueAnimator.areAnimatorsEnabled()) return
+        glassArea(glassBox)
+        val band = dp(EDGE_TOUCH_DP)
+        val nearEdge = x - glassBox.left < band || glassBox.right - x < band ||
+            y - glassBox.top < band || glassBox.bottom - y < band
+        val onTitleBar = !minimized && y < glassBox.top + glass.frameInset + header.height
+        if (!nearEdge && !onTitleBar && !minimized) return
+        val ripple = Ripple(x, y)
+        ripples += ripple
+        ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = RIPPLE_MS
+            interpolator = DecelerateInterpolator(1.6f)
+            addUpdateListener {
+                ripple.progress = it.animatedValue as Float
+                invalidate()
+            }
+            doOnEnd {
+                ripples.remove(ripple)
+                invalidate()
+            }
+            start()
+        }
+    }
+
+    /** Each ripple: a soft bloom that grows and fades, and the nearby edge line burning brighter. */
+    private fun drawRipples(canvas: Canvas) {
+        if (ripples.isEmpty()) return
+        val color = look.edge
+        if (rippleShader == null || rippleColor != color) {
+            rippleColor = color
+            rippleShader = RadialGradient(
+                0f, 0f, 1f,
+                intArrayOf(Hud.withAlpha(Hud.lighten(color, 0.6f), 0.9f), Hud.withAlpha(color, 0.5f), Hud.withAlpha(color, 0f)),
+                floatArrayOf(0f, 0.35f, 1f),
+                Shader.TileMode.CLAMP,
+            )
+        }
+        val shader = rippleShader ?: return
+        glassArea(glassBox)
+        for (ripple in ripples) {
+            val fade = (1f - ripple.progress)
+            val radius = dp(12f) + dp(52f) * ripple.progress
+            ripplePaint.shader = shader
+            ripplePaint.alpha = (255f * fade * fade * 0.85f).toInt()
+            canvas.save()
+            canvas.translate(ripple.x, ripple.y)
+            canvas.scale(radius, radius)
+            canvas.drawCircle(0f, 0f, 1f, ripplePaint)
+            canvas.restore()
+            rippleMatrix.setScale(radius * 1.6f, radius * 1.6f)
+            rippleMatrix.postTranslate(ripple.x, ripple.y)
+            shader.setLocalMatrix(rippleMatrix)
+            rippleEdge.shader = shader
+            rippleEdge.strokeWidth = dp(2.4f)
+            rippleEdge.alpha = (255f * fade).toInt()
+            val corner = chromeRadius(context, look) * 3f
+            canvas.drawRoundRect(glassBox, corner, corner, rippleEdge)
+            shader.setLocalMatrix(null)
+        }
+    }
+
+    /** Typing glow: the edge of the setting being typed in lights softly. Its row draws it. */
+    private fun showTypingGlow(now: View?) {
+        val box = if (now is EditText && look.typingGlow && isDescendant(now)) now else null
+        val next = box?.parent as? View
+        if (next === focusHost && box === focusBox) return
+        focusHost?.foreground = null
+        focusHost = next
+        focusBox = box
+        if (next != null) next.foreground = typingGlow(next, box, look)
+    }
+
+    private fun typingGlow(host: View, box: EditText, current: PanelLook) =
+        FocusGlowDrawable(density, current.edge, chromeRadius(context, current), box, wholeRow = host is NumberRow)
+
+    private fun isDescendant(view: View): Boolean {
+        var parentView = view.parent
+        while (parentView != null) {
+            if (parentView === this) return true
+            parentView = parentView.parent
+        }
+        return false
+    }
+
     private fun buildHeader(): View {
-        val header = LinearLayout(context).apply {
+        header.apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dpi(16f), dpi(8f), dpi(8f), dpi(2f))
+            setPadding(dpi(14f), dpi(6f), dpi(6f), dpi(4f))
             contentDescription = context.getString(R.string.terminal_drag)
+            clipChildren = false
+            clipToPadding = false
         }
         header.addView(GripView(context), LinearLayout.LayoutParams(dpi(12f), dpi(18f)).apply {
-            marginEnd = dpi(10f)
+            marginEnd = dpi(9f)
         })
-        val title = TextView(context).apply {
+        val title = LaserTitleView(context).apply {
             text = context.getString(R.string.terminal_title)
             typeface = Hud.monoBold(context)
             letterSpacing = 0.12f
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
+            setPadding(0, dpi(4f), 0, dpi(4f))
             styled(TextRole.TITLE, 12.5f)
         }
         header.addView(title, LinearLayout.LayoutParams(0, WRAP, 1f))
+        header.addView(widthBox, LinearLayout.LayoutParams(WRAP, WRAP).apply { marginStart = dpi(6f) })
+        header.addView(heightBox, LinearLayout.LayoutParams(WRAP, WRAP).apply { marginStart = dpi(5f) })
         val shrink = ShrinkButton(context).apply {
             contentDescription = context.getString(R.string.terminal_shrink)
             setOnClickListener { showMinimized(true, animate = true) }
         }
-        header.addView(shrink, LinearLayout.LayoutParams(dpi(48f), dpi(36f)))
+        header.addView(shrink, LinearLayout.LayoutParams(dpi(42f), dpi(36f)).apply { marginStart = dpi(2f) })
         header.setOnTouchListener(dragHandle())
         return header
     }
@@ -387,6 +664,7 @@ class TerminalPanel @JvmOverloads constructor(
         detailPane.isClickable = true
         detailPane.visibility = INVISIBLE
         detailContent.orientation = LinearLayout.VERTICAL
+        detailContent.clipChildren = false
         setDetailPadding()
         detailScroll.isVerticalScrollBarEnabled = false
         detailScroll.overScrollMode = OVER_SCROLL_NEVER
@@ -409,15 +687,16 @@ class TerminalPanel @JvmOverloads constructor(
         pill.orientation = LinearLayout.HORIZONTAL
         pill.gravity = Gravity.CENTER_VERTICAL
         pill.setPadding(dpi(10f), dpi(7f), dpi(16f), dpi(7f))
+        pill.clipChildren = false
         val frame = FrameLayout(context)
         frame.addView(pillRing, LayoutParams(dpi(32f), dpi(32f), Gravity.CENTER))
         frame.addView(
             FolderIconView(context, home.folders.size, null, compact = true, special = true),
-            LayoutParams(dpi(17f), dpi(15f), Gravity.CENTER),
+            LayoutParams(dpi(19f), dpi(17f), Gravity.CENTER),
         )
         pill.addView(frame, LinearLayout.LayoutParams(dpi(32f), dpi(32f)))
         pill.addView(
-            TextView(context).apply {
+            LaserTitleView(context).apply {
                 text = context.getString(R.string.terminal_pill)
                 typeface = Hud.monoBold(context)
                 letterSpacing = 0.1f
@@ -432,22 +711,31 @@ class TerminalPanel @JvmOverloads constructor(
         pill.setOnTouchListener(dragHandle())
     }
 
-    /** Drag to move the panel. A short tap counts as a normal tap. */
+    /**
+     * Drag to move the panel. A short tap counts as a normal tap.
+     * With Center guide on, a soft cross shows the middle, and the panel clicks into the
+     * middle when it comes close.
+     */
     private fun dragHandle(): OnTouchListener {
         var downX = 0f
         var downY = 0f
         var startX = 0f
         var startY = 0f
         var dragging = false
+        var snappedX = false
+        var snappedY = false
         val slop = ViewConfiguration.get(context).scaledTouchSlop
         return OnTouchListener { view, event ->
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
+                    stopCentering()
                     downX = event.rawX
                     downY = event.rawY
                     startX = translationX + margin
                     startY = userY + margin
                     dragging = false
+                    snappedX = false
+                    snappedY = false
                     view.isPressed = true
                 }
                 MotionEvent.ACTION_MOVE -> {
@@ -457,20 +745,42 @@ class TerminalPanel @JvmOverloads constructor(
                         dragging = true
                         view.isPressed = false
                         parent?.requestDisallowInterceptTouchEvent(true)
+                        if (look.centerGuide) guides?.showGuides()
                     }
                     if (dragging) {
-                        moveGlassTo(startX + dx, startY + dy)
+                        var x = startX + dx
+                        var y = startY + dy
+                        if (look.centerGuide) {
+                            val glassWidth = width - margin * 2
+                            val glassHeight = height - margin * 2
+                            val middleX = (areaWidth() - glassWidth) / 2f
+                            val middleY = (areaHeight() - glassHeight) / 2f
+                            val near = dp(SNAP_DP)
+                            val nowX = kotlin.math.abs(x - middleX) < near
+                            val nowY = kotlin.math.abs(y - middleY) < near
+                            if (nowX) x = middleX
+                            if (nowY) y = middleY
+                            if ((nowX && !snappedX) || (nowY && !snappedY)) {
+                                if (look.tick) performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                            }
+                            snappedX = nowX
+                            snappedY = nowY
+                            guides?.setSnapped(nowX, nowY)
+                        }
+                        moveGlassTo(x, y)
                     }
                 }
                 MotionEvent.ACTION_UP -> {
                     view.isPressed = false
                     if (dragging) savePosition() else view.performClick()
                     dragging = false
+                    guides?.hideGuides()
                 }
                 MotionEvent.ACTION_CANCEL -> {
                     view.isPressed = false
                     if (dragging) savePosition()
                     dragging = false
+                    guides?.hideGuides()
                 }
             }
             true
@@ -488,6 +798,7 @@ class TerminalPanel @JvmOverloads constructor(
         return OnTouchListener { view, event ->
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
+                    stopCentering()
                     downX = event.rawX
                     downY = event.rawY
                     startWidth = (width - margin * 2).toFloat()
@@ -511,12 +822,12 @@ class TerminalPanel @JvmOverloads constructor(
                 }
                 MotionEvent.ACTION_UP -> {
                     view.isPressed = false
-                    if (resizing) finishResize() else view.performClick()
+                    if (resizing) finishLiveSize() else view.performClick()
                     resizing = false
                 }
                 MotionEvent.ACTION_CANCEL -> {
                     view.isPressed = false
-                    if (resizing) finishResize()
+                    if (resizing && pinch == null) finishLiveSize()
                     resizing = false
                 }
             }
@@ -527,26 +838,103 @@ class TerminalPanel @JvmOverloads constructor(
     /** Sets a new glass size in pixels. It never goes past the screen, or below the smallest size. */
     private fun resizeGlassTo(newWidth: Float, newHeight: Float) {
         val area = parent as? View ?: return
-        val roomWidth = (area.width - (translationX + margin)).coerceAtLeast(0f)
-        val roomHeight = (area.height - (userY + margin)).coerceAtLeast(0f)
-        val glassWidth = newWidth.coerceIn(minOf(dp(MIN_WIDTH_DP), roomWidth), roomWidth)
-        val glassHeight = newHeight.coerceIn(minOf(dp(MIN_HEIGHT_DP), roomHeight), roomHeight)
-        chosenSize = (glassWidth / density) to (glassHeight / density)
+        val widths = widthRange(area.width)
+        val heights = heightRange(area.height)
+        val roomWidth = (area.width - (translationX + margin)).coerceIn(widths.first.toFloat(), widths.second.toFloat())
+        val roomHeight = (area.height - (userY + margin)).coerceIn(heights.first.toFloat(), heights.second.toFloat())
+        val glassWidth = newWidth.coerceIn(widths.first.toFloat(), roomWidth)
+        val glassHeight = newHeight.coerceIn(heights.first.toFloat(), roomHeight)
+        liveSize = glassWidth to glassHeight
+        showSizeNumbers(percentFor(glassWidth, widths), percentFor(glassHeight, heights))
         requestLayout()
     }
 
-    private fun finishResize() {
+    /** Saves the size a finger chose as Width and Height, from 0 to 100, and says so. */
+    private fun finishLiveSize() {
+        val live = liveSize
         glass.holdMasks = false
-        chosenSize?.let { prefs.setSize(it.first, it.second) }
-        savePosition()
-        say(context.getString(R.string.terminal_resized))
+        if (live != null) {
+            val widthPercent = percentFor(live.first, widthRange(areaWidth()))
+            val heightPercent = percentFor(live.second, heightRange(areaHeight()))
+            store.setNumber(LookKeys.WIDTH, widthPercent)
+            store.setNumber(LookKeys.HEIGHT, heightPercent)
+            liveSize = null
+            showSizeNumbers(widthPercent, heightPercent)
+            requestLayout()
+            post { savePosition() }
+            say(context.getString(R.string.terminal_size_saved, widthPercent, heightPercent))
+            if (look.tick) performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+        }
     }
 
     /** For screen readers: the Bigger and Smaller actions on the resize corner. */
     private fun resizeBy(step: Float) {
         if (minimized) return
         resizeGlassTo((width - margin * 2) + step, (height - margin * 2) + step)
-        finishResize()
+        finishLiveSize()
+    }
+
+    /** A typed Width or Height, from the top boxes or the Size folder. */
+    private fun setSizePercent(key: String, value: Int, announce: Boolean) {
+        store.setNumber(key, value)
+        liveSize = null
+        showSizeNumbers(store.number(LookKeys.WIDTH), store.number(LookKeys.HEIGHT))
+        requestLayout()
+        if (announce) {
+            val label = context.getString(if (key == LookKeys.WIDTH) R.string.terminal_width else R.string.terminal_height)
+            say(context.getString(R.string.terminal_number_saved, label, value))
+            post { savePosition() }
+        }
+    }
+
+    /** Shows Width and Height in every box that shows them, except one being typed in. */
+    private fun showSizeNumbers(widthPercent: Int, heightPercent: Int) {
+        fun show(box: NumberBox, value: Int) {
+            if (!box.hasFocus() && box.value != value) box.show(value)
+        }
+        show(widthBox.box, widthPercent)
+        show(heightBox.box, heightPercent)
+        for ((key, box) in sizeRows) {
+            show(box, if (key == LookKeys.WIDTH) widthPercent else heightPercent)
+        }
+    }
+
+    /** Center panel: glides the panel to the middle of the screen, then saves the place. */
+    private fun centerPanel() {
+        val area = parent as? View ?: return
+        stopCentering()
+        val fromX = translationX + margin
+        val fromY = userY + margin
+        val toX = (area.width - (width - margin * 2)) / 2f
+        val toY = (area.height - (height - margin * 2)) / 2f
+        if (!ValueAnimator.areAnimatorsEnabled()) {
+            moveGlassTo(toX, toY)
+            savePosition()
+        } else {
+            centerAnim = ValueAnimator.ofFloat(0f, 1f).apply {
+                duration = CENTER_MS
+                interpolator = DecelerateInterpolator(1.4f)
+                addUpdateListener {
+                    val t = it.animatedValue as Float
+                    moveGlassTo(fromX + (toX - fromX) * t, fromY + (toY - fromY) * t)
+                }
+                doOnEnd {
+                    if (centerAnim === it) {
+                        centerAnim = null
+                        savePosition()
+                    }
+                }
+                start()
+            }
+        }
+        say(context.getString(R.string.terminal_centered))
+    }
+
+    private fun stopCentering() {
+        val running = centerAnim ?: return
+        centerAnim = null
+        running.cancel()
+        savePosition()
     }
 
     /** Moves the glass so its top left corner is at x, y. The glass always stays on the screen. */
@@ -635,6 +1023,9 @@ class TerminalPanel @JvmOverloads constructor(
         val current = look
         glass.look = current
         paneGlass.look = current
+        // The titanium frame is drawn inside the glass edge, so the content starts inside it.
+        val pad = margin + glass.frameInset.roundToInt()
+        if (paddingLeft != pad) setPadding(pad, pad, pad, pad)
         restyle(this, current)
         // The words dim a little with the glass, but never fade away.
         val contentAlpha = 0.7f + 0.3f * current.opacity
@@ -650,6 +1041,12 @@ class TerminalPanel @JvmOverloads constructor(
         styleTyper(statusLine, current.status, STATUS_SP)
         guidance?.let { styleGuidance(it) }
         RecordBarLook.apply(current, barViews, barTexts, barButtons)
+        guides?.applyLook(current)
+        val host = focusHost
+        val box = focusBox
+        if (host != null && box != null) {
+            host.foreground = if (current.typingGlow) typingGlow(host, box, current) else null
+        }
         refreshClock()
         invalidate()
     }
@@ -672,6 +1069,8 @@ class TerminalPanel @JvmOverloads constructor(
         typer.setTextColor(color)
         typer.setTextSize(TypedValue.COMPLEX_UNIT_SP, baseSp * current.fontScale)
         typer.cursorColor = current.cursor
+        typer.cursorGlow = current.cursorGlow
+        typer.glowStrength = current.glowStrength
         typer.speed = current.lettersPerSecond
         typer.animateTyping = current.laserTyping
     }
@@ -679,10 +1078,15 @@ class TerminalPanel @JvmOverloads constructor(
     private fun styleGuidance(typer: LaserTypeView) {
         val current = look
         styleTyper(typer, current.text, GUIDE_SP)
-        typer.background = GradientDrawable().apply {
-            setColor(Hud.withAlpha(Hud.blend(current.skin, Hud.INK, 0.6f), 0.55f))
-            cornerRadius = dp(6f)
-            setStroke(dpi(1f), Hud.withAlpha(current.text, 0.22f))
+        typer.background = if (current.sapphire) {
+            // The typed guidance sits on its own thick sapphire pane.
+            PanelGlassDrawable(density, 0f, pane = true).apply { look = current }
+        } else {
+            GradientDrawable().apply {
+                setColor(Hud.withAlpha(Hud.blend(current.skin, Hud.INK, 0.6f), 0.55f))
+                cornerRadius = chromeRadius(context, current)
+                setStroke(dpi(1f), Hud.withAlpha(current.text, 0.22f))
+            }
         }
     }
 
@@ -799,6 +1203,7 @@ class TerminalPanel @JvmOverloads constructor(
         guidance = null
         headingRing = null
         themeRows.clear()
+        sizeRows.clear()
     }
 
     /** True when folders should unfold like a hologram. Off, or reduced motion, opens them at once. */
@@ -881,6 +1286,7 @@ class TerminalPanel @JvmOverloads constructor(
     private fun buildDetail(folder: PanelFolder) {
         detailContent.removeAllViews()
         themeRows.clear()
+        sizeRows.clear()
         headingRing = null
         detailContent.addView(pathBar(folder), LinearLayout.LayoutParams(MATCH, WRAP))
         detailContent.addView(folderHeading(folder), LinearLayout.LayoutParams(MATCH, WRAP))
@@ -921,13 +1327,23 @@ class TerminalPanel @JvmOverloads constructor(
     }
 
     private fun itemView(folder: PanelFolder, item: PanelItem): View = when (item) {
-        is NumberItem -> NumberRow(
-            context,
-            item,
-            store.number(item.key),
-            onChange = { value, announce -> saveNumber(item, value, announce) },
-            onProblem = { say(it) },
-        )
+        is NumberItem -> if (item.key == LookKeys.WIDTH || item.key == LookKeys.HEIGHT) {
+            NumberRow(
+                context,
+                item,
+                store.number(item.key),
+                onChange = { value, announce -> setSizePercent(item.key, value, announce) },
+                onProblem = { say(it) },
+            ).also { sizeRows += item.key to it.box }
+        } else {
+            NumberRow(
+                context,
+                item,
+                store.number(item.key),
+                onChange = { value, announce -> saveNumber(item, value, announce) },
+                onProblem = { say(it) },
+            )
+        }
         is ToggleItem -> {
             val note = if (item.isTest) markText(markOf(folder, item)) else item.help
             val on = if (item.isTest) prefs.toggle(testKey(folder, item), item.default) else store.toggle(item.key)
@@ -941,7 +1357,7 @@ class TerminalPanel @JvmOverloads constructor(
         is ColorItem -> ColorEditorView(context, item.part, store, onLookChanged = ::refreshLook, say = ::say)
     }
 
-    /** A button with a short note. Reset all asks first, in plain words. */
+    /** A button with a short note. Center panel works at once. Reset all asks first, in plain words. */
     private fun actionRow(item: ActionItem): View {
         val box = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
@@ -973,10 +1389,13 @@ class TerminalPanel @JvmOverloads constructor(
         confirm.addView(choices, LinearLayout.LayoutParams(MATCH, WRAP))
         box.addView(confirm, 1, LinearLayout.LayoutParams(MATCH, WRAP))
         button.setOnClickListener {
-            if (item.action == PanelAction.RESET_ALL) {
-                button.visibility = GONE
-                confirm.visibility = VISIBLE
-                say(context.getString(R.string.terminal_reset_question))
+            when (item.action) {
+                PanelAction.RESET_ALL -> {
+                    button.visibility = GONE
+                    confirm.visibility = VISIBLE
+                    say(context.getString(R.string.terminal_reset_question))
+                }
+                PanelAction.CENTER_PANEL -> centerPanel()
             }
         }
         no.setOnClickListener {
@@ -1000,12 +1419,14 @@ class TerminalPanel @JvmOverloads constructor(
     /** Puts every panel setting back to the start. The test marks and the panel's place stay. */
     private fun resetAll() {
         hideKeyboard()
+        stopCentering()
         store.resetAll()
-        chosenSize = null
+        liveSize = null
         savePosition()
         prefs.activeFolder = activeId
         prefs.minimized = minimized
         refreshLook()
+        showSizeNumbers(store.number(LookKeys.WIDTH), store.number(LookKeys.HEIGHT))
         onTestDiamond?.invoke(testDiamondOn)
         requestLayout()
         openFolder?.let {
@@ -1049,6 +1470,8 @@ class TerminalPanel @JvmOverloads constructor(
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(0, 0, 0, dpi(6f))
+            clipChildren = false
+            clipToPadding = false
         }
         val frame = FrameLayout(context)
         val ringSize = dpi(60f)
@@ -1063,8 +1486,10 @@ class TerminalPanel @JvmOverloads constructor(
         val names = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dpi(8f), 0, 0, 0)
+            clipChildren = false
+            clipToPadding = false
         }
-        names.addView(TextView(context).apply {
+        names.addView(LaserTitleView(context).apply {
             text = folder.title
             typeface = Hud.condensedBold
             styled(TextRole.HEADING, 16f)
@@ -1081,7 +1506,7 @@ class TerminalPanel @JvmOverloads constructor(
     }
 
     private fun sectionLabel(textRes: Int): View {
-        return TextView(context).apply {
+        return LaserTitleView(context).apply {
             text = context.getString(textRes)
             typeface = Hud.monoBold(context)
             letterSpacing = 0.12f
@@ -1147,13 +1572,19 @@ class TerminalPanel @JvmOverloads constructor(
         const val WRAP = ViewGroup.LayoutParams.WRAP_CONTENT
         const val GLOW_MARGIN_DP = 18f
         const val EDGE_DP = 8f
-        const val START_MAX_WIDTH_DP = 440f
-        const val START_MIN_HEIGHT_DP = 300f
-        const val START_MAX_HEIGHT_DP = 470f
-        const val START_HEIGHT_SHARE = 0.44f
-        const val START_BOTTOM_SHARE = 0.82f
         const val MIN_WIDTH_DP = 280f
         const val MIN_HEIGHT_DP = 260f
+
+        /** Height 100 is this share of the screen, so some camera picture always shows. */
+        const val MAX_HEIGHT_SHARE = 0.8f
+
+        /** How close the panel comes to the middle before it clicks into place. */
+        const val SNAP_DP = 12f
+
+        /** How far in from the glass edge a touch still lights the edge. */
+        const val EDGE_TOUCH_DP = 26f
+        const val RIPPLE_MS = 650L
+        const val CENTER_MS = 420L
         const val STEP_DP = 40f
         const val GRIP_DP = 30f
         const val DETAIL_BOTTOM_DP = 30f

@@ -2,6 +2,7 @@ package com.offgrid.compositor.terminal
 
 import android.content.Context
 import android.content.res.ColorStateList
+import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
@@ -18,6 +19,7 @@ import android.text.TextUtils
 import android.text.TextWatcher
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.HapticFeedbackConstants
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
@@ -48,6 +50,10 @@ internal fun TextView.styled(role: TextRole, baseSp: Float): TextView {
 
 internal fun applyTextStyle(view: TextView, style: StyleTag, look: PanelLook) {
     view.setTextSize(TypedValue.COMPLEX_UNIT_SP, style.baseSp * look.fontScale)
+    if (view is LaserTitleView) {
+        applyLaserTitle(view, style.role, look)
+        return
+    }
     val glow = Hud.dp(view.context, 6f)
     when (style.role) {
         TextRole.TITLE -> {
@@ -70,15 +76,37 @@ internal fun applyTextStyle(view: TextView, style: StyleTag, look: PanelLook) {
     }
 }
 
+/**
+ * Titles are Laser Jet Bright: a bright core with layers of glow, in the typed text color.
+ * Holo Classic keeps its Step 2 colors.
+ */
+private fun applyLaserTitle(view: LaserTitleView, role: TextRole, look: PanelLook) {
+    val strength = look.glowStrength
+    when (role) {
+        TextRole.TITLE -> view.setLaser(if (look.holo) look.edge else look.text, null, strength)
+        TextRole.PILL -> view.setLaser(if (look.holo) look.decor else look.text, null, strength)
+        TextRole.HEADING -> view.setLaser(
+            if (look.holo) look.sideText else look.text,
+            if (look.holo) look.folder else null,
+            strength,
+        )
+        TextRole.SECTION -> view.setLaser(if (look.holo) look.decor else look.text, null, strength * 0.6f)
+        else -> view.setLaser(look.text, null, strength)
+    }
+}
+
+/** How round boxes and buttons are. Corner roundness 0 is square. The start look is nearly square. */
+internal fun chromeRadius(context: Context, look: PanelLook): Float = Hud.dp(context, 0.5f + 10f * look.roundness)
+
 internal fun itemsText(context: Context, count: Int): String {
     return context.resources.getQuantityString(R.plurals.terminal_items, count, count)
 }
 
 /** A soft glow when a tile or row is pressed. */
-internal fun pressGlow(context: Context, color: Int): Drawable {
+internal fun pressGlow(context: Context, color: Int, radius: Float = Hud.dp(context, 2f)): Drawable {
     val mask = GradientDrawable().apply {
         setColor(Hud.WHITE)
-        cornerRadius = Hud.dp(context, 6f)
+        cornerRadius = radius
     }
     return RippleDrawable(ColorStateList.valueOf(Hud.withAlpha(color, 0.28f)), null, mask)
 }
@@ -310,11 +338,13 @@ internal class NumberBox(
     start: Int,
     private val onChange: (value: Int, announce: Boolean) -> Unit,
     private val onProblem: (String) -> Unit,
+    private val baseSp: Float = 15f,
 ) : AppCompatEditText(context), Styled {
     var value = start
         private set
     private var announced = start
     private var quiet = false
+    private var tick = false
 
     init {
         setText(start.toString())
@@ -386,13 +416,15 @@ internal class NumberBox(
                 if (value != announced) {
                     announced = value
                     onChange(value, true)
+                    if (tick) performHapticFeedback(HapticFeedbackConstants.CONFIRM)
                 }
             }
         }
     }
 
     override fun applyLook(look: PanelLook) {
-        setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f * look.fontScale)
+        tick = look.tick
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, baseSp * look.fontScale)
         setTextColor(look.edge)
         highlightColor = Hud.withAlpha(look.edge, 0.35f)
         background = fieldBackground(context, look)
@@ -407,7 +439,7 @@ internal class NumberBox(
 internal fun fieldBackground(context: Context, look: PanelLook): Drawable {
     fun box(stroke: Int, width: Float) = GradientDrawable().apply {
         setColor(Hud.withAlpha(Hud.blend(look.skin, Hud.INK, 0.6f), 0.92f))
-        cornerRadius = Hud.dp(context, 5f)
+        cornerRadius = chromeRadius(context, look)
         setStroke(Hud.dpi(context, width), stroke)
     }
     return StateListDrawable().apply {
@@ -427,18 +459,19 @@ internal class NumberRow(
     private val title = rowTitle(context, item.label)
     private val words = rowNote(context, item.help)
 
+    /** The typed box. The panel updates it when the same number changes somewhere else. */
+    val box = NumberBox(context, item.label, start, onChange, onProblem)
+
     init {
         orientation = HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
-        setPadding(0, Hud.dpi(context, 3f), 0, Hud.dpi(context, 3f))
+        // Room inside the edge, so the typing glow along the edge never touches the words.
+        setPadding(Hud.dpi(context, 6f), Hud.dpi(context, 4f), Hud.dpi(context, 6f), Hud.dpi(context, 4f))
         val column = LinearLayout(context).apply { orientation = VERTICAL }
         column.addView(title)
         column.addView(words)
         addView(column, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = Hud.dpi(context, 6f) })
-        addView(
-            NumberBox(context, item.label, start, onChange, onProblem),
-            LayoutParams(Hud.dpi(context, 68f), Hud.dpi(context, 46f)),
-        )
+        addView(box, LayoutParams(Hud.dpi(context, 68f), Hud.dpi(context, 46f)))
     }
 
     override fun applyLook(look: PanelLook) = styleRowWords(title, words, look)
@@ -454,6 +487,7 @@ internal class HexBox(
     private val onProblem: (String) -> Unit,
 ) : AppCompatEditText(context), Styled {
     private var shownText = ""
+    private var tick = false
 
     init {
         typeface = Hud.monoBold(context)
@@ -499,9 +533,11 @@ internal class HexBox(
         shownText = RainbowMix.hex(color)
         setText(shownText)
         onColor(color)
+        if (tick) performHapticFeedback(HapticFeedbackConstants.CONFIRM)
     }
 
     override fun applyLook(look: PanelLook) {
+        tick = look.tick
         setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f * look.fontScale)
         setTextColor(look.edge)
         highlightColor = Hud.withAlpha(look.edge, 0.35f)
@@ -530,7 +566,7 @@ internal class ActionButton(context: Context, label: String) : androidx.appcompa
         setTextColor(look.edge)
         val shape = GradientDrawable().apply {
             setColor(Hud.withAlpha(Hud.blend(look.skin, Hud.INK, 0.5f), 0.85f))
-            cornerRadius = Hud.dp(context, 6f)
+            cornerRadius = chromeRadius(context, look)
             setStroke(Hud.dpi(context, 1.4f), look.edge)
         }
         background = RippleDrawable(ColorStateList.valueOf(Hud.withAlpha(look.edge, 0.35f)), shape, null)
@@ -561,7 +597,7 @@ internal class SwatchView(context: Context) : View(context), Styled {
     override fun onDraw(canvas: Canvas) {
         val pad = Hud.dp(context, 5f)
         box.set(pad, pad, width - pad, height - pad)
-        val corner = Hud.dp(context, 6f)
+        val corner = Hud.dp(context, 2f)
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = Hud.dp(context, 6f)
         paint.color = Hud.withAlpha(color, 0.25f)
@@ -588,7 +624,7 @@ internal class ThemeChip(context: Context, private val colors: IntArray) : View(
     override fun onDraw(canvas: Canvas) {
         val pad = Hud.dp(context, 6f)
         box.set(pad, pad, width - pad, height - pad)
-        val corner = Hud.dp(context, 7f)
+        val corner = Hud.dp(context, 2f)
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = Hud.dp(context, 7f)
         paint.color = Hud.withAlpha(colors[2], 0.3f)
@@ -754,7 +790,7 @@ internal class ShrinkButton(context: Context) : View(context), Styled {
         val top = (height - size) / 2f
         stroke.strokeWidth = Hud.dp(context, 1.2f)
         stroke.color = frameColor
-        canvas.drawRoundRect(left, top, left + size, top + size, Hud.dp(context, 3f), Hud.dp(context, 3f), stroke)
+        canvas.drawRoundRect(left, top, left + size, top + size, Hud.dp(context, 1f), Hud.dp(context, 1f), stroke)
         stroke.strokeWidth = Hud.dp(context, 2f)
         stroke.color = dashColor
         canvas.drawLine(left + size * 0.25f, top + size * 0.62f, left + size * 0.75f, top + size * 0.62f, stroke)
@@ -820,5 +856,96 @@ internal class SweepBand(context: Context) : View(context), Styled {
             GradientDrawable.Orientation.TOP_BOTTOM,
             intArrayOf(0, Hud.withAlpha(look.edge, 0.32f), 0),
         )
+    }
+}
+
+/** A small typed box at the top of the panel, for Width or Height, with its name above it. */
+internal class SizeBox(
+    context: Context,
+    caption: String,
+    label: String,
+    start: Int,
+    onChange: (value: Int, announce: Boolean) -> Unit,
+    onProblem: (String) -> Unit,
+) : LinearLayout(context), Styled {
+    private val name = TextView(context)
+
+    /** The typed box, 0 to 100. */
+    val box = NumberBox(context, label, start, onChange, onProblem, baseSp = 12f)
+
+    init {
+        orientation = VERTICAL
+        gravity = Gravity.CENTER_HORIZONTAL
+        name.text = caption
+        name.typeface = Hud.monoBold(context)
+        name.letterSpacing = 0.08f
+        name.importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
+        // A small gap, so the typing glow around the box never touches the name.
+        addView(name, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply {
+            bottomMargin = Hud.dpi(context, 2f)
+        })
+        addView(box, LayoutParams(Hud.dpi(context, 44f), Hud.dpi(context, 30f)))
+    }
+
+    override fun applyLook(look: PanelLook) {
+        name.setTextSize(TypedValue.COMPLEX_UNIT_SP, 7.5f)
+        name.setTextColor(Hud.withAlpha(look.sideText, 0.75f))
+    }
+}
+
+/**
+ * Typing glow: the edge of the setting being typed in lights softly.
+ * A setting row glows along its own edge. A box with no row of its own, like Width at the
+ * top or a color mixer box, gets a soft halo hugging the box. It never covers any words.
+ */
+internal class FocusGlowDrawable(
+    private val density: Float,
+    color: Int,
+    private val radius: Float,
+    private val target: View,
+    private val wholeRow: Boolean,
+) : Drawable() {
+    private val box = RectF()
+    private val glow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 3f * density
+        maskFilter = BlurMaskFilter(6f * density, BlurMaskFilter.Blur.NORMAL)
+        this.color = Hud.withAlpha(color, 0.85f)
+    }
+    private val line = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 1.2f * density
+        this.color = Hud.withAlpha(color, 0.9f)
+    }
+
+    override fun draw(canvas: Canvas) {
+        val corner: Float
+        if (wholeRow) {
+            val inset = ROW_INSET_DP * density
+            box.set(bounds.left + inset, bounds.top + inset, bounds.right - inset, bounds.bottom - inset)
+            corner = radius
+        } else {
+            val out = HALO_DP * density
+            box.set(target.left - out, target.top - out, target.right + out, target.bottom + out)
+            corner = radius + out
+        }
+        if (box.width() <= 0f || box.height() <= 0f) return
+        canvas.drawRoundRect(box, corner, corner, glow)
+        canvas.drawRoundRect(box, corner, corner, line)
+    }
+
+    override fun setAlpha(alpha: Int) = Unit
+
+    override fun setColorFilter(colorFilter: android.graphics.ColorFilter?) = Unit
+
+    @Deprecated("Deprecated in Java")
+    override fun getOpacity(): Int = android.graphics.PixelFormat.TRANSLUCENT
+
+    private companion object {
+        /** How far the halo line sits outside the box. */
+        const val HALO_DP = 2.5f
+
+        /** How far the row's glow line sits inside the row's edge. Rows keep their words farther in. */
+        const val ROW_INSET_DP = 1.5f
     }
 }

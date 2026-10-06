@@ -121,6 +121,12 @@
             android:text="@string/back_to_camera" />
     </LinearLayout>
 
+    <!-- Step 2.2. The soft center cross shown while the panel is dragged. It never takes taps. -->
+    <com.offgrid.compositor.terminal.SnapGuideView
+        android:id="@+id/snap_guides"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
     <!-- Step 2. The floating terminal panel. Royalty's private control, not painted into the video. -->
     <com.offgrid.compositor.terminal.TerminalPanel
         android:id="@+id/terminal_panel"

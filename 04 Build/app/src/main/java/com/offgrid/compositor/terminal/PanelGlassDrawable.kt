@@ -16,7 +16,6 @@ import android.graphics.RectF
 import android.graphics.Shader
 import android.graphics.SweepGradient
 import android.graphics.drawable.Drawable
-import kotlin.random.Random
 
 /**
  * The panel's glass.
@@ -25,7 +24,14 @@ import kotlin.random.Random
  * outer glow. The soft glows are blurred once into small gray masks, then tinted
  * each frame, so the pulse and the swirl stay cheap on the phone.
  *
- * [pane] draws a lighter inner panel with no outer glow, for open folders.
+ * Titanium frame (Step 2.2): a band of dark brushed titanium around the glass, with a
+ * light bevel on the outside, a dark bevel on the inside, and a thin line of light.
+ * The title bar sits on woven carbon fiber. Everything is drawn on the phone from
+ * small made-up textures. No pictures, and no web code.
+ *
+ * [pane] draws an inner pane with no outer glow, for open folders and the typed guidance.
+ * With Sapphire glass on, a pane is thick, deep, frosted glass with an inner shadow,
+ * so it looks set into the panel.
  */
 internal class PanelGlassDrawable(
     private val density: Float,
@@ -35,7 +41,8 @@ internal class PanelGlassDrawable(
 
     var look: PanelLook? = null
         set(value) {
-            val reshape = field?.roundness != value?.roundness || field?.holo != value?.holo
+            val reshape = field?.roundness != value?.roundness || field?.holo != value?.holo ||
+                field?.titanium != value?.titanium
             field = value
             if (reshape) rebuildShape()
             updateFill()
@@ -55,14 +62,39 @@ internal class PanelGlassDrawable(
             if (!value) invalidateSelf()
         }
 
+    /** Height of the title bar, in pixels from the top of the glass inside the frame. It sits on carbon fiber. */
+    var headerHeight = 0f
+        set(value) {
+            if (field == value) return
+            field = value
+            updateFill()
+            invalidateSelf()
+        }
+
+    /**
+     * How far inside the glass edge the panel's content should start, in pixels.
+     * The titanium frame is drawn in this band. It never changes with size, so the
+     * panel and the small tag keep steady padding.
+     */
+    val frameInset: Float
+        get() = if (titaniumOn()) dp(FRAME_DP) else 0f
+
     private val glass = RectF()
+    private val inside = RectF()
     private val shape = Path()
+    private val innerShape = Path()
+    private val frameBand = Path()
     private val brackets = Path()
     private val ticks = Path()
     private val inner = Path()
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
     private val grain = Paint(Paint.ANTI_ALIAS_FLAG)
     private val sheen = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val metal = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val brushed = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val carbon = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val shade = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val bevelLight = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     private val line = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeJoin = Paint.Join.ROUND
@@ -75,9 +107,20 @@ internal class PanelGlassDrawable(
     private var swirlKey = 0L
     private val swirlMatrix = Matrix()
 
+    // Sapphire pane layers, built when the size or the look changes.
+    private var topShadow: LinearGradient? = null
+    private var sideShadow: LinearGradient? = null
+    private var bottomLight: LinearGradient? = null
+    private var glassSheen: LinearGradient? = null
+    private var titleShadow: LinearGradient? = null
+
     private class Masks(val outer: Bitmap, val edge: Bitmap)
 
     private fun dp(value: Float) = value * density
+
+    private fun titaniumOn(): Boolean = !pane && look?.titanium == true
+
+    private fun sapphireOn(): Boolean = pane && look?.sapphire == true
 
     override fun onBoundsChange(bounds: Rect) {
         super.onBoundsChange(bounds)
@@ -85,14 +128,9 @@ internal class PanelGlassDrawable(
         updateFill()
     }
 
-    /** The glass edges inside this drawable, for touch checks. */
-    fun glassRect(out: RectF) {
-        out.set(glass)
-    }
-
-    private fun corner(): Float {
-        val roundness = look?.roundness ?: 0.4f
-        val most = minOf(glass.width(), glass.height()) / 2f
+    private fun corner(box: RectF = glass): Float {
+        val roundness = look?.roundness ?: 0.04f
+        val most = minOf(box.width(), box.height()) / 2f
         return (roundness * dp(30f)).coerceAtMost(most).coerceAtLeast(0f)
     }
 
@@ -102,6 +140,8 @@ internal class PanelGlassDrawable(
         glass.set(b.left + margin, b.top + margin, b.right - margin, b.bottom - margin)
         shape.reset()
         inner.reset()
+        innerShape.reset()
+        frameBand.reset()
         brackets.reset()
         ticks.reset()
         if (glass.width() <= 0f || glass.height() <= 0f) return
@@ -115,6 +155,22 @@ internal class PanelGlassDrawable(
             if (!pane) buildHoloMarks(size)
         } else {
             shape.addRoundRect(glass, size, size, Path.Direction.CW)
+        }
+        inside.set(glass)
+        if (titaniumOn()) {
+            val band = dp(FRAME_DP)
+            inside.inset(band, band)
+            if (inside.width() > 0f && inside.height() > 0f) {
+                val innerCorner = (size - band).coerceAtLeast(0f)
+                if (holo) {
+                    cutCorners(innerShape, inside, (size - band * 0.6f).coerceAtLeast(0f), dp(3f))
+                } else {
+                    innerShape.addRoundRect(inside, innerCorner, innerCorner, Path.Direction.CW)
+                }
+                frameBand.op(shape, innerShape, Path.Op.DIFFERENCE)
+            } else {
+                inside.set(glass)
+            }
         }
     }
 
@@ -161,26 +217,22 @@ internal class PanelGlassDrawable(
         if (glass.isEmpty) return
         val opacity = current.opacity
         fill.shader = null
-        if (pane) {
-            if (current.holo) {
-                fill.shader = LinearGradient(
-                    0f, glass.top, 0f, glass.bottom,
-                    Hud.withAlpha(0xFF0B3A44.toInt(), 0.35f + 0.55f * opacity),
-                    Hud.withAlpha(Hud.HOLO_GLASS_BOTTOM, 0.45f + 0.5f * opacity),
-                    Shader.TileMode.CLAMP,
-                )
-            } else {
-                fill.color = Hud.withAlpha(Hud.blend(current.skin, current.edge, 0.07f), 0.5f + 0.45f * opacity)
-            }
-        } else if (current.holo) {
-            fill.shader = LinearGradient(
+        when {
+            sapphireOn() -> buildSapphire(current)
+            pane && current.holo -> fill.shader = LinearGradient(
+                0f, glass.top, 0f, glass.bottom,
+                Hud.withAlpha(0xFF0B3A44.toInt(), 0.35f + 0.55f * opacity),
+                Hud.withAlpha(Hud.HOLO_GLASS_BOTTOM, 0.45f + 0.5f * opacity),
+                Shader.TileMode.CLAMP,
+            )
+            pane -> fill.color = Hud.withAlpha(Hud.blend(current.skin, current.edge, 0.07f), 0.5f + 0.45f * opacity)
+            current.holo -> fill.shader = LinearGradient(
                 0f, glass.top, 0f, glass.bottom,
                 Hud.withAlpha(current.skin, opacity),
                 Hud.withAlpha(Hud.blend(current.skin, Hud.INK, 0.75f), opacity),
                 Shader.TileMode.CLAMP,
             )
-        } else {
-            fill.color = Hud.withAlpha(current.skin, opacity)
+            else -> fill.color = Hud.withAlpha(current.skin, opacity)
         }
         if (current.holo && !pane) {
             grain.shader = BitmapShader(grainBitmap, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT)
@@ -192,6 +244,75 @@ internal class PanelGlassDrawable(
                 Shader.TileMode.CLAMP,
             )
         }
+        if (titaniumOn()) buildTitanium(current)
+    }
+
+    /** Dark brushed titanium: a cool metal gradient, fine brushed streaks, and carbon fiber for the title bar. */
+    private fun buildTitanium(current: PanelLook) {
+        val frameAlpha = 0.35f + 0.65f * current.opacity
+        metal.shader = LinearGradient(
+            0f, glass.top, 0f, glass.bottom,
+            intArrayOf(
+                Hud.withAlpha(0xFF4A5157.toInt(), frameAlpha),
+                Hud.withAlpha(0xFF23282C.toInt(), frameAlpha),
+                Hud.withAlpha(0xFF15181B.toInt(), frameAlpha),
+                Hud.withAlpha(0xFF2B3035.toInt(), frameAlpha),
+            ),
+            floatArrayOf(0f, 0.18f, 0.7f, 1f),
+            Shader.TileMode.CLAMP,
+        )
+        brushed.shader = BitmapShader(brushedBitmap, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT)
+        brushed.alpha = (255 * 0.55f * frameAlpha).toInt()
+        carbon.shader = BitmapShader(carbonTile(density), Shader.TileMode.REPEAT, Shader.TileMode.REPEAT)
+        carbon.alpha = (255 * (0.25f + 0.65f * current.opacity)).toInt()
+        bevelLight.shader = LinearGradient(
+            glass.left, glass.top, glass.right, glass.bottom,
+            intArrayOf(Hud.withAlpha(Hud.WHITE, 0.45f * frameAlpha), Hud.withAlpha(Hud.WHITE, 0.08f), 0x00FFFFFF),
+            floatArrayOf(0f, 0.45f, 1f),
+            Shader.TileMode.CLAMP,
+        )
+        val barBottom = minOf(inside.top + headerHeight, inside.bottom)
+        titleShadow = LinearGradient(
+            0f, barBottom, 0f, barBottom + dp(5f),
+            Hud.withAlpha(Hud.INK, 0.55f), 0x00000000, Shader.TileMode.CLAMP,
+        )
+    }
+
+    /** Thick sapphire glass: deep tinted color, frost, an inner shadow at the top and left, and a soft sheen. */
+    private fun buildSapphire(current: PanelLook) {
+        val opacity = current.opacity
+        val tint = current.glassTint
+        fill.shader = LinearGradient(
+            0f, glass.top, 0f, glass.bottom,
+            intArrayOf(
+                Hud.withAlpha(Hud.lighten(tint, 0.06f), 0.8f + 0.18f * opacity),
+                Hud.withAlpha(tint, 0.82f + 0.16f * opacity),
+                Hud.withAlpha(Hud.blend(tint, Hud.INK, 0.55f), 0.86f + 0.13f * opacity),
+            ),
+            floatArrayOf(0f, 0.35f, 1f),
+            Shader.TileMode.CLAMP,
+        )
+        grain.shader = BitmapShader(grainBitmap, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT)
+        grain.alpha = 150
+        val depth = minOf(dp(14f), glass.height() / 4f)
+        topShadow = LinearGradient(
+            0f, glass.top, 0f, glass.top + depth,
+            Hud.withAlpha(Hud.INK, 0.7f), 0x00000000, Shader.TileMode.CLAMP,
+        )
+        sideShadow = LinearGradient(
+            glass.left, 0f, glass.left + depth * 0.7f, 0f,
+            Hud.withAlpha(Hud.INK, 0.5f), 0x00000000, Shader.TileMode.CLAMP,
+        )
+        bottomLight = LinearGradient(
+            0f, glass.bottom - dp(8f), 0f, glass.bottom,
+            0x00FFFFFF, Hud.withAlpha(Hud.lighten(tint, 0.6f), 0.12f), Shader.TileMode.CLAMP,
+        )
+        glassSheen = LinearGradient(
+            glass.left, glass.top, glass.left + glass.width() * 0.55f, glass.top + glass.height() * 0.4f,
+            intArrayOf(0x00FFFFFF, Hud.withAlpha(Hud.WHITE, 0.07f), 0x00FFFFFF),
+            floatArrayOf(0.35f, 0.5f, 0.65f),
+            Shader.TileMode.CLAMP,
+        )
     }
 
     /** Blurs the glow shapes once for this size. Kept for the last two sizes, like panel and tag. */
@@ -258,16 +379,27 @@ internal class PanelGlassDrawable(
     override fun draw(canvas: Canvas) {
         val current = look ?: return
         if (bounds.isEmpty || glass.isEmpty) return
+        if (sapphireOn()) {
+            drawSapphire(canvas, current)
+            return
+        }
         val strength = current.glowStrength
         val breathing = if (current.pulse) breath else 0.8f
         val glow = masksFor()
         if (glow != null && current.outerGlowOn && strength > 0f) {
             drawMask(canvas, glow.outer, current.outerGlow, strength * (0.35f + 0.65f * breathing), current.swirl)
         }
-        canvas.drawPath(shape, fill)
-        if (current.holo && !pane) {
-            canvas.drawPath(shape, grain)
-            canvas.drawPath(shape, sheen)
+        val titanium = titaniumOn() && !frameBand.isEmpty
+        if (titanium) {
+            canvas.drawPath(innerShape, fill)
+            drawCarbonTitleBar(canvas)
+            drawFrame(canvas)
+        } else {
+            canvas.drawPath(shape, fill)
+            if (current.holo && !pane) {
+                canvas.drawPath(shape, grain)
+                canvas.drawPath(shape, sheen)
+            }
         }
         if (glow != null && current.edgeGlow && strength > 0f) {
             drawMask(canvas, glow.edge, current.edge, strength * (0.4f + 0.6f * breathing), current.swirl)
@@ -275,14 +407,80 @@ internal class PanelGlassDrawable(
         line.strokeWidth = dp(if (pane) 1f else 1.25f)
         line.color = Hud.withAlpha(current.edge, if (pane) 0.5f else 0.92f)
         canvas.drawPath(shape, line)
+        if (titanium) {
+            // A thin line of light where the frame meets the glass, like the edge of an inset screen.
+            line.strokeWidth = dp(1f)
+            line.color = Hud.withAlpha(current.edge, 0.3f + 0.35f * strength * breathing)
+            canvas.drawPath(innerShape, line)
+        }
         if (current.holo) {
             line.strokeWidth = dp(1f)
             line.color = Hud.withAlpha(current.edge, 0.16f + 0.1f * strength)
-            if (!pane) canvas.drawPath(inner, line)
+            if (!pane && !titanium) canvas.drawPath(inner, line)
             line.color = Hud.withAlpha(current.edge, 0.4f)
             canvas.drawPath(ticks, line)
             holoStroke(canvas, brackets, current.decor, strength)
         }
+    }
+
+    /** The titanium band: metal, brushed streaks, a light bevel outside, and a dark bevel inside. */
+    private fun drawFrame(canvas: Canvas) {
+        canvas.drawPath(frameBand, metal)
+        canvas.drawPath(frameBand, brushed)
+        bevelLight.strokeWidth = dp(1.2f)
+        canvas.save()
+        canvas.clipPath(frameBand)
+        canvas.drawPath(shape, bevelLight)
+        shade.style = Paint.Style.STROKE
+        shade.shader = null
+        shade.color = Hud.withAlpha(Hud.INK, 0.75f)
+        shade.strokeWidth = dp(2.2f)
+        canvas.drawPath(innerShape, shade)
+        canvas.restore()
+    }
+
+    /** The title bar sits on woven carbon fiber, with a soft shadow under it. */
+    private fun drawCarbonTitleBar(canvas: Canvas) {
+        if (headerHeight <= 0f) return
+        val bottom = minOf(inside.top + headerHeight, inside.bottom)
+        canvas.save()
+        canvas.clipPath(innerShape)
+        canvas.clipRect(inside.left, inside.top, inside.right, bottom)
+        canvas.drawRect(inside.left, inside.top, inside.right, bottom, carbon)
+        canvas.restore()
+        shade.style = Paint.Style.FILL
+        shade.shader = titleShadow
+        canvas.drawRect(inside.left, bottom, inside.right, minOf(bottom + dp(5f), inside.bottom), shade)
+        shade.shader = null
+    }
+
+    /** A sapphire pane: deep glass, frost, inner shadows, a soft sheen, and a thin rim of light. */
+    private fun drawSapphire(canvas: Canvas, current: PanelLook) {
+        canvas.drawPath(shape, fill)
+        canvas.save()
+        canvas.clipPath(shape)
+        canvas.drawRect(glass, grain)
+        shade.style = Paint.Style.FILL
+        shade.shader = topShadow
+        canvas.drawRect(glass, shade)
+        shade.shader = sideShadow
+        canvas.drawRect(glass, shade)
+        shade.shader = bottomLight
+        canvas.drawRect(glass, shade)
+        shade.shader = glassSheen
+        canvas.drawRect(glass, shade)
+        shade.shader = null
+        canvas.restore()
+        line.strokeWidth = dp(1f)
+        line.color = Hud.withAlpha(current.edge, 0.55f)
+        canvas.drawPath(shape, line)
+        line.strokeWidth = dp(0.8f)
+        line.color = Hud.withAlpha(Hud.WHITE, 0.1f)
+        canvas.save()
+        canvas.translate(dp(1.2f), dp(1.2f))
+        canvas.clipRect(glass.left, glass.top, glass.right - dp(2.4f), glass.bottom - dp(2.4f))
+        canvas.drawPath(shape, line)
+        canvas.restore()
     }
 
     /** Holo Classic's glow: soft wide strokes under one bright thin stroke. */
@@ -314,15 +512,12 @@ internal class PanelGlassDrawable(
     override fun getOpacity(): Int = PixelFormat.TRANSLUCENT
 
     private companion object {
-        /** Faint white specks that make Holo Classic's glass look frosted. */
-        val grainBitmap: Bitmap by lazy {
-            val size = 96
-            val random = Random(23)
-            val pixels = IntArray(size * size) {
-                val speck = random.nextInt(0, 22)
-                (speck shl 24) or 0x00FFFFFF
-            }
-            Bitmap.createBitmap(pixels, size, size, Bitmap.Config.ARGB_8888)
-        }
+        /** How wide the titanium frame is. */
+        const val FRAME_DP = 6f
+
+        val grainBitmap: Bitmap get() = PanelTextures.grain
+        val brushedBitmap: Bitmap get() = PanelTextures.brushed
+
+        fun carbonTile(density: Float): Bitmap = PanelTextures.carbon(density)
     }
 }

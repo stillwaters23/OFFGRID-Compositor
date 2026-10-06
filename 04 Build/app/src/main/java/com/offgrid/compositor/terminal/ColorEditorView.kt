@@ -31,10 +31,13 @@ internal class ColorEditorView(
     init {
         orientation = VERTICAL
         setPadding(0, Hud.dpi(context, 2f), 0, Hud.dpi(context, 4f))
+        // The typing glow around a box may reach a little past its row.
+        clipChildren = false
 
         val top = LinearLayout(context).apply {
             orientation = HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
+            clipChildren = false
         }
         top.addView(swatch, LayoutParams(Hud.dpi(context, 60f), Hud.dpi(context, 60f)))
         val code = LinearLayout(context).apply { orientation = VERTICAL }
@@ -59,6 +62,7 @@ internal class ColorEditorView(
 
         addView(label(R.string.terminal_color_mix))
         val grid = TileGrid(context, MIX_CELL_DP, evenRows = true)
+        grid.clipChildren = false
         val start = store.mix(part)
         RainbowMix.NAMES.forEachIndexed { index, name ->
             val cell = LinearLayout(context).apply {
