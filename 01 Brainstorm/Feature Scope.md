@@ -59,7 +59,7 @@ Everything the terminal says to Royalty, including guidance lines, IP leak alert
 29. **Red sweep kick animation (new).** An extra-long red carpet-style sweep rolls across Royalty's video box when the kick toggle flips, in all 11 platform folders.
 30. **Depth shift (new).** Royalty's video seems to burst out of the screen toward the viewer, then snaps back.
 31. **Laser calligraphy writing (new).** A laser beam writes Royalty's typed words in calligraphy across the video box in real time.
-32. **Radar sweep (new).** A security-scanner radar beam rotates around Royalty's video box, pinging as it goes.
+32. **Radar sweep (new).** A security-scanner radar beam rotates around Royalty's video box, pinging as it goes, with a face mode and a no-face background mode.
 33. **Echo trail (new).** Fading copies of Royalty's movements trail behind for about a second, then dissolve.
 
 Related design references are in `03 Design/References`. The toggles there should all look exactly the same as each other, and the typewriter style follows the Grok Bot Laser Typewriter UI Spec.
@@ -389,6 +389,10 @@ Related design references are in `03 Design/References`. The toggles there shoul
 **What it does:** a radar beam rotates around Royalty's video box like a security scanner, with a glowing sweep line and fading trail, pinging as it goes.
 
 - Each pass can light up small blips. The ping is mixed into the outgoing stream audio so viewers hear it, and it can be muted.
+- **Two modes, picked with a toggle in the terminal folder:**
+  1. **Face mode:** the radar finds Royalty's face (using on-phone face tracking, like the MediaPipe face finder) and locks blips and pings onto it as the beam passes.
+  2. **No-face mode:** the radar sweeps the background scenery instead and pings things in the room, like edges, shapes, and objects, without targeting a face.
+- Face tracking runs only on the phone. No face data is saved or sent anywhere.
 - It's baked into the outgoing video, following the core design rule, and it has to pass the viewer-side success code check before HR can mark it PASS.
 - On/off toggle. Sweep speed, size, glow strength, and ping volume are typed numbers from 0 to 100, never sliders. The beam color is a picker.
 - Scope only. Nothing is built yet.
