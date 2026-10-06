@@ -162,7 +162,7 @@ jobs:
           3. Titles and typed words are bright laser teal with a strong glow.
           4. The laser cursor is one solid white block. No soft glow around it.
           5. The corners are sharp. Corner roundness starts at 4.
-          6. Look inside the ball of any toggle. The red or green light flows inside the glass.
+          6. The toggles are the original red OFF and green ON pictures. The swirl inside them is gone.
 
           How to test the panel
           1. At the top, tap the WIDTH box. Type 30. Tap Done. The panel gets narrower.
@@ -190,7 +190,7 @@ jobs:
           13. Swipe OFFGRID away from your recent apps. Open it again.
               Your size, place, and settings are kept.
           14. In your phone's Settings, search for Remove animations. Turn it on.
-              The glow, the toggle swirl, and the touch ripples stop. The cursor glow stays off.
+              The glow stops breathing and touching the edge makes no ripple. The cursor glow stays off.
               Turn Remove animations off again when you are done.
 
           How to check the video

@@ -3,14 +3,13 @@ package com.offgrid.compositor.terminal
 import android.content.Context
 import android.content.res.Resources
 
-/** The nine parts of the panel that each have their own color folder. */
+/** The eight parts of the panel that each have their own color folder. */
 internal enum class ColorPart(val key: String, val title: String) {
     SKIN("skin", "Skin color"),
     EDGE("edge", "Edge color"),
     OUTER_GLOW("outer_glow", "Outer glow color"),
     TEXT("text", "Typewriter text color"),
     CURSOR("cursor", "Laser cursor color"),
-    TOGGLE_GLOW("toggle_glow", "Toggle glow color"),
     FOLDER("folder", "Folder icon color"),
     SIDE_TEXT("side_text", "Side list text color"),
     STATUS("status", "Status line color"),
@@ -76,7 +75,6 @@ internal object LookKeys {
     const val GLOW = "glow"
     const val PULSE_SPEED = "pulse_speed"
     const val SWIRL_SPEED = "swirl_speed"
-    const val TOGGLE_GLOW = "toggle_glow"
 
     /** Step 2.3: the soft glow around the laser cursor. 0 means a solid block only. */
     const val CURSOR_GLOW = "cursor_glow"
@@ -94,7 +92,6 @@ internal object LookKeys {
     const val OUTER_GLOW = "outer_glow"
     const val PULSE = "pulse"
     const val SWIRL = "swirl"
-    const val TOGGLE_SWIRL = "toggle_swirl"
 
     /** Step 2.2 premium look and touch feel. */
     const val TITANIUM_FRAME = "titanium_frame"
@@ -130,7 +127,6 @@ internal object Themes {
         ColorPart.OUTER_GLOW to SystemRole.ACCENT1_400,
         ColorPart.TEXT to SystemRole.ACCENT1_100,
         ColorPart.CURSOR to SystemRole.ACCENT1_300,
-        ColorPart.TOGGLE_GLOW to SystemRole.ACCENT3_200,
         ColorPart.FOLDER to SystemRole.ACCENT1_300,
         ColorPart.SIDE_TEXT to SystemRole.NEUTRAL1_100,
         ColorPart.STATUS to SystemRole.ACCENT1_200,
@@ -150,13 +146,13 @@ internal object Themes {
             },
             numbers = mapOf(
                 LookKeys.OPACITY to 80, LookKeys.CORNERS to 4, LookKeys.GLOW to 70,
-                LookKeys.PULSE_SPEED to 35, LookKeys.SWIRL_SPEED to 30, LookKeys.TOGGLE_GLOW to 60,
+                LookKeys.PULSE_SPEED to 35, LookKeys.SWIRL_SPEED to 30,
                 LookKeys.CURSOR_GLOW to 0,
             ),
             toggles = mapOf(
                 LookKeys.SCAN_LINE to true, LookKeys.RING to true, LookKeys.UNFOLD to true,
                 LookKeys.EDGE_GLOW to true, LookKeys.OUTER_GLOW to true, LookKeys.PULSE to true,
-                LookKeys.SWIRL to true, LookKeys.TOGGLE_SWIRL to true,
+                LookKeys.SWIRL to true,
                 LookKeys.TITANIUM_FRAME to true, LookKeys.SAPPHIRE_GLASS to true,
                 LookKeys.TOUCH_GLOW to true, LookKeys.TYPING_GLOW to true,
             ),
@@ -168,20 +164,19 @@ internal object Themes {
                 ColorPart.OUTER_GLOW to fixed(0xFF00BFB3.toInt(), role(ColorPart.OUTER_GLOW)),
                 ColorPart.TEXT to fixed(LASER_TEAL, role(ColorPart.TEXT)),
                 ColorPart.CURSOR to fixed(CURSOR_WHITE, role(ColorPart.CURSOR)),
-                ColorPart.TOGGLE_GLOW to fixed(LASER_TEAL, role(ColorPart.TOGGLE_GLOW)),
                 ColorPart.FOLDER to fixed(0xFF36E9FF.toInt(), role(ColorPart.FOLDER)),
                 ColorPart.SIDE_TEXT to fixed(0xFFBDEFF0.toInt(), role(ColorPart.SIDE_TEXT)),
                 ColorPart.STATUS to fixed(LASER_TEAL, role(ColorPart.STATUS)),
             ),
             numbers = mapOf(
                 LookKeys.OPACITY to 85, LookKeys.CORNERS to 4, LookKeys.GLOW to 80,
-                LookKeys.PULSE_SPEED to 35, LookKeys.SWIRL_SPEED to 30, LookKeys.TOGGLE_GLOW to 70,
+                LookKeys.PULSE_SPEED to 35, LookKeys.SWIRL_SPEED to 30,
                 LookKeys.CURSOR_GLOW to 0,
             ),
             toggles = mapOf(
                 LookKeys.SCAN_LINE to true, LookKeys.RING to true, LookKeys.UNFOLD to true,
                 LookKeys.EDGE_GLOW to true, LookKeys.OUTER_GLOW to true, LookKeys.PULSE to true,
-                LookKeys.SWIRL to true, LookKeys.TOGGLE_SWIRL to true,
+                LookKeys.SWIRL to true,
                 LookKeys.TITANIUM_FRAME to true, LookKeys.SAPPHIRE_GLASS to true,
                 LookKeys.TOUCH_GLOW to true, LookKeys.TYPING_GLOW to true,
             ),
@@ -193,20 +188,19 @@ internal object Themes {
                 ColorPart.OUTER_GLOW to fixed(0xFF00FF41.toInt(), role(ColorPart.OUTER_GLOW)),
                 ColorPart.TEXT to fixed(Hud.HOLO_LASER, role(ColorPart.TEXT)),
                 ColorPart.CURSOR to fixed(Hud.HOLO_LASER, role(ColorPart.CURSOR)),
-                ColorPart.TOGGLE_GLOW to fixed(Hud.HOLO_LASER, role(ColorPart.TOGGLE_GLOW)),
                 ColorPart.FOLDER to fixed(Hud.HOLO_LASER, role(ColorPart.FOLDER)),
                 ColorPart.SIDE_TEXT to fixed(0xFF8FE38F.toInt(), role(ColorPart.SIDE_TEXT)),
                 ColorPart.STATUS to fixed(Hud.HOLO_LASER, role(ColorPart.STATUS)),
             ),
             numbers = mapOf(
                 LookKeys.OPACITY to 92, LookKeys.CORNERS to 0, LookKeys.GLOW to 0,
-                LookKeys.PULSE_SPEED to 35, LookKeys.SWIRL_SPEED to 30, LookKeys.TOGGLE_GLOW to 0,
+                LookKeys.PULSE_SPEED to 35, LookKeys.SWIRL_SPEED to 30,
                 LookKeys.CURSOR_GLOW to 0,
             ),
             toggles = mapOf(
                 LookKeys.SCAN_LINE to false, LookKeys.RING to false, LookKeys.UNFOLD to false,
                 LookKeys.EDGE_GLOW to false, LookKeys.OUTER_GLOW to false, LookKeys.PULSE to false,
-                LookKeys.SWIRL to false, LookKeys.TOGGLE_SWIRL to false,
+                LookKeys.SWIRL to false,
                 LookKeys.TITANIUM_FRAME to false, LookKeys.SAPPHIRE_GLASS to false,
                 LookKeys.TOUCH_GLOW to false, LookKeys.TYPING_GLOW to false,
             ),
@@ -218,20 +212,19 @@ internal object Themes {
                 ColorPart.OUTER_GLOW to phone(SystemRole.ACCENT1_300),
                 ColorPart.TEXT to phone(SystemRole.NEUTRAL1_50),
                 ColorPart.CURSOR to phone(SystemRole.ACCENT1_200),
-                ColorPart.TOGGLE_GLOW to phone(SystemRole.ACCENT2_200),
                 ColorPart.FOLDER to phone(SystemRole.ACCENT2_200),
                 ColorPart.SIDE_TEXT to phone(SystemRole.NEUTRAL1_100),
                 ColorPart.STATUS to phone(SystemRole.ACCENT1_100),
             ),
             numbers = mapOf(
                 LookKeys.OPACITY to 75, LookKeys.CORNERS to 6, LookKeys.GLOW to 45,
-                LookKeys.PULSE_SPEED to 35, LookKeys.SWIRL_SPEED to 30, LookKeys.TOGGLE_GLOW to 40,
+                LookKeys.PULSE_SPEED to 35, LookKeys.SWIRL_SPEED to 30,
                 LookKeys.CURSOR_GLOW to 0,
             ),
             toggles = mapOf(
                 LookKeys.SCAN_LINE to false, LookKeys.RING to true, LookKeys.UNFOLD to true,
                 LookKeys.EDGE_GLOW to true, LookKeys.OUTER_GLOW to true, LookKeys.PULSE to false,
-                LookKeys.SWIRL to false, LookKeys.TOGGLE_SWIRL to false,
+                LookKeys.SWIRL to false,
                 LookKeys.TITANIUM_FRAME to true, LookKeys.SAPPHIRE_GLASS to true,
                 LookKeys.TOUCH_GLOW to true, LookKeys.TYPING_GLOW to true,
             ),
@@ -243,20 +236,19 @@ internal object Themes {
                 ColorPart.OUTER_GLOW to fixed(Hud.HOLO_CYAN, role(ColorPart.OUTER_GLOW)),
                 ColorPart.TEXT to fixed(Hud.HOLO_LASER, role(ColorPart.TEXT)),
                 ColorPart.CURSOR to fixed(Hud.HOLO_LASER, role(ColorPart.CURSOR)),
-                ColorPart.TOGGLE_GLOW to fixed(Hud.HOLO_CYAN, role(ColorPart.TOGGLE_GLOW)),
                 ColorPart.FOLDER to fixed(Hud.HOLO_CYAN, role(ColorPart.FOLDER)),
                 ColorPart.SIDE_TEXT to fixed(Hud.HOLO_TEXT, role(ColorPart.SIDE_TEXT)),
                 ColorPart.STATUS to fixed(Hud.HOLO_LASER, role(ColorPart.STATUS)),
             ),
             numbers = mapOf(
                 LookKeys.OPACITY to 50, LookKeys.CORNERS to 55, LookKeys.GLOW to 70,
-                LookKeys.PULSE_SPEED to 35, LookKeys.SWIRL_SPEED to 30, LookKeys.TOGGLE_GLOW to 0,
+                LookKeys.PULSE_SPEED to 35, LookKeys.SWIRL_SPEED to 30,
                 LookKeys.CURSOR_GLOW to 0,
             ),
             toggles = mapOf(
                 LookKeys.SCAN_LINE to true, LookKeys.RING to true, LookKeys.UNFOLD to true,
                 LookKeys.EDGE_GLOW to true, LookKeys.OUTER_GLOW to false, LookKeys.PULSE to false,
-                LookKeys.SWIRL to false, LookKeys.TOGGLE_SWIRL to false,
+                LookKeys.SWIRL to false,
                 LookKeys.TITANIUM_FRAME to false, LookKeys.SAPPHIRE_GLASS to false,
                 LookKeys.TOUCH_GLOW to true, LookKeys.TYPING_GLOW to true,
             ),
@@ -287,7 +279,6 @@ internal data class PanelLook(
     val outerGlow: Int,
     val text: Int,
     val cursor: Int,
-    val toggleGlow: Int,
     val folder: Int,
     val sideText: Int,
     val status: Int,
@@ -302,8 +293,6 @@ internal data class PanelLook(
     val pulseSpeed: Float,
     val swirl: Boolean,
     val swirlSpeed: Float,
-    val toggleSwirl: Boolean,
-    val toggleGlowStrength: Float,
     val roundness: Float,
     val fontScale: Float,
     val ring: Boolean,
@@ -451,7 +440,6 @@ internal class ThemeStore(private val context: Context, private val prefs: Panel
             outerGlow = color(ColorPart.OUTER_GLOW),
             text = text,
             cursor = color(ColorPart.CURSOR),
-            toggleGlow = color(ColorPart.TOGGLE_GLOW),
             folder = folder,
             sideText = color(ColorPart.SIDE_TEXT),
             status = color(ColorPart.STATUS),
@@ -466,8 +454,6 @@ internal class ThemeStore(private val context: Context, private val prefs: Panel
             pulseSpeed = number(LookKeys.PULSE_SPEED) / 100f,
             swirl = toggle(LookKeys.SWIRL),
             swirlSpeed = number(LookKeys.SWIRL_SPEED) / 100f,
-            toggleSwirl = toggle(LookKeys.TOGGLE_SWIRL),
-            toggleGlowStrength = number(LookKeys.TOGGLE_GLOW) / 100f,
             roundness = number(LookKeys.CORNERS) / 100f,
             fontScale = fontScale,
             ring = toggle(LookKeys.RING),

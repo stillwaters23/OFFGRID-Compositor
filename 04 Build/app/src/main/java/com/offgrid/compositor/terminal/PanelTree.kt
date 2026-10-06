@@ -127,7 +127,7 @@ internal object PanelTree {
 
     /**
      * Panel settings. Every control sits inside a folder. Nothing is loose here.
-     * The theme office is the Themes, Colors, Glow effects, and Toggle style folders.
+     * The theme office is the Themes, Colors, and Glow effects folders.
      */
     private fun settingsFolder() = PanelFolder(
         id = "panel_settings",
@@ -140,7 +140,6 @@ internal object PanelTree {
             themesFolder(),
             colorsFolder(),
             glowFolder(),
-            toggleStyleFolder(),
             resetFolder(),
         ),
         notes = listOf(
@@ -215,7 +214,7 @@ internal object PanelTree {
                 true,
                 isTest = false,
             ),
-            ToggleItem(LookKeys.TICK, "Tick when saved", "Your phone ticks softly when a number is saved.", true, isTest = false),
+            ToggleItem(LookKeys.TICK, "Tick when saved", "Your phone ticks softly when a setting is saved.", true, isTest = false),
         ),
         notes = listOf(
             "These change what the panel shows.",
@@ -289,7 +288,6 @@ internal object PanelTree {
         ColorPart.OUTER_GLOW to "This colors the soft glow outside the panel.",
         ColorPart.TEXT to "This colors the typed guidance text.",
         ColorPart.CURSOR to "This colors the laser cursor. It is one solid color.",
-        ColorPart.TOGGLE_GLOW to "This colors the swirl inside each toggle.",
         ColorPart.FOLDER to "This colors the folder icons.",
         ColorPart.SIDE_TEXT to "This colors the folder names.",
         ColorPart.STATUS to "This colors the status line at the top.",
@@ -313,29 +311,13 @@ internal object PanelTree {
                 true,
                 isTest = false,
             ),
-            NumberItem(LookKeys.SWIRL_SPEED, "Swirl speed", "How fast all the liquid light moves."),
+            NumberItem(LookKeys.SWIRL_SPEED, "Swirl speed", "How fast the liquid light moves."),
             ToggleItem(LookKeys.TOUCH_GLOW, "Touch glow", "Light ripples where you touch the panel's edge.", true, isTest = false),
             ToggleItem(LookKeys.TYPING_GLOW, "Typing glow", "The box you are typing in glows softly.", true, isTest = false),
         ),
         notes = listOf(
             "Bioluminescent means it glows like living sea light.",
             "Pulse makes the glow breathe slowly.",
-        ),
-    )
-
-    private fun toggleStyleFolder() = PanelFolder(
-        id = "toggle_style",
-        title = "📁 Toggle style",
-        tag = null,
-        kind = FolderKind.OFFICE,
-        folders = listOf(colorFolder("toggle_style", ColorPart.TOGGLE_GLOW)),
-        items = listOf(
-            ToggleItem(LookKeys.TOGGLE_SWIRL, "Liquid swirl", "Light swirls inside each toggle's ball.", true, isTest = false),
-            NumberItem(LookKeys.TOGGLE_GLOW, "Glow strength", "How bright the light inside each toggle is."),
-        ),
-        notes = listOf(
-            "These change the light inside each toggle.",
-            "The red and green toggle art stays the same.",
         ),
     )
 

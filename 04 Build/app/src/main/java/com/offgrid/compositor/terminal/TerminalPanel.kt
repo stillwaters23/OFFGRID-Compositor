@@ -50,7 +50,7 @@ import kotlin.math.roundToInt
  * living glow. A side list and a grid of big glowing folders. Folders unfold like holograms
  * onto thick sapphire glass. Titles and typed text are Laser Jet Bright.
  * Panel settings holds only folders: Size, Display, Themes, Colors, Glow effects,
- * Toggle style, and Reset.
+ * and Reset.
  *
  * Drag the top bar to move it. A soft cross shows the middle while you drag.
  * Type Width and Height at the top, from 0 to 100, pinch with two fingers, or drag the
