@@ -17,6 +17,7 @@
 5. **Termux-style nested folders.** Folders nested inside folders, Termux-style. Bioluminescent glow-stick folders, not skinny folders.
 6. **Soundboard toggle (new).** Each effect can have its own sound.
 7. **Replay buffer (new).** Keeps the last 30 seconds of the outgoing stream.
+8. **Typed-to-speech (new).** Royalty types text and it's spoken out loud in the outgoing stream. It includes a Rex voice preset.
 
 Related design references are in `03 Design/References`. The toggles there should all look exactly the same as each other, and the typewriter style follows the Grok Bot Laser Typewriter UI Spec.
 
@@ -43,6 +44,22 @@ Related design references are in `03 Design/References`. The toggles there shoul
 - Clips stay on the phone only. No automatic upload anywhere.
 - The buffer length is a typed number (default 30 seconds), not a slider.
 - Keep the storage and battery cost small, and test on the Galaxy A37.
+
+## 8. Typed-to-speech, with a Rex voice preset
+
+**What it does:** Royalty types text, and it plays as spoken audio mixed into the outgoing Bigo stream, so the opponent and viewers hear it.
+
+- Provider options being compared: xAI TTS, ElevenLabs, Google Cloud Text-to-Speech, and Android's built-in TextToSpeech as a free offline fallback. Research is in progress and will be saved in `02 Research`.
+- It has to be fast enough for live use, so the speech should start soon after Royalty presses send.
+- The spoken audio mixes with the mic and the voice changer into the outgoing stream audio.
+- Volume and speed are typed numbers, never sliders.
+- Speech text stays on the phone. API keys are never kept in chat or in this repo.
+
+### Rex voice preset
+- This is a named preset in the voice picker called **Rex**.
+- The style is warm, sharp, and concise, like a calm operator.
+- It's built from a stock or designed voice tuned to that tone, not a clone of a real person's voice.
+- Royalty's own voices can be added as more presets later.
 
 ---
 
