@@ -69,4 +69,11 @@ internal object Hud {
     }
 
     fun lighten(color: Int, share: Float): Int = blend(color, WHITE, share)
+
+    /** 0 for grays, 1 for the most colorful colors. */
+    fun saturation(color: Int): Float {
+        val high = maxOf(Color.red(color), Color.green(color), Color.blue(color))
+        val low = minOf(Color.red(color), Color.green(color), Color.blue(color))
+        return if (high == 0) 0f else (high - low) / high.toFloat()
+    }
 }

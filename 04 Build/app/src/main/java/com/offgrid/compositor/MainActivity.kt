@@ -131,6 +131,7 @@ class MainActivity : AppCompatActivity() {
             buttons = listOf(recordButton, playButton, actionButton, backButton),
         )
         terminalPanel.onTestDiamond = { on -> onTestDiamondChanged(on) }
+        terminalPanel.useGuides(findViewById(R.id.snap_guides))
         describeCamera(terminalPanel.testDiamondOn)
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.root)) { _, insets ->
             terminalPanel.onKeyboardInset(insets.getInsets(WindowInsetsCompat.Type.ime()).bottom)

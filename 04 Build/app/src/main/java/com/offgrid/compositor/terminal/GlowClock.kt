@@ -5,7 +5,7 @@ import android.view.Choreographer
 import android.view.View
 
 /**
- * One shared clock for the living light: the panel's pulse and swirl, and the toggle swirls.
+ * One shared clock for the living light: the panel's pulse and swirl.
  * It only runs while something on screen needs it, and only about 30 times a second.
  * The phone skips the frames in between, which saves battery.
  * When the phone's "Remove animations" setting is on, nothing joins, so nothing moves.

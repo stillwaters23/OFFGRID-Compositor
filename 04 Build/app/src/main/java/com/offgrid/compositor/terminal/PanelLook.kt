@@ -3,14 +3,13 @@ package com.offgrid.compositor.terminal
 import android.content.Context
 import android.content.res.Resources
 
-/** The nine parts of the panel that each have their own color folder. */
+/** The eight parts of the panel that each have their own color folder. */
 internal enum class ColorPart(val key: String, val title: String) {
     SKIN("skin", "Skin color"),
     EDGE("edge", "Edge color"),
     OUTER_GLOW("outer_glow", "Outer glow color"),
     TEXT("text", "Typewriter text color"),
     CURSOR("cursor", "Laser cursor color"),
-    TOGGLE_GLOW("toggle_glow", "Toggle glow color"),
     FOLDER("folder", "Folder icon color"),
     SIDE_TEXT("side_text", "Side list text color"),
     STATUS("status", "Status line color"),
@@ -51,7 +50,12 @@ internal enum class Theme(val key: String, val title: String, val blurb: String)
     OLED(
         "oled",
         "OLED Bioluminescent",
-        "True black glass in your phone's colors. The glow breathes like living sea light.",
+        "True black glass and teal laser text. Edges glow in your phone's colors.",
+    ),
+    TITANIUM(
+        "titanium_sapphire",
+        "Titanium Sapphire",
+        "Titanium frame. Sapphire glass. Teal laser light everywhere.",
     ),
     TERMUX("termux", "Termux Black", "Plain black. Green text. No glow."),
     SYSTEM("system", "System Colors", "Your phone's colors everywhere. Calm, with no pulse."),
@@ -71,7 +75,13 @@ internal object LookKeys {
     const val GLOW = "glow"
     const val PULSE_SPEED = "pulse_speed"
     const val SWIRL_SPEED = "swirl_speed"
-    const val TOGGLE_GLOW = "toggle_glow"
+
+    /** Step 2.3: the soft glow around the laser cursor. 0 means a solid block only. */
+    const val CURSOR_GLOW = "cursor_glow"
+
+    /** Panel size as a share of the room it may use. 0 is the smallest readable size. */
+    const val WIDTH = "width"
+    const val HEIGHT = "height"
 
     const val TEST_DIAMOND = "test_diamond"
     const val SCAN_LINE = "scan_line"
@@ -82,7 +92,14 @@ internal object LookKeys {
     const val OUTER_GLOW = "outer_glow"
     const val PULSE = "pulse"
     const val SWIRL = "swirl"
-    const val TOGGLE_SWIRL = "toggle_swirl"
+
+    /** Step 2.2 premium look and touch feel. */
+    const val TITANIUM_FRAME = "titanium_frame"
+    const val SAPPHIRE_GLASS = "sapphire_glass"
+    const val TOUCH_GLOW = "touch_glow"
+    const val TYPING_GLOW = "typing_glow"
+    const val TICK = "tick"
+    const val CENTER_GUIDE = "center_guide"
 }
 
 /** Everything a theme sets. Typing speed, font size, laser typing, and the test diamond are not theme settings. */
@@ -93,6 +110,12 @@ internal class ThemeSpec(
 )
 
 internal object Themes {
+    /** Laser Jet Bright cyan teal, for titles and typed text. */
+    const val LASER_TEAL = 0xFF2BF5E6.toInt()
+
+    /** Step 2.3: the laser cursor is a solid pure white block by default. */
+    const val CURSOR_WHITE = 0xFFFFFFFF.toInt()
+
     private fun phone(role: SystemRole) = PartSpec(system = true, role = role, custom = 0xFF000000.toInt())
 
     private fun fixed(color: Int, role: SystemRole) = PartSpec(system = false, role = role, custom = color)
@@ -104,7 +127,6 @@ internal object Themes {
         ColorPart.OUTER_GLOW to SystemRole.ACCENT1_400,
         ColorPart.TEXT to SystemRole.ACCENT1_100,
         ColorPart.CURSOR to SystemRole.ACCENT1_300,
-        ColorPart.TOGGLE_GLOW to SystemRole.ACCENT3_200,
         ColorPart.FOLDER to SystemRole.ACCENT1_300,
         ColorPart.SIDE_TEXT to SystemRole.NEUTRAL1_100,
         ColorPart.STATUS to SystemRole.ACCENT1_200,
@@ -113,16 +135,50 @@ internal object Themes {
     private fun role(part: ColorPart) = OLED_ROLES.getValue(part)
 
     fun spec(theme: Theme): ThemeSpec = when (theme) {
+        // Titles and typed text are Laser Jet Bright teal. The other accents follow the phone.
         Theme.OLED -> ThemeSpec(
-            parts = ColorPart.entries.associateWith { phone(role(it)) },
+            parts = ColorPart.entries.associateWith {
+                when (it) {
+                    in LASER_PARTS -> fixed(LASER_TEAL, role(it))
+                    ColorPart.CURSOR -> fixed(CURSOR_WHITE, role(it))
+                    else -> phone(role(it))
+                }
+            },
             numbers = mapOf(
-                LookKeys.OPACITY to 80, LookKeys.CORNERS to 40, LookKeys.GLOW to 70,
-                LookKeys.PULSE_SPEED to 35, LookKeys.SWIRL_SPEED to 30, LookKeys.TOGGLE_GLOW to 60,
+                LookKeys.OPACITY to 80, LookKeys.CORNERS to 4, LookKeys.GLOW to 70,
+                LookKeys.PULSE_SPEED to 35, LookKeys.SWIRL_SPEED to 30,
+                LookKeys.CURSOR_GLOW to 0,
             ),
             toggles = mapOf(
                 LookKeys.SCAN_LINE to true, LookKeys.RING to true, LookKeys.UNFOLD to true,
                 LookKeys.EDGE_GLOW to true, LookKeys.OUTER_GLOW to true, LookKeys.PULSE to true,
-                LookKeys.SWIRL to true, LookKeys.TOGGLE_SWIRL to true,
+                LookKeys.SWIRL to true,
+                LookKeys.TITANIUM_FRAME to true, LookKeys.SAPPHIRE_GLASS to true,
+                LookKeys.TOUCH_GLOW to true, LookKeys.TYPING_GLOW to true,
+            ),
+        )
+        Theme.TITANIUM -> ThemeSpec(
+            parts = mapOf(
+                ColorPart.SKIN to fixed(0xFF020809.toInt(), role(ColorPart.SKIN)),
+                ColorPart.EDGE to fixed(0xFF19E3D6.toInt(), role(ColorPart.EDGE)),
+                ColorPart.OUTER_GLOW to fixed(0xFF00BFB3.toInt(), role(ColorPart.OUTER_GLOW)),
+                ColorPart.TEXT to fixed(LASER_TEAL, role(ColorPart.TEXT)),
+                ColorPart.CURSOR to fixed(CURSOR_WHITE, role(ColorPart.CURSOR)),
+                ColorPart.FOLDER to fixed(0xFF36E9FF.toInt(), role(ColorPart.FOLDER)),
+                ColorPart.SIDE_TEXT to fixed(0xFFBDEFF0.toInt(), role(ColorPart.SIDE_TEXT)),
+                ColorPart.STATUS to fixed(LASER_TEAL, role(ColorPart.STATUS)),
+            ),
+            numbers = mapOf(
+                LookKeys.OPACITY to 85, LookKeys.CORNERS to 4, LookKeys.GLOW to 80,
+                LookKeys.PULSE_SPEED to 35, LookKeys.SWIRL_SPEED to 30,
+                LookKeys.CURSOR_GLOW to 0,
+            ),
+            toggles = mapOf(
+                LookKeys.SCAN_LINE to true, LookKeys.RING to true, LookKeys.UNFOLD to true,
+                LookKeys.EDGE_GLOW to true, LookKeys.OUTER_GLOW to true, LookKeys.PULSE to true,
+                LookKeys.SWIRL to true,
+                LookKeys.TITANIUM_FRAME to true, LookKeys.SAPPHIRE_GLASS to true,
+                LookKeys.TOUCH_GLOW to true, LookKeys.TYPING_GLOW to true,
             ),
         )
         Theme.TERMUX -> ThemeSpec(
@@ -132,19 +188,21 @@ internal object Themes {
                 ColorPart.OUTER_GLOW to fixed(0xFF00FF41.toInt(), role(ColorPart.OUTER_GLOW)),
                 ColorPart.TEXT to fixed(Hud.HOLO_LASER, role(ColorPart.TEXT)),
                 ColorPart.CURSOR to fixed(Hud.HOLO_LASER, role(ColorPart.CURSOR)),
-                ColorPart.TOGGLE_GLOW to fixed(Hud.HOLO_LASER, role(ColorPart.TOGGLE_GLOW)),
                 ColorPart.FOLDER to fixed(Hud.HOLO_LASER, role(ColorPart.FOLDER)),
                 ColorPart.SIDE_TEXT to fixed(0xFF8FE38F.toInt(), role(ColorPart.SIDE_TEXT)),
                 ColorPart.STATUS to fixed(Hud.HOLO_LASER, role(ColorPart.STATUS)),
             ),
             numbers = mapOf(
                 LookKeys.OPACITY to 92, LookKeys.CORNERS to 0, LookKeys.GLOW to 0,
-                LookKeys.PULSE_SPEED to 35, LookKeys.SWIRL_SPEED to 30, LookKeys.TOGGLE_GLOW to 0,
+                LookKeys.PULSE_SPEED to 35, LookKeys.SWIRL_SPEED to 30,
+                LookKeys.CURSOR_GLOW to 0,
             ),
             toggles = mapOf(
                 LookKeys.SCAN_LINE to false, LookKeys.RING to false, LookKeys.UNFOLD to false,
                 LookKeys.EDGE_GLOW to false, LookKeys.OUTER_GLOW to false, LookKeys.PULSE to false,
-                LookKeys.SWIRL to false, LookKeys.TOGGLE_SWIRL to false,
+                LookKeys.SWIRL to false,
+                LookKeys.TITANIUM_FRAME to false, LookKeys.SAPPHIRE_GLASS to false,
+                LookKeys.TOUCH_GLOW to false, LookKeys.TYPING_GLOW to false,
             ),
         )
         Theme.SYSTEM -> ThemeSpec(
@@ -154,19 +212,21 @@ internal object Themes {
                 ColorPart.OUTER_GLOW to phone(SystemRole.ACCENT1_300),
                 ColorPart.TEXT to phone(SystemRole.NEUTRAL1_50),
                 ColorPart.CURSOR to phone(SystemRole.ACCENT1_200),
-                ColorPart.TOGGLE_GLOW to phone(SystemRole.ACCENT2_200),
                 ColorPart.FOLDER to phone(SystemRole.ACCENT2_200),
                 ColorPart.SIDE_TEXT to phone(SystemRole.NEUTRAL1_100),
                 ColorPart.STATUS to phone(SystemRole.ACCENT1_100),
             ),
             numbers = mapOf(
-                LookKeys.OPACITY to 75, LookKeys.CORNERS to 70, LookKeys.GLOW to 45,
-                LookKeys.PULSE_SPEED to 35, LookKeys.SWIRL_SPEED to 30, LookKeys.TOGGLE_GLOW to 40,
+                LookKeys.OPACITY to 75, LookKeys.CORNERS to 6, LookKeys.GLOW to 45,
+                LookKeys.PULSE_SPEED to 35, LookKeys.SWIRL_SPEED to 30,
+                LookKeys.CURSOR_GLOW to 0,
             ),
             toggles = mapOf(
                 LookKeys.SCAN_LINE to false, LookKeys.RING to true, LookKeys.UNFOLD to true,
                 LookKeys.EDGE_GLOW to true, LookKeys.OUTER_GLOW to true, LookKeys.PULSE to false,
-                LookKeys.SWIRL to false, LookKeys.TOGGLE_SWIRL to false,
+                LookKeys.SWIRL to false,
+                LookKeys.TITANIUM_FRAME to true, LookKeys.SAPPHIRE_GLASS to true,
+                LookKeys.TOUCH_GLOW to true, LookKeys.TYPING_GLOW to true,
             ),
         )
         Theme.HOLO -> ThemeSpec(
@@ -176,26 +236,36 @@ internal object Themes {
                 ColorPart.OUTER_GLOW to fixed(Hud.HOLO_CYAN, role(ColorPart.OUTER_GLOW)),
                 ColorPart.TEXT to fixed(Hud.HOLO_LASER, role(ColorPart.TEXT)),
                 ColorPart.CURSOR to fixed(Hud.HOLO_LASER, role(ColorPart.CURSOR)),
-                ColorPart.TOGGLE_GLOW to fixed(Hud.HOLO_CYAN, role(ColorPart.TOGGLE_GLOW)),
                 ColorPart.FOLDER to fixed(Hud.HOLO_CYAN, role(ColorPart.FOLDER)),
                 ColorPart.SIDE_TEXT to fixed(Hud.HOLO_TEXT, role(ColorPart.SIDE_TEXT)),
                 ColorPart.STATUS to fixed(Hud.HOLO_LASER, role(ColorPart.STATUS)),
             ),
             numbers = mapOf(
                 LookKeys.OPACITY to 50, LookKeys.CORNERS to 55, LookKeys.GLOW to 70,
-                LookKeys.PULSE_SPEED to 35, LookKeys.SWIRL_SPEED to 30, LookKeys.TOGGLE_GLOW to 0,
+                LookKeys.PULSE_SPEED to 35, LookKeys.SWIRL_SPEED to 30,
+                LookKeys.CURSOR_GLOW to 0,
             ),
             toggles = mapOf(
                 LookKeys.SCAN_LINE to true, LookKeys.RING to true, LookKeys.UNFOLD to true,
                 LookKeys.EDGE_GLOW to true, LookKeys.OUTER_GLOW to false, LookKeys.PULSE to false,
-                LookKeys.SWIRL to false, LookKeys.TOGGLE_SWIRL to false,
+                LookKeys.SWIRL to false,
+                LookKeys.TITANIUM_FRAME to false, LookKeys.SAPPHIRE_GLASS to false,
+                LookKeys.TOUCH_GLOW to true, LookKeys.TYPING_GLOW to true,
             ),
         )
     }
 
+    /** Parts that are Laser Jet Bright teal in OLED Bioluminescent: the typed text and the status line. */
+    private val LASER_PARTS = setOf(ColorPart.TEXT, ColorPart.STATUS)
+
     /** Settings no theme touches, with their start values. */
-    val PERSONAL_NUMBERS = mapOf(LookKeys.TYPING to 50, LookKeys.FONT_SIZE to 50)
-    val PERSONAL_TOGGLES = mapOf(LookKeys.LASER_TYPING to true, LookKeys.TEST_DIAMOND to false)
+    val PERSONAL_NUMBERS = mapOf(
+        LookKeys.TYPING to 50, LookKeys.FONT_SIZE to 50, LookKeys.WIDTH to 100, LookKeys.HEIGHT to 32,
+    )
+    val PERSONAL_TOGGLES = mapOf(
+        LookKeys.LASER_TYPING to true, LookKeys.TEST_DIAMOND to false,
+        LookKeys.TICK to true, LookKeys.CENTER_GUIDE to true,
+    )
 }
 
 /** One part's saved state. */
@@ -209,7 +279,6 @@ internal data class PanelLook(
     val outerGlow: Int,
     val text: Int,
     val cursor: Int,
-    val toggleGlow: Int,
     val folder: Int,
     val sideText: Int,
     val status: Int,
@@ -224,8 +293,6 @@ internal data class PanelLook(
     val pulseSpeed: Float,
     val swirl: Boolean,
     val swirlSpeed: Float,
-    val toggleSwirl: Boolean,
-    val toggleGlowStrength: Float,
     val roundness: Float,
     val fontScale: Float,
     val ring: Boolean,
@@ -233,6 +300,18 @@ internal data class PanelLook(
     val scanLine: Boolean,
     val laserTyping: Boolean,
     val typingSpeed: Float,
+    /** Dark brushed titanium and woven carbon fiber around the glass. */
+    val titanium: Boolean,
+    /** Thick, deep sapphire glass inside the panel. */
+    val sapphire: Boolean,
+    /** The dark tint of the sapphire glass panes. */
+    val glassTint: Int,
+    /** 0 to 1. The optional soft glow around the cursor. 0 is a solid block only. */
+    val cursorGlow: Float,
+    val touchGlow: Boolean,
+    val typingGlow: Boolean,
+    val tick: Boolean,
+    val centerGuide: Boolean,
 ) {
     /** Holo Classic keeps the Step 2 cut corners, gold brackets, and tinted glass. */
     val holo: Boolean get() = base == Theme.HOLO
@@ -361,7 +440,6 @@ internal class ThemeStore(private val context: Context, private val prefs: Panel
             outerGlow = color(ColorPart.OUTER_GLOW),
             text = text,
             cursor = color(ColorPart.CURSOR),
-            toggleGlow = color(ColorPart.TOGGLE_GLOW),
             folder = folder,
             sideText = color(ColorPart.SIDE_TEXT),
             status = color(ColorPart.STATUS),
@@ -376,8 +454,6 @@ internal class ThemeStore(private val context: Context, private val prefs: Panel
             pulseSpeed = number(LookKeys.PULSE_SPEED) / 100f,
             swirl = toggle(LookKeys.SWIRL),
             swirlSpeed = number(LookKeys.SWIRL_SPEED) / 100f,
-            toggleSwirl = toggle(LookKeys.TOGGLE_SWIRL),
-            toggleGlowStrength = number(LookKeys.TOGGLE_GLOW) / 100f,
             roundness = number(LookKeys.CORNERS) / 100f,
             fontScale = fontScale,
             ring = toggle(LookKeys.RING),
@@ -385,9 +461,23 @@ internal class ThemeStore(private val context: Context, private val prefs: Panel
             scanLine = toggle(LookKeys.SCAN_LINE),
             laserTyping = toggle(LookKeys.LASER_TYPING),
             typingSpeed = number(LookKeys.TYPING) / 100f,
+            titanium = toggle(LookKeys.TITANIUM_FRAME),
+            sapphire = toggle(LookKeys.SAPPHIRE_GLASS),
+            glassTint = glassTint(text, edge),
+            cursorGlow = number(LookKeys.CURSOR_GLOW) / 100f,
+            touchGlow = toggle(LookKeys.TOUCH_GLOW),
+            typingGlow = toggle(LookKeys.TYPING_GLOW),
+            tick = toggle(LookKeys.TICK),
+            centerGuide = toggle(LookKeys.CENTER_GUIDE),
         )
         PanelLook.current = look
         return look
+    }
+
+    /** Sapphire glass takes the more colorful of the text and edge colors, deep and dark. */
+    private fun glassTint(text: Int, edge: Int): Int {
+        val source = if (Hud.saturation(text) >= Hud.saturation(edge)) text else edge
+        return Hud.blend(source, Hud.INK, 0.84f)
     }
 
     private companion object {

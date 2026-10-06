@@ -32,7 +32,7 @@
     <string name="terminal_back">‹ BACK</string>
     <string name="terminal_back_label">Go back one folder</string>
     <string name="terminal_home">HOME</string>
-    <string name="terminal_welcome">Terminal is on. Tap a folder to open it. Drag the top bar to move. Drag the corner lines to resize.</string>
+    <string name="terminal_welcome">Terminal is on. Tap a folder to open it. Drag the top bar to move. Pinch, or type Width and Height, to resize.</string>
     <string name="terminal_panel_open">The panel is open again.</string>
     <string name="terminal_folder_open">%1$s is open.</string>
     <string name="terminal_folder_empty">%1$s is empty for now.</string>
@@ -60,7 +60,12 @@
     <!-- Step 2.1. Resize, test diamond, and the theme office. Plain words, short sentences. -->
     <string name="terminal_resize">Resize corner. Drag it to make the panel bigger or smaller.</string>
     <string name="terminal_resize_hint">Drag this corner to make the panel bigger or smaller.</string>
-    <string name="terminal_resized">Panel size saved.</string>
+    <string name="terminal_size_saved">Size saved. Width is %1$d. Height is %2$d.</string>
+    <string name="terminal_width">Width</string>
+    <string name="terminal_height">Height</string>
+    <string name="terminal_width_caption">WIDTH</string>
+    <string name="terminal_height_caption">HEIGHT</string>
+    <string name="terminal_centered">The panel is in the middle now.</string>
     <string name="terminal_bigger">Make the panel bigger</string>
     <string name="terminal_smaller">Make the panel smaller</string>
     <string name="terminal_diamond_on">Test diamond is on. It shows in the video.</string>

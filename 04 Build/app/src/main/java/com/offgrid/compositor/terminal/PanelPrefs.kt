@@ -10,6 +10,20 @@ import androidx.core.content.edit
 internal class PanelPrefs(context: Context) {
     private val prefs = context.getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE)
 
+    init {
+        // Step 2.2 saves the size as Width and Height from 0 to 100, and opens the panel in the
+        // exact middle the first time. The old size and place from Step 2.1 are let go once.
+        if (prefs.getInt(LAYOUT, 0) < LAYOUT_NOW) {
+            prefs.edit {
+                remove(OLD_SIZE_W)
+                remove(OLD_SIZE_H)
+                remove(POSITION_X)
+                remove(POSITION_Y)
+                putInt(LAYOUT, LAYOUT_NOW)
+            }
+        }
+    }
+
     fun number(key: String, default: Int): Int {
         return prefs.getInt(NUMBER + key, default).coerceIn(0, 100)
     }
@@ -92,27 +106,12 @@ internal class PanelPrefs(context: Context) {
         }
     }
 
-    /** The panel's width and height in dp, if Royalty resized it. */
-    fun size(): Pair<Float, Float>? {
-        if (!prefs.contains(SIZE_W) || !prefs.contains(SIZE_H)) {
-            return null
-        }
-        return prefs.getFloat(SIZE_W, 0f) to prefs.getFloat(SIZE_H, 0f)
-    }
-
-    fun setSize(widthDp: Float, heightDp: Float) {
-        prefs.edit {
-            putFloat(SIZE_W, widthDp)
-            putFloat(SIZE_H, heightDp)
-        }
-    }
-
     /** Puts every setting back to the start. The private test markers stay. */
     fun resetAll() {
         val keep = TOGGLE + TEST_PREFIX
         prefs.edit {
             for (key in prefs.all.keys) {
-                if (!key.startsWith(keep)) remove(key)
+                if (!key.startsWith(keep) && key != LAYOUT) remove(key)
             }
         }
     }
@@ -128,7 +127,9 @@ internal class PanelPrefs(context: Context) {
         private const val ACTIVE_FOLDER = "active_folder"
         private const val POSITION_X = "position_x"
         private const val POSITION_Y = "position_y"
-        private const val SIZE_W = "size_w_dp"
-        private const val SIZE_H = "size_h_dp"
+        private const val OLD_SIZE_W = "size_w_dp"
+        private const val OLD_SIZE_H = "size_h_dp"
+        private const val LAYOUT = "layout_version"
+        private const val LAYOUT_NOW = 2
     }
 }
