@@ -18,6 +18,8 @@
 6. **Soundboard toggle (new).** Each effect can have its own sound.
 7. **Replay buffer (new).** Keeps the last 30 seconds of the outgoing stream.
 8. **Typed-to-speech (new).** Royalty types text and it's spoken out loud in the outgoing stream. It includes a Rex voice preset.
+9. **Ghost mode (new).** Makes Royalty invisible to everyone. Details to come.
+10. **Cloaking effect (new).** Predator-style cloak. Royalty's video box looks like empty void to the other person.
 
 Related design references are in `03 Design/References`. The toggles there should all look exactly the same as each other, and the typewriter style follows the Grok Bot Laser Typewriter UI Spec.
 
@@ -64,6 +66,20 @@ Related design references are in `03 Design/References`. The toggles there shoul
 - The style is warm, sharp, and concise, like a calm operator.
 - It uses xAI's stock Rex voice, not a clone of a real person's voice.
 - Royalty's own voices can be added as more presets later.
+
+## 9. Ghost mode
+
+**What it does:** makes Royalty invisible to everyone. Royalty's description is short so far, so more details are needed before this is designed.
+
+## 10. Cloaking effect (Predator style)
+
+**What it does:** while Royalty is in someone's video box during a call or battle, the box looks completely empty to the other person, like looking through a wormhole into nothing. They see a void or absence, not Royalty's face and not the room.
+
+- This is different from ghost mode. Ghost mode makes Royalty invisible to everyone. Cloaking makes the video box itself look like empty space to the viewer.
+- Inspired by the Predator cloak. It can have a shimmer or ripple edge when it turns on and off.
+- It has to be baked into the outgoing video so the other person actually sees it.
+- Strength and fade time are typed numbers, never sliders.
+- Scope only. Nothing is built yet.
 
 ## Voice effects (live voice changer)
 
