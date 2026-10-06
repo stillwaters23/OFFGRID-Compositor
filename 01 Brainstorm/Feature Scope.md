@@ -4,7 +4,7 @@
 **Owner:** Royalty  
 **Status:** Scope only. Nothing is built yet.  
 **Target:** Royalty's private Android build first (Galaxy S25 Ultra and Galaxy A37). A PC and OBS version can come later.  
-**Updated:** 2026-10-06 (America/Chicago). Features up to 25. ElevenLabs removed from all voice options.
+**Updated:** 2026-10-06 (America/Chicago). Features up to 26. ElevenLabs removed from all voice options.
 
 ---
 
@@ -52,6 +52,7 @@ Everything the terminal says to Royalty, including guidance lines, IP leak alert
 23. **Flying through clouds (new).** An aerial view soaring through clouds.
 24. **Beach theme (new).** Pure ocean beach scenery fills the whole box, with no person in frame.
 25. **IP leak check (new).** Shows what IP and country the other side sees, so Royalty can confirm ProtonVPN Stealth is masking the real IP. A leak sets off a red flash and a sound alert right away.
+26. **Time freeze (new).** Holds Royalty's outgoing video on one frame for a few seconds, then picks back up, like a glitch.
 
 Related design references are in `03 Design/References`. The toggles there should all look exactly the same as each other, and the typewriter style follows the Grok Bot Laser Typewriter UI Spec.
 
@@ -296,6 +297,18 @@ Related design references are in `03 Design/References`. The toggles there shoul
 - It runs once before the stream opens and again on a timer during the stream. The recheck interval is a typed number, never a slider.
 - Feasibility note: OFFGRID can't read what a platform's servers log. It confirms the address the internet sees from the phone on the same connection, which is what the platform also sees. It uses well-known IP-check services or a small self-hosted check, and stores no IP history outside the phone.
 - The result also shows as an `IP CHECK` line in the folder guidance panel (feature 19).
+- Scope only. Nothing is built yet.
+
+## 26. Time freeze
+
+**What it does:** one toggle freezes Royalty's outgoing video on the last frame for a few seconds while Royalty moves around off camera. Then live video picks back up like nothing happened, so it looks like the stream glitched.
+
+- While it's frozen, OFFGRID keeps sending that held frame in the outgoing video, so the viewer sees a paused picture instead of a dropped stream.
+- When it ends, live video comes back right away. A small glitch flicker on the way in and out is optional.
+- It's baked into the outgoing video, following the core design rule, so viewers see it.
+- On/off toggle. Freeze length in seconds and glitch strength are typed numbers from 0 to 100, never sliders.
+- Audio choice for later: mute the mic during the freeze, or let audio keep going. Decide before building.
+- Considered and declined: freezing the other person's stream on their own device. That would mean controlling video on someone else's phone or interfering with the platform's service, so it's out of scope. Time freeze only ever changes Royalty's own outgoing video.
 - Scope only. Nothing is built yet.
 
 ## Potential future feature: floating text overlay on calls
