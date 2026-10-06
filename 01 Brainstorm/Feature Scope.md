@@ -23,6 +23,7 @@
 11. **Camera blackout and cloaking modes (new).** Pick solid black, the cloak void, or a status label like "CLOAKED."
 12. **Screen takeover and flip-flop switch (new).** Make Royalty's video fill the screen, and swap who's big and who's small.
 13. **Terminal panel (new).** The draggable, see-through master control panel with five platform folders: Bigo Live, Tagged, MeetMe, SuperLive, and TikTok.
+14. **Self-call and secure handshake (new, folder 8).** Phones swap 300-character codes before an OFFGRID call. The codes rotate after every call, and blocked people's codes stop working.
 
 Related design references are in `03 Design/References`. The toggles there should all look exactly the same as each other, and the typewriter style follows the Grok Bot Laser Typewriter UI Spec.
 
@@ -125,6 +126,19 @@ Related design references are in `03 Design/References`. The toggles there shoul
 - **Real time:** tapping a folder item or flipping a switch triggers that effect right away on the outgoing stream.
 - The folder style follows feature 5 (Termux-style nested folders with bioluminescent glow-stick folders) and the identical toggles in `03 Design/References`.
 - Each platform's research is in `02 Research` or on Rex's computer, and that research decides what goes in its folder.
+- Scope only. Nothing is built yet.
+
+## 14. Self-call and secure handshake (folder 8)
+
+**What it does:** a mutual check for OFFGRID-to-OFFGRID calls, so only phones Royalty has approved can connect.
+
+- Each phone generates its own 300-character code.
+- Both phones swap codes with each other before the call connects. If either code doesn't match, the call doesn't connect.
+- The codes are saved on the phone inside the Termux-style terminal.
+- The codes rotate automatically to new ones after every call ends.
+- If Royalty blocks or deletes someone, that person's codes stop working. Because the codes keep changing, they can't reach Royalty again.
+- It lives in the terminal panel as folder 8.
+- Design note for later: use real, standard encryption (key pairs that change every call) rather than plain text codes, and keep the keys in Android's secure key storage, never in chat or this repo.
 - Scope only. Nothing is built yet.
 
 ## Potential future feature: floating text overlay on calls
