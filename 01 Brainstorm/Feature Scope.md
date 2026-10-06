@@ -8,6 +8,12 @@
 
 ---
 
+## Credentials security rule (hard rule)
+
+No API keys, passwords, tokens, stream keys, or other sensitive credentials go in the GitHub repo, the chat, or any documentation. They live only in Android's secure storage on the phone. Any agent that puts a credential in the repo is an automatic FAIL in HR review. The full rule is in `06 Prompts and Skills/Credentials Security Rule.md`.
+
+---
+
 ## Core design rule (governing principle)
 
 **Every effect is seen by the other side.**
