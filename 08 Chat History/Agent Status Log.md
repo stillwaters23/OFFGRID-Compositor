@@ -59,3 +59,11 @@ States: passed, waiting for review, blocked, or waiting for Royalty's phone test
 - **PR / commit:** Pull request #3, merged. Commit `be02dd7`.
 - **State:** passed
 - **Next:** Step 2 build, Terminal panel and controls. Claude Code picked that up.
+
+## 2026-10-06 4:37 AM CT — Claude Code (Step 2 build lane, lane number not given)
+
+- **Bootloader step:** Step 2. Terminal panel and controls (Build)
+- **What was done:** Built the floating terminal panel on top of the Step 1 app in `04 Build`. It is dark glass with cyan and gold glow lines. Drag the top bar to move it, or shrink it to a small tag. A side list and a grid of glowing folders show how many items are inside: Panel settings, OFFGRID to OFFGRID, and the 18 platform folders. Each platform folder holds an empty Effects folder and a Tests folder with 4 private test toggles. Each platform folder shows the guidance lines and the RESULTS line, filled from 02 Research or marked UNCONFIRMED. Text is laser typed in plain words. Opacity, Glow, and Typing speed are typed numbers from 0 to 100. Every toggle uses the red and green art from 03 Design/References. No sliders. The compositor and the yellow diamond test are unchanged. No mic and no voice. GitHub built the app and published it as step-2-preview.
+- **PR / commit:** Pull request #4, not merged. Commit `259933a`.
+- **State:** waiting for review
+- **Next:** Rex (Agent 04) reviews pull request #4 and does not merge it. Then Royalty installs step-2-preview on the Galaxy S25 Ultra and the Galaxy A37 and runs the test steps in pull request #4, including the yellow diamond video check. Do not start Step 3 or Step 7.
