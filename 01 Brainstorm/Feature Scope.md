@@ -4,7 +4,7 @@
 **Owner:** Royalty  
 **Status:** Scope only. Nothing is built yet.  
 **Target:** Royalty's private Android build first (Galaxy S25 Ultra and Galaxy A37). A PC and OBS version can come later.  
-**Updated:** 2026-10-06 (America/Chicago). Features up to 34. ElevenLabs removed from all voice options.
+**Updated:** 2026-10-06 (America/Chicago). Features up to 36. ElevenLabs removed from all voice options.
 
 ---
 
@@ -62,6 +62,8 @@ Everything the terminal says to Royalty, including guidance lines, IP leak alert
 32. **Radar sweep (new).** A security-scanner radar beam rotates around Royalty's video box, pinging as it goes, with a face mode and a no-face background mode.
 33. **Echo trail (new).** Fading copies of Royalty's movements trail behind for about a second, then dissolve.
 34. **Mirror plus scan (new, OFFGRID-to-OFFGRID).** The other person's face shows mirrored while the radar sweep pings blips across it.
+35. **Quiet mode (new).** The box goes still and dark for a beat, then one small light flickers on like a reboot.
+36. **Shatter (new).** Royalty's video box cracks like glass, falls apart, then reassembles.
 
 Related design references are in `03 Design/References`. The toggles there should all look exactly the same as each other, and the typewriter style follows the Grok Bot Laser Typewriter UI Spec.
 
@@ -416,6 +418,26 @@ Related design references are in `03 Design/References`. The toggles there shoul
 - It's baked into the video that both sides see, following the core design rule, and it has to pass the viewer-side success code check before HR can mark it PASS.
 - The other person's face tracking runs only on the phones in the call. No face data is saved or sent anywhere else. The other person sees a small "scan on" note while it's running.
 - On/off toggle. Mirror on or off, plus radar speed, blip count, and ping volume, as typed numbers from 0 to 100, never sliders.
+- Scope only. Nothing is built yet.
+
+## 35. Quiet mode
+
+**What it does:** everything in the video box goes still and dark for a beat. Then one small light flickers back on, like the system is rebooting. It's a deadpan comedy pause that makes the next effect hit harder.
+
+- The picture holds still (using the same held-frame method as time freeze, feature 26) and fades to near black. Then a single small light, like a power or boot light, flickers on, and the picture comes back.
+- It can be chained so the next effect fires the moment the light comes back on.
+- It's baked into the outgoing video, following the core design rule, and it has to pass the viewer-side success code check before HR can mark it PASS.
+- On/off toggle, or a one-tap trigger. Dark time, fade speed, flicker count, and light size are typed numbers, never sliders. An optional power-down and boot-up sound comes from the soundboard (feature 6).
+- Scope only. Nothing is built yet.
+
+## 36. Shatter
+
+**What it does:** Royalty's video box cracks like glass, the pieces fall away, and then they fly back together and reassemble.
+
+- Cracks spread from a point (the center or a tapped spot), the picture breaks into shards that tumble and fall, and then the shards pull back into place.
+- What shows behind the falling pieces is selectable: black, the cloak void (feature 10), or a scene like the beach (feature 24).
+- It's baked into the outgoing video, following the core design rule, and it has to pass the viewer-side success code check before HR can mark it PASS.
+- On/off toggle, or a one-tap trigger. Number of pieces, fall speed, how long it stays broken, and reassemble speed are typed numbers, never sliders. An optional glass-break sound comes from the soundboard (feature 6).
 - Scope only. Nothing is built yet.
 
 ## Potential future feature: floating text overlay on calls
