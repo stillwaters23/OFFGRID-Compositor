@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">OFFGRID</string>
+    <string name="camera_picture">Front camera picture</string>
+    <string name="camera_starting">The front camera is starting.</string>
+    <string name="camera_needs_ok">The front camera is off. Tap Allow when your phone asks.</string>
+    <string name="camera_denied">The front camera is off. Tap Try again, then tap Allow.</string>
+    <string name="camera_blocked">The camera stays off. Open Settings and turn the camera on.</string>
+    <string name="camera_missing">This phone has no front camera.</string>
+    <string name="camera_failed">The camera did not start. Close the app and open it again.</string>
+    <string name="try_again">Try again</string>
+    <string name="open_settings">Open Settings</string>
+</resources>
