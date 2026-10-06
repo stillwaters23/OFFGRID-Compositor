@@ -35,3 +35,11 @@ States: passed, waiting for review, blocked, or waiting for Royalty's phone test
 - **PR / commit:** On main. Latest voice commit `38d2c01`.
 - **State:** The voice step is still paused.
 - **Next:** Do not start Step 7. Wait until Royalty says go.
+
+## 2026-10-06 3:29 AM CT — Agent 03
+
+- **Bootloader step:** Step 1. Outgoing video compositor, build part
+- **What was done:** Extended the Step 0 app in `04 Build`. One CameraX effect paints the camera, then an empty effect list, then a bright yellow diamond. The live view shows that painted picture. A Record 5 seconds button saves a short video on the phone with the mic off. Play last video plays it back. No stream library, no stream key, and no upload. Feature Scope now goes through feature 39 (read-aloud button, and speak as Rex). Both wait for the paused voice step. The Bootloader now says to write this log when an agent finishes or stops.
+- **PR / commit:** Pull request #3, not merged. Commit `7e6604b`.
+- **State:** Waiting for Royalty's phone test
+- **Next:** Rex (Agent 04) reviews pull request #3 and does not merge it. Royalty installs the step-1-preview build, taps Record 5 seconds, taps Play last video, and checks that the yellow diamond is in the video. Do not start Step 2 or Step 7.
