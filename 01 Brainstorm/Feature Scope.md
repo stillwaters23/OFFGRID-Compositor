@@ -45,7 +45,7 @@
 22. **Roller coaster (new).** An animated coaster track and cars ride through the video box.
 23. **Flying through clouds (new).** An aerial view soaring through clouds.
 24. **Beach theme (new).** Pure ocean beach scenery fills the whole box, with no person in frame.
-25. **IP leak check (new).** Shows what IP and country the other side sees, so Royalty can confirm ProtonVPN Stealth is masking the real IP.
+25. **IP leak check (new).** Shows what IP and country the other side sees, so Royalty can confirm ProtonVPN Stealth is masking the real IP. A leak sets off a red flash and a sound alert right away.
 
 Related design references are in `03 Design/References`. The toggles there should all look exactly the same as each other, and the typewriter style follows the Grok Bot Laser Typewriter UI Spec.
 
@@ -285,6 +285,8 @@ Related design references are in `03 Design/References`. The toggles there shoul
   2. DNS leak check, which servers look up web addresses for the phone.
   3. WebRTC leak check, for platforms used in the browser, since browser video calls can expose a real IP.
   4. IPv6 leak check, since some VPN setups only cover IPv4.
+- **Instant alert:** the moment any check finds a problem (real IP showing, wrong country, DNS leak, WebRTC leak, or IPv6 leak), OFFGRID alerts Royalty right away with a red flash on the terminal panel and a sound cue, not just a quiet indicator. The alert names which check failed, and it fires both before and during the stream.
+- The alert is for Royalty only. Like the private test toggles, it's a tool rather than an effect, so it stays on Royalty's screen and phone speaker and is never put into the outgoing video or stream audio. The alert sound and its volume are set like the soundboard (feature 6), with a typed volume number.
 - It runs once before the stream opens and again on a timer during the stream. The recheck interval is a typed number, never a slider.
 - Feasibility note: OFFGRID can't read what a platform's servers log. It confirms the address the internet sees from the phone on the same connection, which is what the platform also sees. It uses well-known IP-check services or a small self-hosted check, and stores no IP history outside the phone.
 - The result also shows as an `IP CHECK` line in the folder guidance panel (feature 19).
