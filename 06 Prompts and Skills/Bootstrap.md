@@ -41,7 +41,7 @@ If any of these conflict, Bootstrap wins, then Bootloader, then Feature Scope.
 8. **Folders.** Put work only in the matching numbered folder: `01 Brainstorm`, `02 Research`, `03 Design`, `04 Build`, `05 Docs`, `06 Prompts and Skills`, `07 Logs and Failures`, `08 Chat History`.
 9. **Agent lanes and HR review.** Each coding agent (Agent 01, 02, or 03) works only in its own lane, on one feature at a time. Nothing is accepted until the HR Manager returns PASS with evidence and Royalty okays it. See `Agent Lanes and HR Review.md`.
 10. **Plain language in the terminal.** All terminal text talks to Royalty like a 13-year-old new to tech. See `Terminal Plain Language Rule.md`.
-11. **Android first.** Targets are Royalty's Galaxy S25 Ultra and Galaxy A37. PC and OBS come later.
+11. **Android only (hard rule).** Targets are Royalty's Galaxy S25 Ultra and Galaxy A37. Royalty has no computer, so nothing may need a PC. OBS, computer-only stream keys, and computer virtual cameras are not applicable.
 
 ---
 

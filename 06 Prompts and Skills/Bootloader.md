@@ -9,6 +9,10 @@ Read `06 Prompts and Skills/Bootstrap.md` first. This is the full pipeline from 
 
 Each step goes to one lane (Agent 01, 02, or 03). **Agent 04** is the HR Manager and oversees Agents 01, 02, and 03. (`Agent Lanes and HR Review.md` calls this role the HR Manager. It's the same agent.) Every step ends with an Agent 04 review: **PASS**, **FAIL**, or **BLOCKED**, with evidence. A step is done only on PASS. See `Agent Lanes and HR Review.md`.
 
+## Android-only (hard rule)
+
+OFFGRID-Compositor is Android-only. Royalty has no computer. Every step must build, run, and be tested entirely on Android phones. Any method that needs a PC (OBS, stream keys you can only get from a computer, a virtual camera on a computer, or desktop or computer-browser app versions) is marked **not applicable (needs a computer)** and isn't built. Agent 04 marks a step FAIL if it depends on a computer.
+
 ## Read everything first (read only)
 
 Before starting any task, each agent (01, 02, and 03) must read **all** documents in the repo:
@@ -48,7 +52,7 @@ This is **reading only**. Reading about other features never means working on th
 - **Acceptance:** the app installs on the Galaxy S25 Ultra and Galaxy A37 and shows a smooth camera preview. No keys in the repo.
 
 ## Step 1. Outgoing video compositor (Research first, then Build)
-- Research: the CameraX SurfaceProcessor and OpenGL layering approach, and the RTMP library for sending to a stream key.
+- Research: the CameraX SurfaceProcessor and OpenGL layering approach, and the RTMP library for sending to a stream key straight from the phone.
 - Build: the layer stack (camera, then effects, then the top layer) that every effect draws into.
 - **Acceptance:** a test shape drawn in the compositor shows up in a recorded copy of the outgoing video.
 
@@ -89,7 +93,7 @@ This is **reading only**. Reading about other features never means working on th
 - **Acceptance:** a saved clip includes the effects. Check battery and storage use on the Galaxy A37.
 
 ## Step 10. Platform lanes, test toggles, and status prompts (Research first, then Build)
-- Research: confirm stream key access for each platform using the dummy account, and confirm a maintained Android browser for web-only platforms (Kiwi Browser was reportedly discontinued in early 2025).
+- Research: confirm stream key access for each platform using the dummy account, on the phone only (any key that can only be gotten on a computer is marked not applicable, like the Instagram Live Producer key), and confirm a maintained Android browser for web-only platforms (Kiwi Browser was reportedly discontinued in early 2025).
 - Build: features 15 and 19, filling each platform folder with only what that platform allows.
 - **Acceptance:** each folder shows a confirmed status line, and test results are logged.
 
