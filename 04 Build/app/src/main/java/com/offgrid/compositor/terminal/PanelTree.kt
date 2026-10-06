@@ -159,7 +159,7 @@ internal object PanelTree {
         notes = listOf(
             "Type a number from 0 to 100. Then tap Done.",
             "Green toggle means on. Red toggle means off.",
-            "The theme office is in the folders: Themes, Colors, Glow effects, and Toggle style.",
+            "The theme office folders: Themes, Colors, Glow effects, and Toggle style.",
             "No sliders here. Only typed numbers and toggles.",
         ),
     )
@@ -198,7 +198,7 @@ internal object PanelTree {
         notes = listOf(
             PART_HELP.getValue(part),
             "Type a hex code like #00FF66, then tap Done.",
-            "Or mix Red, Yellow, Green, Blue, Indigo, and Violet, from 0 to 100.",
+            "Or mix the six colors below, each from 0 to 100.",
             "Use system color follows your phone's own colors.",
         ),
     )

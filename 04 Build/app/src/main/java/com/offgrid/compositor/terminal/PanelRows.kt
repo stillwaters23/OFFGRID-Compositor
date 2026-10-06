@@ -9,6 +9,7 @@ import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.RippleDrawable
 import android.graphics.drawable.StateListDrawable
+import android.graphics.text.LineBreaker
 import android.text.Editable
 import android.text.InputFilter
 import android.text.InputType
@@ -188,6 +189,8 @@ internal class SideRow(context: Context, folder: PanelFolder) : LinearLayout(con
             typeface = Hud.condensed
             maxLines = 2
             ellipsize = TextUtils.TruncateAt.END
+            // Break lines only between words. A name too long for two lines ends with "…".
+            breakStrategy = LineBreaker.BREAK_STRATEGY_SIMPLE
         }
         addView(name, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = Hud.dpi(context, 3f) })
         count.apply {
@@ -237,7 +240,11 @@ internal class SideRow(context: Context, folder: PanelFolder) : LinearLayout(con
         probe.set(name.paint)
         probe.textSize = fullTextPx
         val widest = widestWord(name.text)
-        val fitted = if (widest <= room) fullTextPx else maxOf(fullTextPx * room / widest, fullTextPx * SMALLEST_SHARE)
+        val fitted = if (widest <= room * ROOM_SHARE) {
+            fullTextPx
+        } else {
+            maxOf(fullTextPx * room * ROOM_SHARE / widest, fullTextPx * SMALLEST_SHARE)
+        }
         if (abs(fitted - name.textSize) > 0.5f) {
             name.setTextSize(TypedValue.COMPLEX_UNIT_PX, fitted)
             super.onMeasure(widthMeasureSpec, heightMeasureSpec)
@@ -257,6 +264,8 @@ internal class SideRow(context: Context, folder: PanelFolder) : LinearLayout(con
     }
 
     private companion object {
+        /** A little room to spare, so a word never lands exactly on the edge. */
+        const val ROOM_SHARE = 0.95f
         const val SMALLEST_SHARE = 0.7f
     }
 }
