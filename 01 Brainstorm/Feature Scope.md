@@ -8,6 +8,17 @@
 
 ---
 
+## Core design rule (governing principle)
+
+**Every effect is seen by the other side.**
+
+- In every platform folder (Bigo Live, Tagged, MeetMe, SuperLive, TikTok, Twitch, Kick, YouTube Live, Trovo, Telegram, and Tango), every effect must render into the outgoing video so the other person sees it on their end. Nothing in those folders stays local-only.
+- Each platform folder is its own lane, with only what that platform allows.
+- **OFFGRID-to-OFFGRID calling is the exception and the premium lane.** There, everything is visible to everyone on both sides: all effects, toggles, the terminal UI, audio-reactive pulses, everything.
+- The private platform test toggles (feature 15) are testing tools, not effects, so they don't break this rule.
+
+---
+
 ## Ongoing feature list
 
 1. **Drawing effects.** Draw on yourself during a live stream. The ink can stay fixed on the screen or be pinned to the face so it moves with you. It has to be baked into the outgoing video so the PK opponent and viewers see it.
@@ -25,7 +36,12 @@
 13. **Terminal panel (new).** The draggable, see-through master control panel with platform folders for Bigo Live, Tagged, MeetMe, SuperLive, TikTok, Twitch, Kick, YouTube Live, Trovo, Telegram, and Tango.
 14. **Self-call and secure handshake (new, folder 8).** Phones swap 300-character codes before an OFFGRID call. The codes rotate after every call, and blocked people's codes stop working.
 15. **Platform test toggles (new, private).** Test toggles in every platform folder that check what each platform allows.
-16. **Audio-reactive terminal UI (new).** The terminal's folders, toggles, and glow pulse to music and voices, with a typed 0 to 100 sensitivity.
+16. **Audio-reactive terminal UI (new).** The terminal's folders, toggles, and glow pulse to music and voices, baked into the outgoing video so viewers see it, with a typed 0 to 100 sensitivity.
+17. **Traveling glow border (new).** A glowing border loops around the video box, synced to Royalty's heartbeat or the audio pulse.
+18. **Fireworks bursts (new).** Fireworks burst when a toggle flips or a gift lands.
+19. **Platform status prompt (new).** Each platform folder shows a read-only line: app or web only, the exact web address, and which Android browser to use.
+20. **Portals and wormholes (new).** A swirling portal or wormhole opens inside Royalty's video box.
+21. **Flying superheroes (new).** Original animated heroes fly around inside the video box, picked from a set.
 
 Related design references are in `03 Design/References`. The toggles there should all look exactly the same as each other, and the typewriter style follows the Grok Bot Laser Typewriter UI Spec.
 
@@ -168,10 +184,61 @@ Related design references are in `03 Design/References`. The toggles there shoul
 
 **What it does:** the folders, toggles, and glow effects in the terminal panel pulse and react to sound, so the whole UI becomes a live instrument instead of a static menu.
 
-- It reacts to sound in the room: music, Royalty's voice, or the other person's voice on the call.
+- The pulsing folders, toggles, and glow are baked into the outgoing video, so viewers and the person on the other end see the audio-reactive effects too, not just Royalty.
+- It reacts to sound: music, Royalty's voice, and the other person's voice.
 - It has an on/off toggle and a sensitivity setting as a typed number from 0 to 100, never a slider, matching the terminal panel design.
-- The pulse is only on Royalty's own screen in the terminal panel. It isn't sent in the outgoing video unless that's decided later.
-- Feasibility note: Android doesn't let one app record another app's call audio. The other person's voice can still drive the pulse when it plays out loud on speaker and the mic hears it, or directly inside an OFFGRID-to-OFFGRID call.
+- Sound sources: the phone's mic picks up the room, music, and Royalty's voice. The other person's voice is picked up by the mic when it's playing on speaker, or comes in directly during an OFFGRID-to-OFFGRID call.
+- Scope only. Nothing is built yet.
+
+## 17. Traveling glow border
+
+**What it does:** a glowing border travels in a loop around the edge of the video box, synced to Royalty's heartbeat or to the audio pulse from feature 16.
+
+- It's baked into the outgoing video, following the core design rule, so viewers see it.
+- On outside platforms, the border frames Royalty's box as the other person sees it, because OFFGRID can only draw inside Royalty's own video. In an OFFGRID-to-OFFGRID call, it can truly loop around the other person's box.
+- Sync source picker: heartbeat or audio pulse. Heartbeat needs a heart-rate source, like a Galaxy Watch through Samsung Health or Android's Health Connect.
+- On/off toggle. Speed, thickness, and glow strength are typed numbers from 0 to 100, never sliders.
+- Scope only. Nothing is built yet.
+
+## 18. Fireworks bursts
+
+**What it does:** fireworks burst on the other person's screen when Royalty flips a toggle or when a gift lands.
+
+- Triggers: any toggle flip, or a gift landing. This is especially useful on Tango, where gift events can trigger effects. On platforms without gift events, fireworks fire from toggles only.
+- It's baked into the outgoing video, following the core design rule, so viewers see it.
+- On/off toggle. Burst size, count, and duration are typed numbers from 0 to 100, never sliders.
+- Scope only. Nothing is built yet.
+
+## 19. Platform status prompt
+
+**What it does:** when Royalty opens a platform folder in the terminal panel, the folder shows a clear status line. It's read-only guidance, not a control.
+
+- Folders: Bigo Live, Tagged, MeetMe, SuperLive, TikTok, Twitch, Kick, YouTube Live, Trovo, Telegram, and Tango.
+- Each status line says:
+  1. Whether the platform works through its native app or only through the web.
+  2. Which exact web address to use. For example, meetme.com belongs to the MeetMe app's company, but meetme.video is a separate browser-only site, so the prompt makes clear which one is right.
+  3. Which Android browser to use, if the effects feed needs a specific one.
+- The values come from the research in `02 Research` and the results of the platform test toggles (feature 15), so the prompts are filled in only after testing confirms them.
+- Browser note: Kiwi Browser was reportedly discontinued in early 2025, so confirm a browser is still maintained before listing it.
+- Scope only. Nothing is built yet.
+
+## 20. Portals and wormholes
+
+**What it does:** a swirling portal or wormhole opens inside Royalty's video box, giving the illusion of looking through to another place or disappearing into a void.
+
+- Styles: a portal to another scene, a wormhole swirl, and a disappear-into-the-void transition that ties into the cloak (feature 10).
+- It's baked into the outgoing video, following the core design rule, so viewers see it.
+- On/off toggle. Size, spin speed, position, and glow strength are typed numbers from 0 to 100, never sliders.
+- Scope only. Nothing is built yet.
+
+## 21. Flying superheroes
+
+**What it does:** animated superhero figures appear and fly around inside the video box during a stream or call. Royalty picks from a set of different flying heroes.
+
+- Hero picker with several flying heroes to choose from.
+- The heroes are original OFFGRID characters, not Marvel, DC, or other trademarked heroes, to avoid copyright problems and takedowns.
+- It's baked into the outgoing video, following the core design rule, so viewers see it.
+- On/off toggle. Number of heroes, size, and flight speed are typed numbers from 0 to 100, never sliders.
 - Scope only. Nothing is built yet.
 
 ## Potential future feature: floating text overlay on calls
