@@ -20,6 +20,8 @@
 8. **Typed-to-speech (new).** Royalty types text and it's spoken out loud in the outgoing stream. It includes a Rex voice preset.
 9. **Ghost mode (new).** Makes Royalty invisible to everyone. Details to come.
 10. **Cloaking effect (new).** Predator-style cloak. Royalty's video box looks like empty void to the other person.
+11. **Camera blackout and cloaking modes (new).** Pick solid black, the cloak void, or a status label like "CLOAKED."
+12. **Screen takeover and flip-flop switch (new).** Make Royalty's video fill the screen, and swap who's big and who's small.
 
 Related design references are in `03 Design/References`. The toggles there should all look exactly the same as each other, and the typewriter style follows the Grok Bot Laser Typewriter UI Spec.
 
@@ -80,6 +82,41 @@ Related design references are in `03 Design/References`. The toggles there shoul
 - It has to be baked into the outgoing video so the other person actually sees it.
 - Strength and fade time are typed numbers, never sliders.
 - Scope only. Nothing is built yet.
+
+## 11. Camera blackout and cloaking modes
+
+**What it does:** gives Royalty a picker of selectable modes for the outgoing camera feed, instead of one fixed effect.
+
+1. **Blackout.** The outgoing feed is solid black.
+2. **Cloaked.** The feed shows the void, using the Predator-style cloak from section 10.
+3. **Status label.** Instead of video, the box shows a status word like "CLOAKED" or "INVISIBLE."
+
+- These sit alongside ghost mode (section 9) and the Predator cloak (section 10).
+- Each mode is baked into the outgoing video so the other person sees it.
+- The status label text can be edited. Sizes and fade times are typed numbers, never sliders.
+- Scope only. Nothing is built yet.
+
+## 12. Screen takeover and flip-flop switch
+
+**What it does:** lets Royalty control the size of the video boxes, and swap who is big and who is small during a call.
+
+1. **Screen takeover.** Resize the date box so Royalty's video fills the whole screen and the other person shrinks to a small box.
+2. **Flip-flop switch.** One switch swaps who is in the big box and who is in the small box. Royalty can flip it back and forth during a call.
+
+- The controls live in the terminal panel's folder structure, like Windows or Samsung internal storage folders. Each folder has an on/off toggle.
+- Sizes are typed numbers from 0 to 100, never sliders, the same as emoji rain and the other features.
+- Feasibility note: Bigo and other apps draw the battle and call layout on each viewer's own phone, so OFFGRID can't resize the other person's box on their screen. Full takeover works inside an OFFGRID-to-OFFGRID call, or inside Royalty's own outgoing video (for example, Royalty fills the frame with the opponent shown as a small inset). Confirm the approach before building.
+- Scope only. Nothing is built yet.
+
+## Potential future feature: floating text overlay on calls
+
+**What it does:** during a video call, Royalty types a short message like "I love you" and it floats up as real text on the other person's screen, not burned into the video.
+
+- This only works when both people are using OFFGRID for the call. It would be a custom video call with a side channel that sends the text (for example LiveKit or Stream).
+- It can't be done inside Instagram, WhatsApp, FaceTime, Messenger, Meet, or Zoom calls. Those apps don't let outside apps into their calls, Meta ended third-party camera effects in January 2025, and Android overlays only show on your own phone.
+- Fallbacks that do work elsewhere: burn the text into the outgoing video (like the Bigo effects), or screen share while the overlay shows.
+- Message length (for example 1 to 80 characters) and how long it stays on screen (for example 1 to 30 seconds) are typed numbers, never sliders.
+- Research is in `/workspace/research/Remote Text Overlay Research.md` on Rex's computer. Not built yet.
 
 ## Voice effects (live voice changer)
 
