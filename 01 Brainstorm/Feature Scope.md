@@ -4,7 +4,7 @@
 **Owner:** Royalty  
 **Status:** Scope only. Nothing is built yet.  
 **Target:** Royalty's private Android build first (Galaxy S25 Ultra and Galaxy A37). A PC and OBS version can come later.  
-**Updated:** 2026-10-06 (America/Chicago). Features up to 36. ElevenLabs removed from all voice options.
+**Updated:** 2026-10-06 (America/Chicago). Features up to 37. ElevenLabs removed from all voice options.
 
 ---
 
@@ -64,6 +64,7 @@ Everything the terminal says to Royalty, including guidance lines, IP leak alert
 34. **Mirror plus scan (new, OFFGRID-to-OFFGRID).** The other person's face shows mirrored while the radar sweep pings blips across it.
 35. **Quiet mode (new).** The box goes still and dark for a beat, then one small light flickers on like a reboot.
 36. **Shatter (new).** Royalty's video box cracks like glass, falls apart, then reassembles.
+37. **Test result tracking (new, private).** Every test toggle in every platform folder is marked "baked in as success" or "failed" with a note, and failed tests are flagged for more research.
 
 Related design references are in `03 Design/References`. The toggles there should all look exactly the same as each other, and the typewriter style follows the Grok Bot Laser Typewriter UI Spec.
 
@@ -439,6 +440,20 @@ Related design references are in `03 Design/References`. The toggles there shoul
 - It's baked into the outgoing video, following the core design rule, and it has to pass the viewer-side success code check before HR can mark it PASS.
 - On/off toggle, or a one-tap trigger. Number of pieces, fall speed, how long it stays broken, and reassemble speed are typed numbers, never sliders. An optional glass-break sound comes from the soundboard (feature 6).
 - Scope only. Nothing is built yet.
+
+## 37. Test result tracking (success and failure log)
+
+**What it does:** every test toggle (feature 15) in every platform folder's subfolders keeps a visible result, so Royalty always knows what works where.
+
+- **Baked in as success:** a test is marked this only after it passes the viewer-side success code check (Phone 2 sees the effect, and Royalty enters the matching code on Phone 1). There's no success mark without the code.
+- **Failed:** if the test fails or the code doesn't match, it's marked "failed" with a short plain-language note, such as "Viewers didn't see the glow on Phone 2."
+- **Flagged for research:** every failed item is automatically flagged for more research later.
+- **Screenshots:** Royalty screenshots failed results and brings them back in a future session to review. The failed list is laid out so one screenshot shows the folder, the test, the date, and the note.
+- **Where it shows:** next to each test toggle in its folder, plus a `RESULTS` line in that folder's guidance panel (feature 19).
+- **Which folders:** every platform folder. That's the original 11 (Bigo Live, Tagged, MeetMe, SuperLive, TikTok, Twitch, Kick, YouTube Live, Trovo, Telegram, and Tango), plus the new Messenger, WhatsApp, Instagram, and other video calling app folders.
+- **Private:** this is a testing tool, not an effect, so it never appears in the outgoing video.
+- Results stay on the phone. They hold no logins, numbers, or keys.
+- All text follows the Terminal Plain Language Rule.
 
 ## Potential future feature: floating text overlay on calls
 
