@@ -73,7 +73,7 @@ Everything the terminal says to Royalty, including guidance lines, IP leak alert
 26. **Time freeze (new).** Holds Royalty's outgoing video on one frame for a few seconds, then picks back up, like a glitch.
 27. **Optical illusions (new).** Impossible shapes, depth tricks, and shifting patterns inside Royalty's video box.
 28. **Kick detection and rejoin (new).** Flags a host kick right away, explains in plain words what to do, and gives a one-tap shortcut to ask to rejoin. There's no auto-rejoin, because of ban risk.
-29. **Red sweep kick animation (new).** An extra-long red carpet-style sweep rolls across Royalty's video box when the kick toggle flips, in all 11 platform folders.
+29. **Red sweep kick animation (new).** An extra-long red carpet-style sweep rolls across Royalty's video box when the kick toggle flips, in all 18 platform folders.
 30. **Depth shift (new).** Royalty's video seems to burst out of the screen toward the viewer, then snaps back.
 31. **Laser calligraphy writing (new).** A laser beam writes Royalty's typed words in calligraphy across the video box in real time.
 32. **Radar sweep (new).** A security-scanner radar beam rotates around Royalty's video box, pinging as it goes, with a face mode and a no-face background mode.
@@ -413,7 +413,9 @@ These are Android-only routes (see the Android-only rule). Two limits apply to e
 
 - It's Royalty's own effect, baked into the outgoing video, following the core design rule, so viewers see it.
 - **Extra-long sweep:** the sweep is much longer than the platform's normal kick animation. It's a long, long, long red carpet that keeps rolling past the usual length to drown out the chat area. The length and how long it stays are typed numbers, with defaults set well beyond a normal kick animation.
-- **Platform folders:** all 11, which are Bigo Live, Tagged, MeetMe, SuperLive, TikTok, Twitch, Kick, YouTube Live, Trovo, Telegram, and Tango. Each folder gets its own copy of the kick toggle and its settings.
+- **Platform folders:** all 18. The original 11 are Bigo Live, Tagged, MeetMe, SuperLive, TikTok, Twitch, Kick, YouTube Live, Trovo, Telegram, and Tango. The 7 new calling app folders are Instagram, Messenger, WhatsApp, Zoom, Google Meet, Discord, and Microsoft Teams. Each folder gets its own copy of the red sweep toggle, with the same typed settings for speed, width, and length.
+- **New calling app folders:** these apps on Android don't take OFFGRID's camera feed (Android has no virtual camera), so the sweep reaches viewers only through screen share with OFFGRID full screen, or through Zoom's developer kit inside OFFGRID. In each of these folders, the sweep must be tested to confirm it shows in the outgoing video, and it stays marked "untested" until it passes the viewer-side success code check (feature 37).
+- **Viber, LINE, and Signal:** no folder, and no sweep. Their only effect route is screen share from a computer, which the Android-only rule rules out.
 - **MeetMe and Tagged:** effects there only work through the browser route, so the sweep is drawn into the outgoing video feed that's sent through the browser, on the web version (see `02 Research` and the folder guidance panel, feature 19).
 - Feasibility note: the platform draws its chat on each viewer's own phone, on top of the video. OFFGRID can't cover or hide the real chat. The sweep fills Royalty's own video box, so it can only cover chat in places where the chat sits on top of Royalty's video. Inside OFFGRID-to-OFFGRID calls, it can sweep over the whole screen, chat included.
 - It uses an original OFFGRID design inspired by platform kick animations, not a copy of Bigo's artwork, so it doesn't look like a real platform kick message.
