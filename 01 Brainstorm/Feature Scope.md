@@ -4,7 +4,7 @@
 **Owner:** Royalty  
 **Status:** Scope only. Nothing is built yet.  
 **Target:** Royalty's private Android build first (Galaxy S25 Ultra and Galaxy A37). A PC and OBS version can come later.  
-**Updated:** 2026-10-06 (America/Chicago). Features up to 33. ElevenLabs removed from all voice options.
+**Updated:** 2026-10-06 (America/Chicago). Features up to 34. ElevenLabs removed from all voice options.
 
 ---
 
@@ -61,6 +61,7 @@ Everything the terminal says to Royalty, including guidance lines, IP leak alert
 31. **Laser calligraphy writing (new).** A laser beam writes Royalty's typed words in calligraphy across the video box in real time.
 32. **Radar sweep (new).** A security-scanner radar beam rotates around Royalty's video box, pinging as it goes, with a face mode and a no-face background mode.
 33. **Echo trail (new).** Fading copies of Royalty's movements trail behind for about a second, then dissolve.
+34. **Mirror plus scan (new, OFFGRID-to-OFFGRID).** The other person's face shows mirrored while the radar sweep pings blips across it.
 
 Related design references are in `03 Design/References`. The toggles there should all look exactly the same as each other, and the typewriter style follows the Grok Bot Laser Typewriter UI Spec.
 
@@ -404,6 +405,17 @@ Related design references are in `03 Design/References`. The toggles there shoul
 - Royalty is cut out from the background, and the last moments of movement are layered behind as see-through copies that fade out.
 - It's baked into the outgoing video, following the core design rule, and it has to pass the viewer-side success code check before HR can mark it PASS.
 - On/off toggle. Trail length (default about 1 second), number of copies, and fade strength are typed numbers, never sliders.
+- Scope only. Nothing is built yet.
+
+## 34. Mirror plus scan (OFFGRID-to-OFFGRID calls)
+
+**What it does:** in an OFFGRID-to-OFFGRID call, when the other person is streaming in Royalty's box, their face shows mirrored, and the radar sweep (feature 32, face mode) scans across the mirrored face, pinging blips on it.
+
+- It combines the mirror effect from the drawing scope with the radar sweep.
+- It's for the OFFGRID-to-OFFGRID premium lane only, because only there can OFFGRID work with the other person's video. On outside platforms, OFFGRID can only change Royalty's own outgoing video.
+- It's baked into the video that both sides see, following the core design rule, and it has to pass the viewer-side success code check before HR can mark it PASS.
+- The other person's face tracking runs only on the phones in the call. No face data is saved or sent anywhere else. The other person sees a small "scan on" note while it's running.
+- On/off toggle. Mirror on or off, plus radar speed, blip count, and ping volume, as typed numbers from 0 to 100, never sliders.
 - Scope only. Nothing is built yet.
 
 ## Potential future feature: floating text overlay on calls
