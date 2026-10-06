@@ -1,0 +1,400 @@
+package com.offgrid.compositor.terminal
+
+import android.content.Context
+import android.content.res.Resources
+
+/** The nine parts of the panel that each have their own color folder. */
+internal enum class ColorPart(val key: String, val title: String) {
+    SKIN("skin", "Skin color"),
+    EDGE("edge", "Edge color"),
+    OUTER_GLOW("outer_glow", "Outer glow color"),
+    TEXT("text", "Typewriter text color"),
+    CURSOR("cursor", "Laser cursor color"),
+    TOGGLE_GLOW("toggle_glow", "Toggle glow color"),
+    FOLDER("folder", "Folder icon color"),
+    SIDE_TEXT("side_text", "Side list text color"),
+    STATUS("status", "Status line color"),
+}
+
+/**
+ * The phone's own colors (Material You, Android 12 and newer).
+ * If the phone can't give one, a plain gray is used instead.
+ */
+internal enum class SystemRole(private val resId: Int, private val fallback: Int) {
+    ACCENT1_100(android.R.color.system_accent1_100, 0xFFE4E4E4.toInt()),
+    ACCENT1_200(android.R.color.system_accent1_200, 0xFFC8C8C8.toInt()),
+    ACCENT1_300(android.R.color.system_accent1_300, 0xFFACACAC.toInt()),
+    ACCENT1_400(android.R.color.system_accent1_400, 0xFF919191.toInt()),
+    ACCENT2_100(android.R.color.system_accent2_100, 0xFFE4E4E4.toInt()),
+    ACCENT2_200(android.R.color.system_accent2_200, 0xFFC8C8C8.toInt()),
+    ACCENT3_200(android.R.color.system_accent3_200, 0xFFC8C8C8.toInt()),
+    ACCENT3_300(android.R.color.system_accent3_300, 0xFFACACAC.toInt()),
+    NEUTRAL1_50(android.R.color.system_neutral1_50, 0xFFF2F2F2.toInt()),
+    NEUTRAL1_100(android.R.color.system_neutral1_100, 0xFFE4E4E4.toInt()),
+    NEUTRAL1_1000(android.R.color.system_neutral1_1000, 0xFF000000.toInt()),
+    NEUTRAL2_900(android.R.color.system_neutral2_900, 0xFF1B1B1B.toInt());
+
+    fun resolve(context: Context): Int {
+        return try {
+            context.getColor(resId) or 0xFF000000.toInt()
+        } catch (error: Resources.NotFoundException) {
+            fallback
+        }
+    }
+}
+
+/** One part's color in a theme: follow the phone, or a fixed color. */
+internal class PartSpec(val system: Boolean, val role: SystemRole, val custom: Int)
+
+/** A ready-made look. Tapping it in the Themes folder applies it. */
+internal enum class Theme(val key: String, val title: String, val blurb: String) {
+    OLED(
+        "oled",
+        "OLED Bioluminescent",
+        "True black glass in your phone's colors. The glow breathes like living sea light.",
+    ),
+    TERMUX("termux", "Termux Black", "Plain black. Green text. No glow."),
+    SYSTEM("system", "System Colors", "Your phone's colors everywhere. Calm, with no pulse."),
+    HOLO("holo", "Holo Classic", "The Step 2 look. Cyan and gold lines.");
+
+    companion object {
+        fun from(key: String?): Theme = entries.firstOrNull { it.key == key } ?: OLED
+    }
+}
+
+/** Keys for the look settings. Typed numbers are 0 to 100. */
+internal object LookKeys {
+    const val OPACITY = "opacity"
+    const val TYPING = "typing"
+    const val FONT_SIZE = "font_size"
+    const val CORNERS = "corners"
+    const val GLOW = "glow"
+    const val PULSE_SPEED = "pulse_speed"
+    const val SWIRL_SPEED = "swirl_speed"
+    const val TOGGLE_GLOW = "toggle_glow"
+
+    const val TEST_DIAMOND = "test_diamond"
+    const val SCAN_LINE = "scan_line"
+    const val LASER_TYPING = "laser_typing"
+    const val RING = "ring"
+    const val UNFOLD = "unfold"
+    const val EDGE_GLOW = "edge_glow"
+    const val OUTER_GLOW = "outer_glow"
+    const val PULSE = "pulse"
+    const val SWIRL = "swirl"
+    const val TOGGLE_SWIRL = "toggle_swirl"
+}
+
+/** Everything a theme sets. Typing speed, font size, laser typing, and the test diamond are not theme settings. */
+internal class ThemeSpec(
+    val parts: Map<ColorPart, PartSpec>,
+    val numbers: Map<String, Int>,
+    val toggles: Map<String, Boolean>,
+)
+
+internal object Themes {
+    private fun phone(role: SystemRole) = PartSpec(system = true, role = role, custom = 0xFF000000.toInt())
+
+    private fun fixed(color: Int, role: SystemRole) = PartSpec(system = false, role = role, custom = color)
+
+    /** The roles OLED Bioluminescent uses. "Use system color" falls back to these. */
+    private val OLED_ROLES = mapOf(
+        ColorPart.SKIN to SystemRole.NEUTRAL1_1000,
+        ColorPart.EDGE to SystemRole.ACCENT1_200,
+        ColorPart.OUTER_GLOW to SystemRole.ACCENT1_400,
+        ColorPart.TEXT to SystemRole.ACCENT1_100,
+        ColorPart.CURSOR to SystemRole.ACCENT1_300,
+        ColorPart.TOGGLE_GLOW to SystemRole.ACCENT3_200,
+        ColorPart.FOLDER to SystemRole.ACCENT1_300,
+        ColorPart.SIDE_TEXT to SystemRole.NEUTRAL1_100,
+        ColorPart.STATUS to SystemRole.ACCENT1_200,
+    )
+
+    private fun role(part: ColorPart) = OLED_ROLES.getValue(part)
+
+    fun spec(theme: Theme): ThemeSpec = when (theme) {
+        Theme.OLED -> ThemeSpec(
+            parts = ColorPart.entries.associateWith { phone(role(it)) },
+            numbers = mapOf(
+                LookKeys.OPACITY to 80, LookKeys.CORNERS to 40, LookKeys.GLOW to 70,
+                LookKeys.PULSE_SPEED to 35, LookKeys.SWIRL_SPEED to 30, LookKeys.TOGGLE_GLOW to 60,
+            ),
+            toggles = mapOf(
+                LookKeys.SCAN_LINE to true, LookKeys.RING to true, LookKeys.UNFOLD to true,
+                LookKeys.EDGE_GLOW to true, LookKeys.OUTER_GLOW to true, LookKeys.PULSE to true,
+                LookKeys.SWIRL to true, LookKeys.TOGGLE_SWIRL to true,
+            ),
+        )
+        Theme.TERMUX -> ThemeSpec(
+            parts = mapOf(
+                ColorPart.SKIN to fixed(0xFF000000.toInt(), role(ColorPart.SKIN)),
+                ColorPart.EDGE to fixed(0xFF1E8C3A.toInt(), role(ColorPart.EDGE)),
+                ColorPart.OUTER_GLOW to fixed(0xFF00FF41.toInt(), role(ColorPart.OUTER_GLOW)),
+                ColorPart.TEXT to fixed(Hud.HOLO_LASER, role(ColorPart.TEXT)),
+                ColorPart.CURSOR to fixed(Hud.HOLO_LASER, role(ColorPart.CURSOR)),
+                ColorPart.TOGGLE_GLOW to fixed(Hud.HOLO_LASER, role(ColorPart.TOGGLE_GLOW)),
+                ColorPart.FOLDER to fixed(Hud.HOLO_LASER, role(ColorPart.FOLDER)),
+                ColorPart.SIDE_TEXT to fixed(0xFF8FE38F.toInt(), role(ColorPart.SIDE_TEXT)),
+                ColorPart.STATUS to fixed(Hud.HOLO_LASER, role(ColorPart.STATUS)),
+            ),
+            numbers = mapOf(
+                LookKeys.OPACITY to 92, LookKeys.CORNERS to 0, LookKeys.GLOW to 0,
+                LookKeys.PULSE_SPEED to 35, LookKeys.SWIRL_SPEED to 30, LookKeys.TOGGLE_GLOW to 0,
+            ),
+            toggles = mapOf(
+                LookKeys.SCAN_LINE to false, LookKeys.RING to false, LookKeys.UNFOLD to false,
+                LookKeys.EDGE_GLOW to false, LookKeys.OUTER_GLOW to false, LookKeys.PULSE to false,
+                LookKeys.SWIRL to false, LookKeys.TOGGLE_SWIRL to false,
+            ),
+        )
+        Theme.SYSTEM -> ThemeSpec(
+            parts = mapOf(
+                ColorPart.SKIN to phone(SystemRole.NEUTRAL2_900),
+                ColorPart.EDGE to phone(SystemRole.ACCENT1_200),
+                ColorPart.OUTER_GLOW to phone(SystemRole.ACCENT1_300),
+                ColorPart.TEXT to phone(SystemRole.NEUTRAL1_50),
+                ColorPart.CURSOR to phone(SystemRole.ACCENT1_200),
+                ColorPart.TOGGLE_GLOW to phone(SystemRole.ACCENT2_200),
+                ColorPart.FOLDER to phone(SystemRole.ACCENT2_200),
+                ColorPart.SIDE_TEXT to phone(SystemRole.NEUTRAL1_100),
+                ColorPart.STATUS to phone(SystemRole.ACCENT1_100),
+            ),
+            numbers = mapOf(
+                LookKeys.OPACITY to 75, LookKeys.CORNERS to 70, LookKeys.GLOW to 45,
+                LookKeys.PULSE_SPEED to 35, LookKeys.SWIRL_SPEED to 30, LookKeys.TOGGLE_GLOW to 40,
+            ),
+            toggles = mapOf(
+                LookKeys.SCAN_LINE to false, LookKeys.RING to true, LookKeys.UNFOLD to true,
+                LookKeys.EDGE_GLOW to true, LookKeys.OUTER_GLOW to true, LookKeys.PULSE to false,
+                LookKeys.SWIRL to false, LookKeys.TOGGLE_SWIRL to false,
+            ),
+        )
+        Theme.HOLO -> ThemeSpec(
+            parts = mapOf(
+                ColorPart.SKIN to fixed(Hud.HOLO_GLASS_TOP, role(ColorPart.SKIN)),
+                ColorPart.EDGE to fixed(Hud.HOLO_CYAN, role(ColorPart.EDGE)),
+                ColorPart.OUTER_GLOW to fixed(Hud.HOLO_CYAN, role(ColorPart.OUTER_GLOW)),
+                ColorPart.TEXT to fixed(Hud.HOLO_LASER, role(ColorPart.TEXT)),
+                ColorPart.CURSOR to fixed(Hud.HOLO_LASER, role(ColorPart.CURSOR)),
+                ColorPart.TOGGLE_GLOW to fixed(Hud.HOLO_CYAN, role(ColorPart.TOGGLE_GLOW)),
+                ColorPart.FOLDER to fixed(Hud.HOLO_CYAN, role(ColorPart.FOLDER)),
+                ColorPart.SIDE_TEXT to fixed(Hud.HOLO_TEXT, role(ColorPart.SIDE_TEXT)),
+                ColorPart.STATUS to fixed(Hud.HOLO_LASER, role(ColorPart.STATUS)),
+            ),
+            numbers = mapOf(
+                LookKeys.OPACITY to 50, LookKeys.CORNERS to 55, LookKeys.GLOW to 70,
+                LookKeys.PULSE_SPEED to 35, LookKeys.SWIRL_SPEED to 30, LookKeys.TOGGLE_GLOW to 0,
+            ),
+            toggles = mapOf(
+                LookKeys.SCAN_LINE to true, LookKeys.RING to true, LookKeys.UNFOLD to true,
+                LookKeys.EDGE_GLOW to true, LookKeys.OUTER_GLOW to false, LookKeys.PULSE to false,
+                LookKeys.SWIRL to false, LookKeys.TOGGLE_SWIRL to false,
+            ),
+        )
+    }
+
+    /** Settings no theme touches, with their start values. */
+    val PERSONAL_NUMBERS = mapOf(LookKeys.TYPING to 50, LookKeys.FONT_SIZE to 50)
+    val PERSONAL_TOGGLES = mapOf(LookKeys.LASER_TYPING to true, LookKeys.TEST_DIAMOND to false)
+}
+
+/** One part's saved state. */
+internal class PartState(val system: Boolean, val role: SystemRole, val custom: Int, val mix: IntArray?)
+
+/** Everything the panel needs to draw itself, worked out once per change. */
+internal data class PanelLook(
+    val base: Theme,
+    val skin: Int,
+    val edge: Int,
+    val outerGlow: Int,
+    val text: Int,
+    val cursor: Int,
+    val toggleGlow: Int,
+    val folder: Int,
+    val sideText: Int,
+    val status: Int,
+    val label: Int,
+    val decor: Int,
+    val specialFolder: Int,
+    val opacity: Float,
+    val glowStrength: Float,
+    val edgeGlow: Boolean,
+    val outerGlowOn: Boolean,
+    val pulse: Boolean,
+    val pulseSpeed: Float,
+    val swirl: Boolean,
+    val swirlSpeed: Float,
+    val toggleSwirl: Boolean,
+    val toggleGlowStrength: Float,
+    val roundness: Float,
+    val fontScale: Float,
+    val ring: Boolean,
+    val unfold: Boolean,
+    val scanLine: Boolean,
+    val laserTyping: Boolean,
+    val typingSpeed: Float,
+) {
+    /** Holo Classic keeps the Step 2 cut corners, gold brackets, and tinted glass. */
+    val holo: Boolean get() = base == Theme.HOLO
+
+    /** Letters per second for the laser typewriter. */
+    val lettersPerSecond: Float get() = 12f + typingSpeed * 138f
+
+    companion object {
+        /** The look in use right now. Text spans read it when they draw. */
+        var current: PanelLook? = null
+    }
+}
+
+/** Reads and writes the theme settings. Unsaved values come from the current theme. */
+internal class ThemeStore(private val context: Context, private val prefs: PanelPrefs) {
+
+    fun base(): Theme = Theme.from(prefs.text(BASE))
+
+    private fun spec(): ThemeSpec = Themes.spec(base())
+
+    fun number(key: String): Int {
+        val default = spec().numbers[key] ?: Themes.PERSONAL_NUMBERS[key] ?: 50
+        return prefs.number(key, default)
+    }
+
+    fun toggle(key: String): Boolean {
+        val default = spec().toggles[key] ?: Themes.PERSONAL_TOGGLES[key] ?: false
+        return prefs.toggle(key, default)
+    }
+
+    fun setNumber(key: String, value: Int) = prefs.setNumber(key, value)
+
+    fun setToggle(key: String, value: Boolean) = prefs.setToggle(key, value)
+
+    fun part(part: ColorPart): PartState {
+        val spec = spec().parts.getValue(part)
+        val role = prefs.text(ROLE + part.key)?.let { saved -> SystemRole.entries.firstOrNull { it.name == saved } }
+        return PartState(
+            system = prefs.toggle(SYSTEM + part.key, spec.system),
+            role = role ?: spec.role,
+            custom = prefs.color(CUSTOM + part.key, spec.custom),
+            mix = RainbowMix.decode(prefs.text(MIX + part.key)),
+        )
+    }
+
+    fun systemColor(part: ColorPart): Int = part(part).role.resolve(context)
+
+    fun color(part: ColorPart): Int {
+        val state = part(part)
+        return if (state.system) state.role.resolve(context) else state.custom
+    }
+
+    /** The six numbers to show for this part. */
+    fun mix(part: ColorPart): IntArray {
+        val state = part(part)
+        return if (!state.system && state.mix != null) state.mix else RainbowMix.split(color(part))
+    }
+
+    /** Turns "Use system color" on or off. Turning it off keeps the color that is showing now. */
+    fun setSystem(part: ColorPart, on: Boolean) {
+        val showing = color(part)
+        prefs.write {
+            toggle(SYSTEM + part.key, on)
+            if (!on) {
+                color(CUSTOM + part.key, showing)
+                text(MIX + part.key, RainbowMix.encode(RainbowMix.split(showing)))
+            }
+        }
+    }
+
+    fun setCustom(part: ColorPart, color: Int, mix: IntArray) {
+        prefs.write {
+            toggle(SYSTEM + part.key, false)
+            color(CUSTOM + part.key, color or 0xFF000000.toInt())
+            text(MIX + part.key, RainbowMix.encode(mix))
+        }
+    }
+
+    /** Puts one part back to the current theme's color. */
+    fun resetPart(part: ColorPart) {
+        prefs.write { clearPart(part) }
+    }
+
+    private fun PanelPrefs.Writer.clearPart(part: ColorPart) {
+        removeToggle(SYSTEM + part.key)
+        removeColor(CUSTOM + part.key)
+        text(ROLE + part.key, null)
+        text(MIX + part.key, null)
+    }
+
+    /** Applies a theme. Every setting can still be changed afterward. */
+    fun applyTheme(theme: Theme) {
+        val next = Themes.spec(theme)
+        prefs.write {
+            text(BASE, theme.key)
+            ColorPart.entries.forEach { clearPart(it) }
+            next.numbers.keys.forEach { removeNumber(it) }
+            next.toggles.keys.forEach { removeToggle(it) }
+        }
+    }
+
+    fun resetAll() = prefs.resetAll()
+
+    /** A few colors to preview a theme before it is applied: glass, edge, glow, and text. */
+    fun preview(theme: Theme): IntArray {
+        val parts = Themes.spec(theme).parts
+        fun pick(part: ColorPart): Int {
+            val spec = parts.getValue(part)
+            return if (spec.system) spec.role.resolve(context) else spec.custom
+        }
+        return intArrayOf(pick(ColorPart.SKIN), pick(ColorPart.EDGE), pick(ColorPart.OUTER_GLOW), pick(ColorPart.TEXT))
+    }
+
+    fun look(): PanelLook {
+        val base = base()
+        val edge = color(ColorPart.EDGE)
+        val folder = color(ColorPart.FOLDER)
+        val text = color(ColorPart.TEXT)
+        // Font size 50 is normal. 0 is three quarters as big. 100 is almost half again as big.
+        val fontValue = number(LookKeys.FONT_SIZE)
+        val fontScale = if (fontValue <= 50) 0.75f + 0.25f * fontValue / 50f else 1f + 0.45f * (fontValue - 50) / 50f
+        val look = PanelLook(
+            base = base,
+            skin = color(ColorPart.SKIN),
+            edge = edge,
+            outerGlow = color(ColorPart.OUTER_GLOW),
+            text = text,
+            cursor = color(ColorPart.CURSOR),
+            toggleGlow = color(ColorPart.TOGGLE_GLOW),
+            folder = folder,
+            sideText = color(ColorPart.SIDE_TEXT),
+            status = color(ColorPart.STATUS),
+            label = if (base == Theme.HOLO) Hud.HOLO_LABEL else Hud.lighten(text, 0.55f),
+            decor = if (base == Theme.HOLO) Hud.HOLO_GOLD else edge,
+            specialFolder = if (base == Theme.HOLO) Hud.HOLO_GOLD else folder,
+            opacity = number(LookKeys.OPACITY) / 100f,
+            glowStrength = number(LookKeys.GLOW) / 100f,
+            edgeGlow = toggle(LookKeys.EDGE_GLOW),
+            outerGlowOn = toggle(LookKeys.OUTER_GLOW),
+            pulse = toggle(LookKeys.PULSE),
+            pulseSpeed = number(LookKeys.PULSE_SPEED) / 100f,
+            swirl = toggle(LookKeys.SWIRL),
+            swirlSpeed = number(LookKeys.SWIRL_SPEED) / 100f,
+            toggleSwirl = toggle(LookKeys.TOGGLE_SWIRL),
+            toggleGlowStrength = number(LookKeys.TOGGLE_GLOW) / 100f,
+            roundness = number(LookKeys.CORNERS) / 100f,
+            fontScale = fontScale,
+            ring = toggle(LookKeys.RING),
+            unfold = toggle(LookKeys.UNFOLD),
+            scanLine = toggle(LookKeys.SCAN_LINE),
+            laserTyping = toggle(LookKeys.LASER_TYPING),
+            typingSpeed = number(LookKeys.TYPING) / 100f,
+        )
+        PanelLook.current = look
+        return look
+    }
+
+    private companion object {
+        const val BASE = "base_theme"
+        const val SYSTEM = "system_color."
+        const val ROLE = "role."
+        const val CUSTOM = "custom."
+        const val MIX = "mix."
+    }
+}

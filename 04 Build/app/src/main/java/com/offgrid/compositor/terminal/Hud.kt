@@ -2,24 +2,26 @@ package com.offgrid.compositor.terminal
 
 import android.content.Context
 import android.content.res.Resources
+import android.graphics.Color
 import android.graphics.Typeface
 import androidx.core.content.res.ResourcesCompat
 import com.offgrid.compositor.R
 
 /**
- * Colors, fonts, and sizes for the terminal panel.
- * Our own look: dark glass, cyan and gold glow lines, laser green text.
+ * Fonts, sizes, and small color helpers for the terminal panel.
+ * The colors themselves come from the theme. See PanelLook.kt.
  */
 internal object Hud {
-    const val CYAN = 0xFF46F0FF.toInt()
-    const val GOLD = 0xFFFFC34D.toInt()
-    const val LASER = 0xFF33FF00.toInt()
-    const val LASER_BRIGHT = 0xFFCCFF99.toInt()
-    const val TEXT = 0xFFDDF8FF.toInt()
-    const val TEXT_DIM = 0xFF8DB4BF.toInt()
-    const val GLASS_TOP = 0xFF0D1E26.toInt()
-    const val GLASS_BOTTOM = 0xFF03090D.toInt()
+    /** Step 2 colors. Holo Classic still uses them. */
+    const val HOLO_CYAN = 0xFF46F0FF.toInt()
+    const val HOLO_GOLD = 0xFFFFC34D.toInt()
+    const val HOLO_LASER = 0xFF33FF00.toInt()
+    const val HOLO_LABEL = 0xFFCCFF99.toInt()
+    const val HOLO_TEXT = 0xFFDDF8FF.toInt()
+    const val HOLO_GLASS_TOP = 0xFF0D1E26.toInt()
+    const val HOLO_GLASS_BOTTOM = 0xFF03090D.toInt()
     const val INK = 0xFF000000.toInt()
+    const val WHITE = 0xFFFFFFFF.toInt()
 
     private var monoFace: Typeface? = null
     private var monoBoldFace: Typeface? = null
@@ -56,4 +58,15 @@ internal object Hud {
         val a = (alpha.coerceIn(0f, 1f) * 255f + 0.5f).toInt()
         return (color and 0x00FFFFFF) or (a shl 24)
     }
+
+    /** Mixes [color] toward [other]. 0 keeps [color], 1 gives [other]. Alpha comes from [color]. */
+    fun blend(color: Int, other: Int, share: Float): Int {
+        val t = share.coerceIn(0f, 1f)
+        val r = Color.red(color) + (Color.red(other) - Color.red(color)) * t
+        val g = Color.green(color) + (Color.green(other) - Color.green(color)) * t
+        val b = Color.blue(color) + (Color.blue(other) - Color.blue(color)) * t
+        return Color.argb(Color.alpha(color), r.toInt(), g.toInt(), b.toInt())
+    }
+
+    fun lighten(color: Int, share: Float): Int = blend(color, WHITE, share)
 }

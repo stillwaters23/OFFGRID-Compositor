@@ -3,14 +3,22 @@ package com.offgrid.compositor.terminal
 import android.graphics.Typeface
 import android.text.SpannableStringBuilder
 import android.text.Spanned
-import android.text.style.ForegroundColorSpan
+import android.text.TextPaint
+import android.text.style.CharacterStyle
 import android.text.style.StyleSpan
+import android.text.style.UpdateAppearance
 
-/** What kind of folder it is. It picks the glow color. */
-internal enum class FolderKind { SETTINGS, PREMIUM, PLATFORM, EFFECTS, TESTS }
+/** What kind of folder it is. Settings and premium folders use the special folder color. */
+internal enum class FolderKind { SETTINGS, OFFICE, COLOR, PREMIUM, PLATFORM, EFFECTS, TESTS }
+
+/** Something inside a folder, in the order it shows. */
+internal sealed class PanelItem {
+    /** How many items this counts as on the folder icon. */
+    open val count: Int get() = 1
+}
 
 /** A typed whole number from 0 to 100. Never a slider. */
-internal class NumberItem(val key: String, val label: String, val help: String, val default: Int)
+internal class NumberItem(val key: String, val label: String, val help: String) : PanelItem()
 
 /** An on and off toggle. Every toggle uses the same art from 03 Design/References. */
 internal class ToggleItem(
@@ -19,7 +27,20 @@ internal class ToggleItem(
     val help: String,
     val default: Boolean,
     val isTest: Boolean,
-)
+) : PanelItem()
+
+/** A button that does one thing, like Reset all. */
+internal class ActionItem(val action: PanelAction, val label: String, val help: String) : PanelItem()
+
+internal enum class PanelAction { RESET_ALL }
+
+/** One ready-made theme. Tapping it applies it. */
+internal class ThemeItem(val theme: Theme) : PanelItem()
+
+/** The color editor for one part: hex code, six typed numbers, swatch, Use system color, and Reset. */
+internal class ColorItem(val part: ColorPart) : PanelItem() {
+    override val count: Int get() = 9
+}
 
 /** The mark next to a private test toggle (feature 37). */
 internal enum class TestMark { NOT_TESTED, SUCCESS, FAILED }
@@ -46,8 +67,7 @@ internal class PanelFolder(
     val tag: String?,
     val kind: FolderKind,
     val folders: List<PanelFolder> = emptyList(),
-    val numbers: List<NumberItem> = emptyList(),
-    val toggles: List<ToggleItem> = emptyList(),
+    val items: List<PanelItem> = emptyList(),
     val guide: Guide? = null,
     val notes: List<String> = emptyList(),
 ) {
@@ -58,9 +78,13 @@ internal class PanelFolder(
         folders.forEach { it.parent = this }
     }
 
-    val itemCount: Int get() = folders.size + numbers.size + toggles.size
+    val itemCount: Int get() = folders.size + items.sumOf { it.count }
 
     val label: String get() = if (tag == null) title else "$tag $title"
+
+    /** Settings, the theme office, and the premium lane use the special folder color. */
+    val special: Boolean get() = kind == FolderKind.SETTINGS || kind == FolderKind.OFFICE ||
+        kind == FolderKind.COLOR || kind == FolderKind.PREMIUM
 
     /** The folders from the top level down to this one. */
     fun trail(): List<PanelFolder> {
@@ -74,9 +98,9 @@ internal class PanelFolder(
         var success = 0
         var failed = 0
         fun walk(folder: PanelFolder) {
-            for (toggle in folder.toggles) {
-                if (!toggle.isTest) continue
-                when (markOf(folder, toggle)) {
+            for (item in folder.items) {
+                if (item !is ToggleItem || !item.isTest) continue
+                when (markOf(folder, item)) {
                     TestMark.SUCCESS -> success++
                     TestMark.FAILED -> failed++
                     TestMark.NOT_TESTED -> Unit
@@ -95,36 +119,141 @@ internal class PanelFolder(
  * Platform folders hold no effects yet. Effects come in later steps.
  */
 internal object PanelTree {
-    const val OPACITY = "opacity"
-    const val GLOW = "glow"
-    const val TYPING = "typing"
-    const val SCAN_LINE = "scan_line"
-    const val LASER_TYPING = "laser_typing"
-
     fun build(): PanelFolder {
         val top = listOf(settingsFolder(), offgridFolder()) +
             PLATFORMS.mapIndexed { index, platform -> platformFolder(index + 1, platform) }
         return PanelFolder(id = "home", title = "HOME", tag = null, kind = FolderKind.SETTINGS, folders = top)
     }
 
+    /** Panel settings, with the theme office inside it. */
     private fun settingsFolder() = PanelFolder(
         id = "panel_settings",
         title = "Panel settings",
         tag = null,
         kind = FolderKind.SETTINGS,
-        numbers = listOf(
-            NumberItem(OPACITY, "Opacity", "How solid the panel looks. 0 is clear. 100 is solid.", 50),
-            NumberItem(GLOW, "Glow", "How bright the glow lines are.", 70),
-            NumberItem(TYPING, "Typing speed", "How fast the laser types.", 50),
-        ),
-        toggles = listOf(
-            ToggleItem(SCAN_LINE, "Scan line", "A soft line sweeps across the panel.", true, isTest = false),
-            ToggleItem(LASER_TYPING, "Laser typing", "Off shows the text all at once.", true, isTest = false),
+        folders = listOf(themesFolder(), colorsFolder(), glowFolder(), toggleStyleFolder()),
+        items = listOf(
+            NumberItem(LookKeys.OPACITY, "Opacity", "How solid the panel looks. 0 is clear. 100 is solid."),
+            NumberItem(LookKeys.FONT_SIZE, "Font size", "How big the words are. 50 is normal."),
+            NumberItem(LookKeys.CORNERS, "Corner roundness", "0 is square. 100 is very round."),
+            NumberItem(LookKeys.TYPING, "Typing speed", "How fast the laser types."),
+            ToggleItem(
+                LookKeys.TEST_DIAMOND,
+                "Test diamond",
+                "Paints the yellow test shape into the video. It starts off.",
+                false,
+                isTest = false,
+            ),
+            ToggleItem(LookKeys.SCAN_LINE, "Scan line", "A soft line sweeps across the panel.", true, isTest = false),
+            ToggleItem(LookKeys.LASER_TYPING, "Laser typing", "Off shows the text all at once.", true, isTest = false),
+            ToggleItem(LookKeys.RING, "Ring", "A soft ring turns around the open folder.", true, isTest = false),
+            ToggleItem(
+                LookKeys.UNFOLD,
+                "Hologram unfold",
+                "Folders open like a hologram. Off opens them at once.",
+                true,
+                isTest = false,
+            ),
+            ActionItem(PanelAction.RESET_ALL, "Reset all to default", "Puts every panel setting back to the start."),
         ),
         notes = listOf(
             "Type a number from 0 to 100. Then tap Done.",
             "Green toggle means on. Red toggle means off.",
+            "The theme office is in the folders: Themes, Colors, Glow effects, and Toggle style.",
             "No sliders here. Only typed numbers and toggles.",
+        ),
+    )
+
+    private fun themesFolder() = PanelFolder(
+        id = "themes",
+        title = "📁 Themes",
+        tag = null,
+        kind = FolderKind.OFFICE,
+        items = Theme.entries.map { ThemeItem(it) },
+        notes = listOf(
+            "Tap a theme to use it.",
+            "You can still change every setting after.",
+            "OLED means the screen's black parts turn fully off.",
+        ),
+    )
+
+    private fun colorsFolder() = PanelFolder(
+        id = "colors",
+        title = "📁 Colors",
+        tag = null,
+        kind = FolderKind.OFFICE,
+        folders = ColorPart.entries.map { colorFolder("colors", it) },
+        notes = listOf(
+            "Each folder changes the color of one part.",
+            "Open one to type a hex code, or mix six colors.",
+        ),
+    )
+
+    private fun colorFolder(parentId: String, part: ColorPart) = PanelFolder(
+        id = "$parentId.${part.key}",
+        title = "📁 ${part.title}",
+        tag = null,
+        kind = FolderKind.COLOR,
+        items = listOf(ColorItem(part)),
+        notes = listOf(
+            PART_HELP.getValue(part),
+            "Type a hex code like #00FF66, then tap Done.",
+            "Or mix Red, Yellow, Green, Blue, Indigo, and Violet, from 0 to 100.",
+            "Use system color follows your phone's own colors.",
+        ),
+    )
+
+    private val PART_HELP = mapOf(
+        ColorPart.SKIN to "This colors the panel glass.",
+        ColorPart.EDGE to "This colors the thin line around the panel.",
+        ColorPart.OUTER_GLOW to "This colors the soft glow outside the panel.",
+        ColorPart.TEXT to "This colors the typed guidance text.",
+        ColorPart.CURSOR to "This colors the laser cursor's glow.",
+        ColorPart.TOGGLE_GLOW to "This colors the swirl inside each toggle.",
+        ColorPart.FOLDER to "This colors the folder icons.",
+        ColorPart.SIDE_TEXT to "This colors the folder names.",
+        ColorPart.STATUS to "This colors the status line at the top.",
+    )
+
+    private fun glowFolder() = PanelFolder(
+        id = "glow_effects",
+        title = "📁 Glow effects",
+        tag = null,
+        kind = FolderKind.OFFICE,
+        items = listOf(
+            ToggleItem(LookKeys.EDGE_GLOW, "Edge glow", "A soft glow along the panel's edge.", true, isTest = false),
+            ToggleItem(LookKeys.OUTER_GLOW, "Outer glow", "A soft glow outside the panel.", true, isTest = false),
+            ToggleItem(LookKeys.PULSE, "Pulse", "The glow breathes in and out.", true, isTest = false),
+            NumberItem(LookKeys.PULSE_SPEED, "Pulse speed", "How fast the glow breathes."),
+            NumberItem(LookKeys.GLOW, "Glow strength", "How bright the glow is. 0 turns it off."),
+            ToggleItem(
+                LookKeys.SWIRL,
+                "Bioluminescent liquid swirl",
+                "Light flows around the edge, like living sea light.",
+                true,
+                isTest = false,
+            ),
+            NumberItem(LookKeys.SWIRL_SPEED, "Swirl speed", "How fast all the liquid light moves."),
+        ),
+        notes = listOf(
+            "Bioluminescent means it glows like living sea light.",
+            "Pulse makes the glow breathe slowly.",
+        ),
+    )
+
+    private fun toggleStyleFolder() = PanelFolder(
+        id = "toggle_style",
+        title = "📁 Toggle style",
+        tag = null,
+        kind = FolderKind.OFFICE,
+        folders = listOf(colorFolder("toggle_style", ColorPart.TOGGLE_GLOW)),
+        items = listOf(
+            ToggleItem(LookKeys.TOGGLE_SWIRL, "Liquid swirl", "Light swirls inside each toggle's ball.", true, isTest = false),
+            NumberItem(LookKeys.TOGGLE_GLOW, "Glow strength", "How bright the light inside each toggle is."),
+        ),
+        notes = listOf(
+            "These change the light inside each toggle.",
+            "The red and green toggle art stays the same.",
         ),
     )
 
@@ -168,16 +297,19 @@ internal object PanelTree {
                     title = "Tests",
                     tag = null,
                     kind = FolderKind.TESTS,
-                    toggles = TEST_TOGGLES,
+                    items = TEST_TOGGLES,
                     notes = listOf(
                         "Private test toggles. Viewers never see them.",
                         "Green means on. Red means off.",
-                        "Real checks come in a later step.",
+                        TEST_MARKERS_LINE,
                     ),
                 ),
             ),
         )
     }
+
+    /** Tells Royalty the test toggles don't change anything inside live-stream apps yet. */
+    const val TEST_MARKERS_LINE = "These are test markers for now. Real checks come in a later step."
 
     /** The example tests from feature 15. They hold no checks yet. */
     private val TEST_TOGGLES = listOf(
@@ -405,12 +537,19 @@ internal object PanelText {
             if (label != null) {
                 val start = out.length
                 out.append(label).append(':')
-                out.setSpan(ForegroundColorSpan(Hud.LASER_BRIGHT), start, out.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                out.setSpan(LabelSpan(), start, out.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
                 out.setSpan(StyleSpan(Typeface.BOLD), start, out.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
                 out.append(' ')
             }
             out.append(value)
         }
         return out
+    }
+
+    /** Labels like "CAN DO:" draw a little brighter than the text, in the current theme's color. */
+    private class LabelSpan : CharacterStyle(), UpdateAppearance {
+        override fun updateDrawState(paint: TextPaint) {
+            PanelLook.current?.let { paint.color = it.label }
+        }
     }
 }
