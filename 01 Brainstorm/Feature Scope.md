@@ -4,7 +4,7 @@
 **Owner:** Royalty  
 **Status:** Scope only. Nothing is built yet.  
 **Target:** Royalty's private Android build first (Galaxy S25 Ultra and Galaxy A37). A PC and OBS version can come later.  
-**Updated:** 2026-10-06 (America/Chicago). Features up to 26. ElevenLabs removed from all voice options.
+**Updated:** 2026-10-06 (America/Chicago). Features up to 27. ElevenLabs removed from all voice options.
 
 ---
 
@@ -53,6 +53,7 @@ Everything the terminal says to Royalty, including guidance lines, IP leak alert
 24. **Beach theme (new).** Pure ocean beach scenery fills the whole box, with no person in frame.
 25. **IP leak check (new).** Shows what IP and country the other side sees, so Royalty can confirm ProtonVPN Stealth is masking the real IP. A leak sets off a red flash and a sound alert right away.
 26. **Time freeze (new).** Holds Royalty's outgoing video on one frame for a few seconds, then picks back up, like a glitch.
+27. **Optical illusions (new).** Impossible shapes, depth tricks, and shifting patterns inside Royalty's video box.
 
 Related design references are in `03 Design/References`. The toggles there should all look exactly the same as each other, and the typewriter style follows the Grok Bot Laser Typewriter UI Spec.
 
@@ -309,6 +310,16 @@ Related design references are in `03 Design/References`. The toggles there shoul
 - On/off toggle. Freeze length in seconds and glitch strength are typed numbers from 0 to 100, never sliders.
 - Audio choice for later: mute the mic during the freeze, or let audio keep going. Decide before building.
 - Considered and declined: freezing the other person's stream on their own device. That would mean controlling video on someone else's phone or interfering with the platform's service, so it's out of scope. Time freeze only ever changes Royalty's own outgoing video.
+- Scope only. Nothing is built yet.
+
+## 27. Optical illusions
+
+**What it does:** wild optical illusions appear in Royalty's outgoing video box during a stream or call.
+
+- Styles: impossible shapes (like the never-ending staircase or impossible triangle), depth tricks that make the box look like a tunnel or a hole, motion illusions, and patterns that seem to move or shift when they're still.
+- It's baked into the outgoing video, following the core design rule, so viewers see it.
+- On/off toggle, plus an illusion picker. Size, speed, and strength are typed numbers from 0 to 100, never sliders.
+- Safety limit: no fast flashing or strobing, and no more than 3 flashes per second, so it can't set off seizures for viewers with photosensitive epilepsy. This limit can't be turned off.
 - Scope only. Nothing is built yet.
 
 ## Potential future feature: floating text overlay on calls
