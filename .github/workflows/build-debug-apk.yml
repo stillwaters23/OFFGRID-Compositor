@@ -101,6 +101,10 @@ jobs:
         working-directory: 04 Build
         run: chmod +x ./gradlew && ./gradlew assembleDebug --stacktrace
 
+      - name: Check the color mix math
+        working-directory: 04 Build
+        run: ./gradlew testDebugUnitTest --stacktrace
+
       - name: Check the built app has no mic permission
         run: |
           set -euo pipefail
@@ -132,9 +136,9 @@ jobs:
         run: |
           set -euo pipefail
           cat > /tmp/release-notes.txt << 'EOF'
-          This is the Step 2 test build of OFFGRID.
-          It adds the terminal panel on top of the camera.
-          The yellow diamond test from Step 1 is still there.
+          This is the Step 2.1 test build of OFFGRID.
+          It polishes the terminal panel and adds the theme office.
+          The yellow test diamond is now off until you turn it on.
           The mic stays off.
 
           Sign in to GitHub in your phone browser first. This project is private.
@@ -142,30 +146,47 @@ jobs:
           How to put it on your phone
           1. If OFFGRID is already on your phone, remove it first.
              Press and hold the OFFGRID icon. Tap Uninstall.
-             Each test build is made fresh, so the phone may refuse to put it over the old one.
+             Each test build is new, so the phone may refuse the update.
           2. Tap OFFGRID.Preview.apk below.
           3. If your phone asks, allow this browser to install apps.
           4. Tap Install. If Play Protect warns you, tap More details, then Install anyway.
           5. Open OFFGRID. Tap Allow so the front camera can turn on.
 
-          How to test the panel
-          1. Find the glowing OFFGRID TERMINAL panel.
-          2. Drag its top bar. The panel moves anywhere you drag it.
-          3. Tap Panel settings. Scroll down to Opacity.
-          4. Type 80. Tap Done. The glass gets more solid.
-          5. Type 0. Tap Done. The glass gets clear. The words stay.
-          6. Type 150. Tap Done. The panel says the number is too big.
-          7. Look at the toggles. Green means on. Red means off. They all look the same.
-          8. Tap BACK. Tap Bigo Live. Read the typed lines. Find the RESULTS line.
-          9. Tap Tests. Flip a test toggle. It turns green.
-          10. Tap the small dash at the top right. The panel shrinks to a small tag.
-              Tap the OFFGRID tag to open it again.
+          What to look for first
+          1. The panel is true black glass. No blue or gold is built in.
+          2. The edge and the outer glow use your phone's color palette.
+          3. The glow breathes in and out slowly, like living light.
+          4. Watch the typed words. Only typed letters show. Nothing waits behind them.
+          5. The laser cursor is very bright, with a glow around it.
+          6. Look inside the ball of any toggle. Soft light swirls inside it.
 
-          How to check the diamond still records
+          How to test the panel
+          1. Drag the three short lines in the bottom right corner.
+             The panel gets bigger or smaller.
+             Swipe OFFGRID away from your recent apps. Open it again.
+             The panel keeps its new size and place.
+          2. Tap Panel settings. Find Test diamond. It is red, so it is off.
+             Tap it. The yellow diamond shows on the camera. Tap it again to hide it.
+          3. Tap 📁 Themes. Tap Termux Black. The panel turns plain black and green.
+             Tap Holo Classic for the Step 2 look. Tap OLED Bioluminescent to go back.
+          4. Tap BACK. Tap 📁 Colors. Tap 📁 Edge color.
+          5. In HEX CODE, type #00FF66. Tap Done. The edge turns green.
+          6. Type abc. Tap Done. The panel says the code won't work. Nothing changes.
+          7. Under MIX SIX COLORS, type 150 in Red. Tap Done.
+             The panel says the number is too big. Nothing changes.
+          8. Type 100 in Red. Tap Done. The swatch and the hex code change.
+          9. Turn on Use system color. The edge follows your phone again.
+          10. Tap BACK twice. Scroll down. Tap Reset all to default.
+              Read the question. Tap Yes, reset all. Everything goes back to the start.
+          11. In your phone's Settings, search for Remove animations. Turn it on.
+              The glow stops breathing and the toggle swirl stops.
+              Turn Remove animations off again when you are done.
+
+          How to check the video
           1. Tap Record 5 seconds.
           2. Tap Play last video.
-          3. The yellow diamond should be in the video.
-             The panel is not in the video. That is on purpose.
+          3. The panel is not in the video. That is on purpose.
+          4. To see the diamond in a video, turn on Test diamond first.
           EOF
           if gh release view step-2-preview >/dev/null 2>&1; then
             gh release delete step-2-preview --yes --cleanup-tag

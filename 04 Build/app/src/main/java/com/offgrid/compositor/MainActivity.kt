@@ -57,6 +57,7 @@ import java.io.File
  * Step 1. Shows the painted camera picture, records a few seconds, and plays it back.
  * The mic stays off.
  * Step 2. The floating terminal panel sits on top. It is not painted into the video.
+ * Step 2.1. The yellow test diamond is off unless Panel settings turns it on.
  */
 class MainActivity : AppCompatActivity() {
 
@@ -88,6 +89,8 @@ class MainActivity : AppCompatActivity() {
     private var videoWidth = 0
     private var videoHeight = 0
     private var playbackRotation = 0
+    private var shownMessage = 0
+    private var diamondInVideo: Boolean? = null
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private var stopRecordingTask: Runnable? = null
@@ -122,6 +125,13 @@ class MainActivity : AppCompatActivity() {
         terminalPanel = findViewById(R.id.terminal_panel)
 
         onBackPressedDispatcher.addCallback(this, terminalPanel.backCallback)
+        terminalPanel.matchLook(
+            bars = listOf(controlBar, playbackBar),
+            texts = listOf(statusText, playbackHint),
+            buttons = listOf(recordButton, playButton, actionButton, backButton),
+        )
+        terminalPanel.onTestDiamond = { on -> onTestDiamondChanged(on) }
+        describeCamera(terminalPanel.testDiamondOn)
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.root)) { _, insets ->
             terminalPanel.onKeyboardInset(insets.getInsets(WindowInsetsCompat.Type.ime()).bottom)
             insets
@@ -208,6 +218,7 @@ class MainActivity : AppCompatActivity() {
             }
             processor = created
         }
+        painter.testShapeOn = terminalPanel.testDiamondOn
         val effect = CompositorEffect(
             painter.executor,
             painter,
@@ -285,6 +296,7 @@ class MainActivity : AppCompatActivity() {
         }
         recording = true
         stopRequested = false
+        diamondInVideo = terminalPanel.testDiamondOn
         showMessage(R.string.recording_now, ButtonMode.RECORDING)
         val options = FileOutputOptions.Builder(temp).build()
         val pending = capture.output.prepareRecording(this, options)
@@ -359,7 +371,8 @@ class MainActivity : AppCompatActivity() {
         playbackBackdrop.visibility = View.VISIBLE
         playbackView.visibility = View.VISIBLE
         playbackBar.visibility = View.VISIBLE
-        playbackHint.setText(R.string.playback_hint)
+        val diamond = diamondInVideo ?: terminalPanel.testDiamondOn
+        playbackHint.setText(if (diamond) R.string.playback_hint else R.string.playback_hint_plain)
         playbackRotation = readVideoRotation(file)
         if (playbackSurface != null) {
             startPlayer(file)
@@ -542,7 +555,23 @@ class MainActivity : AppCompatActivity() {
         if (recording || playRequested) {
             return
         }
-        showMessage(R.string.shape_ready, ButtonMode.LIVE)
+        val message = if (terminalPanel.testDiamondOn) R.string.shape_ready else R.string.camera_ready
+        showMessage(message, ButtonMode.LIVE)
+    }
+
+    /** The Test diamond toggle in Panel settings. Off paints nothing extra into the video. */
+    private fun onTestDiamondChanged(on: Boolean) {
+        processor?.testShapeOn = on
+        describeCamera(on)
+        if (shownMessage == R.string.shape_ready || shownMessage == R.string.camera_ready) {
+            showLivePicture()
+        }
+    }
+
+    private fun describeCamera(diamondOn: Boolean) {
+        previewView.contentDescription = getString(
+            if (diamondOn) R.string.camera_picture else R.string.camera_picture_plain,
+        )
     }
 
     private fun showPermissionHelp() {
@@ -559,6 +588,7 @@ class MainActivity : AppCompatActivity() {
             hidePlayback()
         }
         controlBar.visibility = View.VISIBLE
+        shownMessage = textRes
         statusText.setText(textRes)
         val showRecord = buttonMode == ButtonMode.LIVE || buttonMode == ButtonMode.RECORDING
         recordButton.visibility = if (showRecord) View.VISIBLE else View.GONE

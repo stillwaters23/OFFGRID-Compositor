@@ -67,3 +67,19 @@ States: passed, waiting for review, blocked, or waiting for Royalty's phone test
 - **PR / commit:** Pull request #4, not merged. Commit `259933a`.
 - **State:** waiting for review
 - **Next:** Rex (Agent 04) reviews pull request #4 and does not merge it. Then Royalty installs step-2-preview on the Galaxy S25 Ultra and the Galaxy A37 and runs the test steps in pull request #4, including the yellow diamond video check. Do not start Step 3 or Step 7.
+
+## 2026-10-06 6:49 AM CT — Agent 05, Claude Code
+
+- **Bootloader step:** Step 2. Terminal panel and controls (Build)
+- **What was done:** Recorded that Royalty phone-tested the step-2-preview build and likes it. Pull request #4 was merged into main at 5:29 AM CT, as squash commit `3e10d39`. Step 2 is done. Royalty's phone-test feedback became Step 2.1.
+- **PR / commit:** Pull request #4, merged. Commit `3e10d39`.
+- **State:** passed
+- **Next:** Step 2.1, Panel polish and theme office. Agent 05 picked that up.
+
+## 2026-10-06 6:49 AM CT — Agent 05, Claude Code
+
+- **Bootloader step:** Step 2.1. Panel polish and theme office (Royalty's Step 2 phone-test feedback)
+- **What was done:** Fixed the ghost text. Only typed letters show now, and the words still never jump. Added a resize corner. The panel keeps its size and place after a restart. The yellow Step 1 diamond is now a Test diamond toggle in Panel settings. It starts off, and off paints nothing extra. The compositor files and the effect list are kept. The new first look is true black glass in the phone's own colors, with no blue and no gold. The edge and outer glow breathe softly. The laser cursor is much brighter. Each toggle keeps the red and green art and has a swirl of light inside its ball. All motion stops when the phone's Remove animations setting is on. Built the theme office in Panel settings: Themes (OLED Bioluminescent, Termux Black, System Colors, Holo Classic), Colors (9 color folders, each with a hex code box, Red, Yellow, Green, Blue, Indigo, and Violet from 0 to 100, a swatch, Use system color, and Reset), Glow effects, and Toggle style. Added Corner roundness, Font size, Ring, Hologram unfold, and Reset all to default, which asks first. Bad input gets a plain message and changes nothing. Each Tests folder now says the test markers don't check anything yet. Every setting is saved on the phone. No sliders, no mic, no voice. A new unit test checks the color mix math. GitHub built the app and published it again as step-2-preview.
+- **PR / commit:** Pull request #5, not merged. Commits `e892d2f` and `d119dff`.
+- **State:** waiting for review
+- **Next:** Rex (Agent 04) reviews pull request #5 and does not merge it. Then Royalty installs step-2-preview on the Galaxy S25 Ultra and the Galaxy A37 and runs the test steps in pull request #5. Do not start Step 3 or Step 7.

@@ -2,14 +2,11 @@ package com.offgrid.compositor.terminal
 
 import android.animation.ValueAnimator
 import android.content.Context
+import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Paint
 import android.os.SystemClock
-import android.text.Spannable
-import android.text.SpannableString
-import android.text.Spanned
-import android.text.style.ForegroundColorSpan
+import android.text.Layout
 import android.view.animation.LinearInterpolator
 import androidx.appcompat.widget.AppCompatTextView
 import androidx.core.animation.doOnEnd
@@ -17,26 +14,43 @@ import androidx.core.animation.doOnEnd
 /**
  * Laser typewriter text, per 03 Design/References/Grok Bot Laser Typewriter UI Spec.md.
  *
- * The whole text is laid out once and the letters not typed yet are see-through,
- * so words never jump to a new line while typing. A block caret sits at the end.
- * It blinks in hard steps, not a fade. Tap the text to finish typing at once.
+ * The whole text is laid out once, so words never jump to a new line while typing.
+ * Only the letters typed so far are drawn. Nothing is drawn for the letters still to come,
+ * so no ghost text shows behind the laser. A bright block cursor sits at the end. It blinks
+ * in hard steps, not a fade. Tap the text to finish typing at once.
  */
 internal class LaserTypeView(context: Context) : AppCompatTextView(context) {
     /** Letters per second. */
     var speed = 80f
 
-    /** False shows the full text at once with a still caret (reduce motion). */
+    /** False shows the full text at once with a still cursor (reduce motion). */
     var animateTyping = true
 
-    private var hidden = ForegroundColorSpan(Color.TRANSPARENT)
+    /** The cursor's glow color. Its middle burns near white. */
+    var cursorColor = Hud.HOLO_LASER
+        set(value) {
+            field = value
+            invalidate()
+        }
+
+    /** 0 to 1. How far the cursor's light spreads. */
+    var cursorGlow = 0.8f
+        set(value) {
+            field = value.coerceIn(0f, 1f)
+            invalidate()
+        }
+
     private var shownCount = 0
     private var typing: ValueAnimator? = null
     private var caretOn = true
     private var blinking = false
     private var blinkUntil = 0L
     private var attachedAndShown = false
-    private val caretPaint = Paint().apply { color = Hud.LASER }
+    private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val corePaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val metrics = Paint.FontMetrics()
+    private var glowRadius = 0f
 
     private val blink = object : Runnable {
         override fun run() {
@@ -56,10 +70,7 @@ internal class LaserTypeView(context: Context) : AppCompatTextView(context) {
 
     init {
         typeface = Hud.mono(context)
-        setTextColor(Hud.LASER)
         setLineSpacing(0f, 1.12f)
-        // An opaque shadow color follows each letter's own alpha, so hidden letters cast no shadow.
-        setShadowLayer(Hud.dp(context, 3f), 0f, 0f, Hud.INK)
         setOnClickListener { finishNow() }
     }
 
@@ -68,17 +79,13 @@ internal class LaserTypeView(context: Context) : AppCompatTextView(context) {
         val old = typing
         typing = null
         old?.cancel()
+        setText(text, BufferType.SPANNABLE)
         val reduceMotion = !animateTyping || !ValueAnimator.areAnimatorsEnabled()
         if (reduceMotion || text.isEmpty()) {
-            setText(text, BufferType.SPANNABLE)
             shownCount = text.length
             stopBlink(caretStays = true)
             return
         }
-        val start = SpannableString(text)
-        hidden = ForegroundColorSpan(Color.TRANSPARENT)
-        start.setSpan(hidden, 0, start.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-        setText(start, BufferType.SPANNABLE)
         shownCount = 0
         val total = text.length
         typing = ValueAnimator.ofInt(0, total).apply {
@@ -107,18 +114,13 @@ internal class LaserTypeView(context: Context) : AppCompatTextView(context) {
     }
 
     private fun reveal(count: Int) {
-        val spannable = text as? Spannable ?: return
-        var end = count.coerceIn(0, spannable.length)
-        if (end in 1 until spannable.length && Character.isHighSurrogate(spannable[end - 1])) {
+        val full = text
+        var end = count.coerceIn(0, full.length)
+        if (end in 1 until full.length && Character.isHighSurrogate(full[end - 1])) {
             end++
         }
-        if (end == shownCount && end != spannable.length) return
+        if (end == shownCount) return
         shownCount = end
-        if (end >= spannable.length) {
-            spannable.removeSpan(hidden)
-        } else {
-            spannable.setSpan(hidden, end, spannable.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-        }
         invalidate()
     }
 
@@ -158,20 +160,76 @@ internal class LaserTypeView(context: Context) : AppCompatTextView(context) {
         super.onDetachedFromWindow()
     }
 
+    private fun updateGlowPaint() {
+        val radius = (textSize * 0.55f).coerceAtLeast(1f)
+        if (radius != glowRadius) {
+            glowRadius = radius
+            glowPaint.maskFilter = BlurMaskFilter(radius, BlurMaskFilter.Blur.NORMAL)
+        }
+    }
+
+    /**
+     * Draws only the typed letters. Lines above the cursor are drawn whole.
+     * The cursor's line is drawn up to the cursor. Everything after it is never drawn.
+     */
     override fun onDraw(canvas: Canvas) {
-        super.onDraw(canvas)
-        if (!caretOn) return
         val textLayout = layout ?: return
-        val offset = shownCount.coerceIn(0, text.length)
-        val line = textLayout.getLineForOffset(offset)
-        val x = textLayout.getPrimaryHorizontal(offset)
+        val total = text.length
+        val shown = shownCount.coerceIn(0, total)
+        paint.color = currentTextColor
+        paint.drawableState = drawableState
+        canvas.save()
+        canvas.translate(totalPaddingLeft.toFloat(), totalPaddingTop.toFloat())
+        if (shown >= total) {
+            textLayout.draw(canvas)
+        } else if (shown > 0) {
+            drawTyped(canvas, textLayout, shown)
+        }
+        canvas.restore()
+        if (caretOn) drawCursor(canvas, textLayout, shown)
+    }
+
+    private fun drawTyped(canvas: Canvas, textLayout: Layout, shown: Int) {
+        val line = textLayout.getLineForOffset(shown)
+        val lineTop = textLayout.getLineTop(line).toFloat()
+        val right = width.toFloat()
+        if (line > 0) {
+            canvas.save()
+            canvas.clipRect(-right, -right, right * 2f, lineTop)
+            textLayout.draw(canvas)
+            canvas.restore()
+        }
+        val cursorX = textLayout.getPrimaryHorizontal(shown)
+        if (cursorX > 0f) {
+            canvas.save()
+            canvas.clipRect(-right, lineTop, cursorX, textLayout.getLineBottom(line).toFloat())
+            textLayout.draw(canvas)
+            canvas.restore()
+        }
+    }
+
+    /** A laser-jet bright block: a wide soft glow, a bright body, and a white-hot core. */
+    private fun drawCursor(canvas: Canvas, textLayout: Layout, shown: Int) {
+        val line = textLayout.getLineForOffset(shown)
+        val x = textLayout.getPrimaryHorizontal(shown)
         val baseline = textLayout.getLineBaseline(line).toFloat()
         paint.getFontMetrics(metrics)
         val left = totalPaddingLeft + x
         val top = totalPaddingTop + baseline + metrics.ascent
         val bottom = totalPaddingTop + baseline + metrics.descent
         val width = paint.measureText(CARET)
-        canvas.drawRect(left, top, left + width, bottom, caretPaint)
+        updateGlowPaint()
+        if (cursorGlow > 0f) {
+            glowPaint.color = Hud.withAlpha(cursorColor, 0.95f * cursorGlow)
+            val spread = glowRadius * 0.35f
+            canvas.drawRect(left - spread, top - spread, left + width + spread, bottom + spread, glowPaint)
+        }
+        bodyPaint.color = Hud.lighten(cursorColor, 0.35f)
+        canvas.drawRect(left, top, left + width, bottom, bodyPaint)
+        corePaint.color = Hud.withAlpha(Hud.WHITE, 0.9f)
+        val inset = width * 0.28f
+        val height = bottom - top
+        canvas.drawRect(left + inset, top + height * 0.14f, left + width - inset, bottom - height * 0.14f, corePaint)
     }
 
     private companion object {

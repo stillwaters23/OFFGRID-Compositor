@@ -2,6 +2,7 @@
 <resources>
     <string name="app_name">OFFGRID</string>
     <string name="camera_picture">Front camera picture with a yellow diamond</string>
+    <string name="camera_picture_plain">Front camera picture</string>
     <string name="playback_picture">Saved video</string>
     <string name="camera_starting">The front camera is starting.</string>
     <string name="camera_needs_ok">The front camera is off. Tap Allow when your phone asks.</string>
@@ -10,12 +11,14 @@
     <string name="camera_missing">This phone has no front camera.</string>
     <string name="camera_failed">The camera did not start. Close the app and open it again.</string>
     <string name="shape_ready">Look near the top for a bright yellow diamond.</string>
+    <string name="camera_ready">The camera is on. Tap Record 5 seconds to test.</string>
     <string name="record_five">Record 5 seconds</string>
     <string name="recording_now">Recording now. It stops by itself.</string>
     <string name="record_saved">Saved. Tap Play last video.</string>
     <string name="record_failed">The video did not save. Tap Record and try again.</string>
     <string name="play_last">Play last video</string>
     <string name="playback_hint">This is the saved video. Look for the yellow diamond.</string>
+    <string name="playback_hint_plain">This is the saved video. The panel is not in it.</string>
     <string name="back_to_camera">Back to camera</string>
     <string name="try_again">Try again</string>
     <string name="open_settings">Open Settings</string>
@@ -29,7 +32,7 @@
     <string name="terminal_back">‹ BACK</string>
     <string name="terminal_back_label">Go back one folder</string>
     <string name="terminal_home">HOME</string>
-    <string name="terminal_welcome">Terminal is on. Tap a folder to open it. Drag the top bar to move this panel.</string>
+    <string name="terminal_welcome">Terminal is on. Tap a folder to open it. Drag the top bar to move. Drag the corner lines to resize.</string>
     <string name="terminal_panel_open">The panel is open again.</string>
     <string name="terminal_folder_open">%1$s is open.</string>
     <string name="terminal_folder_empty">%1$s is empty for now.</string>
@@ -48,9 +51,42 @@
     <string name="terminal_on">On</string>
     <string name="terminal_off">Off</string>
     <string name="terminal_section_folders">FOLDERS</string>
-    <string name="terminal_section_numbers">TYPED NUMBERS</string>
     <string name="terminal_section_toggles">TOGGLES</string>
+    <string name="terminal_section_settings">SETTINGS</string>
+    <string name="terminal_section_themes">THEMES</string>
+    <string name="terminal_section_color">COLOR</string>
     <string name="terminal_folder_description">%1$s folder. %2$s.</string>
+
+    <!-- Step 2.1. Resize, test diamond, and the theme office. Plain words, short sentences. -->
+    <string name="terminal_resize">Resize corner. Drag it to make the panel bigger or smaller.</string>
+    <string name="terminal_resize_hint">Drag this corner to make the panel bigger or smaller.</string>
+    <string name="terminal_resized">Panel size saved.</string>
+    <string name="terminal_bigger">Make the panel bigger</string>
+    <string name="terminal_smaller">Make the panel smaller</string>
+    <string name="terminal_diamond_on">Test diamond is on. It shows in the video.</string>
+    <string name="terminal_diamond_off">Test diamond is off. Nothing extra is painted.</string>
+    <string name="terminal_theme_in_use">IN USE</string>
+    <string name="terminal_theme_tap">Tap to use</string>
+    <string name="terminal_theme_description">%1$s theme. %2$s Tap to use it.</string>
+    <string name="terminal_theme_applied">%1$s is on. You can still change every setting.</string>
+    <string name="terminal_color_code">HEX CODE</string>
+    <string name="terminal_color_mix">MIX SIX COLORS, 0 TO 100</string>
+    <string name="terminal_color_system">Use system color</string>
+    <string name="terminal_color_system_help">Follows your phone\'s own colors.</string>
+    <string name="terminal_color_reset">Reset</string>
+    <string name="terminal_color_reset_description">Reset %1$s to the theme color.</string>
+    <string name="terminal_color_saved">%1$s is now %2$s.</string>
+    <string name="terminal_mix_saved">%1$s is now %2$d. The color is %3$s.</string>
+    <string name="terminal_color_system_on">%1$s now follows your phone\'s colors.</string>
+    <string name="terminal_color_system_off">%1$s is now your own color.</string>
+    <string name="terminal_color_reset_done">%1$s is back to the theme color.</string>
+    <string name="terminal_hex_wrong">That hex code won\'t work. Use 0 to 9 and A to F, like #00FF66.</string>
+    <string name="terminal_hex_description">Hex code. Type # and 6 letters or numbers, like #00FF66.</string>
+    <string name="terminal_reset_question">Reset every setting to the start? Test marks stay.</string>
+    <string name="terminal_reset_yes">Yes, reset all</string>
+    <string name="terminal_reset_no">No, keep them</string>
+    <string name="terminal_reset_kept">Nothing changed. Your settings stay.</string>
+    <string name="terminal_reset_done">Every setting is back to the start.</string>
     <plurals name="terminal_items">
         <item quantity="one">%d item</item>
         <item quantity="other">%d items</item>

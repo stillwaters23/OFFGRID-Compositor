@@ -12,14 +12,15 @@ import android.view.View
 /**
  * A big glow-stick folder (feature 5). The number on its face is how many items are inside.
  * [compact] draws a small one with no words, for the side list.
+ * [special] folders (Panel settings, OFFGRID to OFFGRID) use the special folder color.
  */
 internal class FolderIconView(
     context: Context,
-    private val accent: Int,
     private val count: Int,
     private val tag: String?,
     private val compact: Boolean,
-) : View(context) {
+    private val special: Boolean,
+) : View(context), Styled {
     private val outline = Path()
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
     private val tube = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -32,9 +33,19 @@ internal class FolderIconView(
     private val countText = count.toString()
     private val itemsWord = if (count == 1) "ITEM" else "ITEMS"
     private var lipY = 0f
+    private var accent = Hud.HOLO_CYAN
 
     init {
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
+    }
+
+    override fun applyLook(look: PanelLook) {
+        val next = if (special) look.specialFolder else look.folder
+        if (next != accent) {
+            accent = next
+            buildFill(width, height)
+            invalidate()
+        }
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
@@ -59,8 +70,13 @@ internal class FolderIconView(
         outline.reset()
         outline.op(body, tab, Path.Op.UNION)
         lipY = height * 0.4f
+        buildFill(w, h)
+    }
+
+    private fun buildFill(w: Int, h: Int) {
+        if (w == 0 || h == 0) return
         fill.shader = LinearGradient(
-            0f, height * 0.12f, 0f, height * 0.9f,
+            0f, h * 0.12f, 0f, h * 0.9f,
             Hud.withAlpha(accent, 0.34f),
             Hud.withAlpha(accent, 0.07f),
             Shader.TileMode.CLAMP,
@@ -82,7 +98,7 @@ internal class FolderIconView(
         tube.color = Hud.withAlpha(accent, 0.95f)
         canvas.drawPath(outline, tube)
         tube.strokeWidth = unit * 0.014f
-        tube.color = Hud.withAlpha(0xFFFFFFFF.toInt(), 0.7f)
+        tube.color = Hud.withAlpha(Hud.WHITE, 0.7f)
         canvas.drawPath(outline, tube)
         // The front flap.
         tube.strokeWidth = unit * 0.02f
@@ -98,7 +114,7 @@ internal class FolderIconView(
         }
         words.typeface = boldFace
         words.textSize = height * 0.28f
-        words.color = Hud.withAlpha(0xFFFFFFFF.toInt(), 0.95f)
+        words.color = Hud.withAlpha(Hud.WHITE, 0.95f)
         words.setShadowLayer(height * 0.08f, 0f, 0f, accent)
         canvas.drawText(countText, width / 2f, height * 0.69f, words)
         words.clearShadowLayer()

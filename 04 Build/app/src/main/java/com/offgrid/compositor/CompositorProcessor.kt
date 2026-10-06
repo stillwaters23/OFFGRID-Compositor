@@ -30,6 +30,10 @@ class CompositorProcessor : SurfaceProcessor, SurfaceTexture.OnFrameAvailableLis
     @Volatile
     var onFailed: (() -> Unit)? = null
 
+    /** The Step 1 yellow test diamond. Off by default, so nothing extra is painted. */
+    @Volatile
+    var testShapeOn = false
+
     private val thread = HandlerThread("OffgridCompositor")
     private val handler: Handler
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -172,7 +176,9 @@ class CompositorProcessor : SurfaceProcessor, SurfaceTexture.OnFrameAvailableLis
         GLES20.glEnable(GLES20.GL_BLEND)
         GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
         effectList.drawAll(slot.width, slot.height)
-        painter.drawTopLayer()
+        if (testShapeOn) {
+            painter.drawTopLayer()
+        }
         EGLExt.eglPresentationTimeANDROID(display, slot.eglSurface, stamp)
         EGL14.eglSwapBuffers(display, slot.eglSurface)
         if (!toldFirstFrame && slot.surfaceOutput.targets and CameraEffect.PREVIEW != 0) {
