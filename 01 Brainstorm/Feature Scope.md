@@ -4,7 +4,7 @@
 **Owner:** Royalty  
 **Status:** Scope only. Nothing is built yet.  
 **Target:** Royalty's private Android build first (Galaxy S25 Ultra and Galaxy A37). A PC and OBS version can come later.  
-**Updated:** 2026-10-06 (America/Chicago). Features up to 24. ElevenLabs removed from all voice options.
+**Updated:** 2026-10-06 (America/Chicago). Features up to 25. ElevenLabs removed from all voice options.
 
 ---
 
@@ -45,6 +45,7 @@
 22. **Roller coaster (new).** An animated coaster track and cars ride through the video box.
 23. **Flying through clouds (new).** An aerial view soaring through clouds.
 24. **Beach theme (new).** Pure ocean beach scenery fills the whole box, with no person in frame.
+25. **IP leak check (new).** Shows what IP and country the other side sees, so Royalty can confirm ProtonVPN Stealth is masking the real IP.
 
 Related design references are in `03 Design/References`. The toggles there should all look exactly the same as each other, and the typewriter style follows the Grok Bot Laser Typewriter UI Spec.
 
@@ -223,6 +224,7 @@ Related design references are in `03 Design/References`. The toggles there shoul
   3. **Which Android browser to use** (Chrome, Firefox, Brave, or Kiwi Browser) and where to download it. Kiwi Browser was reportedly discontinued in early 2025, so confirm it's still maintained and safe before listing it.
   4. **VPN setup required:** ProtonVPN in Stealth mode, with a Philippines exit server for PH streams. Order matters: create the Cloaked number with the VPN off first, then turn on Stealth mode before opening the app.
   5. **Which phone to use:** dummy phone 1, dummy phone 2, S24, S25 Ultra, or A37.
+  6. **IP check:** the live result from the IP leak check (feature 25), green when the real IP is masked and red if it leaks.
 - The values come from the research in `02 Research` and the results of the platform test toggles (feature 15), so each panel is filled in only after testing confirms it.
 - The full per-folder template is in `06 Prompts and Skills/Folder Guidance Panel.md`.
 - Scope only. Nothing is built yet.
@@ -271,6 +273,21 @@ Related design references are in `03 Design/References`. The toggles there shoul
 - Royalty's camera image is fully replaced by the beach, not blended in as a background.
 - It's baked into the outgoing video, following the core design rule, so viewers see it.
 - On/off toggle. Wave motion and brightness are typed numbers from 0 to 100, never sliders.
+- Scope only. Nothing is built yet.
+
+## 25. IP leak check
+
+**What it does:** when Royalty enters a stream, OFFGRID checks what IP address the outside world sees, and shows it next to Royalty's real IP status, so Royalty can confirm ProtonVPN Stealth is masking the real IP before or during the stream.
+
+- It shows the public IP and country the other side would see, and flags it red if it matches Royalty's real IP or the wrong country (for example, not the Philippines for a PH stream).
+- Checks to include:
+  1. Public IP and country, through the same network path the stream uses.
+  2. DNS leak check, which servers look up web addresses for the phone.
+  3. WebRTC leak check, for platforms used in the browser, since browser video calls can expose a real IP.
+  4. IPv6 leak check, since some VPN setups only cover IPv4.
+- It runs once before the stream opens and again on a timer during the stream. The recheck interval is a typed number, never a slider.
+- Feasibility note: OFFGRID can't read what a platform's servers log. It confirms the address the internet sees from the phone on the same connection, which is what the platform also sees. It uses well-known IP-check services or a small self-hosted check, and stores no IP history outside the phone.
+- The result also shows as an `IP CHECK` line in the folder guidance panel (feature 19).
 - Scope only. Nothing is built yet.
 
 ## Potential future feature: floating text overlay on calls
