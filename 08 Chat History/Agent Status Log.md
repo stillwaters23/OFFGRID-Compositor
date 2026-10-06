@@ -83,3 +83,28 @@ States: passed, waiting for review, blocked, or waiting for Royalty's phone test
 - **PR / commit:** Pull request #5, not merged. Commits `e892d2f` and `d119dff`.
 - **State:** waiting for review
 - **Next:** Rex (Agent 04) reviews pull request #5 and does not merge it. Then Royalty installs step-2-preview on the Galaxy S25 Ultra and the Galaxy A37 and runs the test steps in pull request #5. Do not start Step 3 or Step 7.
+
+## 2026-10-06 4:09 PM CT — Agent 05, Claude Code
+
+- **Bootloader step:** Step 2.1. Panel polish and theme office
+- **What was done:** Recorded that Royalty phone-tested the Step 2.1 build and likes the direction. Her phone feedback became Step 2.2, Premium Panel Polish. Pull request #5 is still open and not merged, so Step 2.2 is built on its head.
+- **PR / commit:** Pull request #5, not merged. Commit `1e84330`.
+- **State:** waiting for review
+- **Next:** Step 2.2. Agent 05 picked that up.
+
+## 2026-10-06 4:09 PM CT — Agent 05, Claude Code
+
+- **Bootloader step:** Step 2.2. Premium Panel Polish (Royalty's Step 2.1 phone-test feedback)
+- **What was done:** Tried once to bake a liquid glow inside the toggle balls. An independent check found it did not look truly inside the art, so the swirl was removed completely, with its settings (📁 Toggle style and 📁 Toggle glow color). The toggles are the original red OFF and green ON pictures again. Corner roundness now starts at 4, and the folder icons and chrome are sharp. Panel settings now holds only folders: 📁 Size, 📁 Display, 📁 Themes, 📁 Colors, 📁 Glow effects, and 📁 Reset. Nothing is loose. Width and Height are typed boxes from 0 to 100 next to the − button and in 📁 Size. They stay in step with the new two-finger pinch and the resize corner, and they are saved. The panel opens in the exact middle the first time, and Center panel in 📁 Size glides it back. A touch on the edge lights a short ripple. The panel has a dark titanium frame, a carbon fiber top bar, and thick sapphire glass panes, all drawn on the phone. Titles and typed text are Laser Jet Bright teal with a harsh glow. New theme Titanium Sapphire; OLED Bioluminescent stays the start theme. The folder icons were redrawn sharper. Extra polish: the row being typed in glows at its edge, a soft tick when a value is saved (no new permission; CAMERA stays the only one), a center guide while dragging, and the pulse, the edge swirl, the ripples, and the cursor glow all stop with Remove animations. Test diamond still starts off. No sliders, no mic, no voice. GitHub built the app and published it again as step-2-preview.
+- **PR / commit:** Pull request #6, not merged. It is stacked on pull request #5. Commits `956899c`, `f5b9972`, and `74deffb`.
+- **State:** waiting for review
+- **Next:** Rex (Agent 04) reviews pull request #6 and does not merge it. Then Royalty installs step-2-preview on the Galaxy S25 Ultra and the Galaxy A37 and runs the test steps in pull request #6. Do not start Step 3 or Step 7.
+- **TODO, folder art:** Royalty will send her final folder icon art. When it lands in `03 Design/References`, use it in place of the drawn folder icon (`FolderIconView.kt` in `04 Build`). Until then the drawn folder stands in.
+
+## 2026-10-06 4:09 PM CT — Agent 05, Claude Code
+
+- **Bootloader step:** Step 2.3. Solid Laser Jet Cursor (folded into Step 2.2)
+- **What was done:** Royalty asked to apply Step 2.3 along the way, so it is in the same pull request as Step 2.2. The Step 2.3 prompt said to wait until 2.2 merged, but Royalty's later chat message asked for it now. The laser cursor is now one solid, opaque block in one color, pure white (#FFFFFF) by default, with no soft multi-shade fill. 📁 Colors → 📁 Laser cursor color keeps the hex code and the six 0 to 100 mixers and adds Cursor glow, from 0 to 100, 0 by default. Above 0, a soft outer glow shows. With Remove animations on, the blink stays and the glow stays off. Reset all and the OLED Bioluminescent theme bring back the solid white cursor with the glow at 0. No Step 2.2 work was undone.
+- **PR / commit:** Pull request #6, not merged. It is stacked on pull request #5. Commits `956899c`, `f5b9972`, and `74deffb`.
+- **State:** waiting for review
+- **Next:** Same as Step 2.2. Rex reviews pull request #6. Royalty runs the cursor steps in it.
