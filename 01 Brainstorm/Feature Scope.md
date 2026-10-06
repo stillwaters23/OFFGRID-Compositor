@@ -25,6 +25,7 @@
 13. **Terminal panel (new).** The draggable, see-through master control panel with platform folders for Bigo Live, Tagged, MeetMe, SuperLive, TikTok, Twitch, Kick, YouTube Live, Trovo, Telegram, and Tango.
 14. **Self-call and secure handshake (new, folder 8).** Phones swap 300-character codes before an OFFGRID call. The codes rotate after every call, and blocked people's codes stop working.
 15. **Platform test toggles (new, private).** Test toggles in every platform folder that check what each platform allows.
+16. **Audio-reactive terminal UI (new).** The terminal's folders, toggles, and glow pulse to music and voices, with a typed 0 to 100 sensitivity.
 
 Related design references are in `03 Design/References`. The toggles there should all look exactly the same as each other, and the typewriter style follows the Grok Bot Laser Typewriter UI Spec.
 
@@ -161,6 +162,16 @@ Related design references are in `03 Design/References`. The toggles there shoul
 - Each test is an on/off toggle, with typed 0 to 100 inputs where needed, matching the terminal panel design. Never sliders.
 - Test results decide which effects go into each platform's real folder.
 - Test only with the dummy account and never the paid big-gifter account.
+- Scope only. Nothing is built yet.
+
+## 16. Audio-reactive terminal UI
+
+**What it does:** the folders, toggles, and glow effects in the terminal panel pulse and react to sound, so the whole UI becomes a live instrument instead of a static menu.
+
+- It reacts to sound in the room: music, Royalty's voice, or the other person's voice on the call.
+- It has an on/off toggle and a sensitivity setting as a typed number from 0 to 100, never a slider, matching the terminal panel design.
+- The pulse is only on Royalty's own screen in the terminal panel. It isn't sent in the outgoing video unless that's decided later.
+- Feasibility note: Android doesn't let one app record another app's call audio. The other person's voice can still drive the pulse when it plays out loud on speaker and the mic hears it, or directly inside an OFFGRID-to-OFFGRID call.
 - Scope only. Nothing is built yet.
 
 ## Potential future feature: floating text overlay on calls
