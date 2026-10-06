@@ -9,6 +9,8 @@ Read `06 Prompts and Skills/Bootstrap.md` first. This is the full pipeline from 
 
 Royalty assigns each step to one lane (Agent 01, 02, or 03). Every step ends with an HR Manager review: **PASS**, **FAIL**, or **BLOCKED**, with evidence. A step is done only on PASS plus Royalty's okay. See `Agent Lanes and HR Review.md`.
 
+**Required for every step: viewer-side success code.** After a lane builds a feature, Royalty tests it on a dummy phone (Phone 1) while watching from a second device (Phone 2). A one-time success number shows on Phone 2 only if the effect really reached the viewer. Royalty taps Check on Phone 1 and types that number. The HR Manager can't return PASS without this confirmation. See `Agent Lanes and HR Review.md`.
+
 ---
 
 ## Step 0. Project setup (Build)
