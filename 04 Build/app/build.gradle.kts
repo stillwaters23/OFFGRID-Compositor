@@ -13,8 +13,8 @@ android {
         // 33 lets the app install on both phones even if a system update is still waiting.
         minSdk = 33
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1"
+        versionCode = 2
+        versionName = "0.2"
     }
 
     buildTypes {
@@ -43,4 +43,6 @@ dependencies {
     implementation("androidx.camera:camera-core:$cameraX")
     implementation("androidx.camera:camera-camera2:$cameraX")
     implementation("androidx.camera:camera-lifecycle:$cameraX")
+    implementation("androidx.camera:camera-video:$cameraX")
+    implementation("androidx.camera:camera-view:$cameraX")
 }

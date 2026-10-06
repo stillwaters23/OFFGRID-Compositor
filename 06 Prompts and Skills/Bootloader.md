@@ -36,6 +36,7 @@ This is **reading only**. Reading about other features never means working on th
 6. **Next task.** After Agent 04 says PASS and the pause, the agents move on to the next open steps automatically. Royalty doesn't need to say go each time.
 7. **Agent scaling.** Only as many agents work as there are open steps. If only two steps are left, only two agents work. If only one is left, only one agent works. Any agent without an assigned step stays idle and doesn't touch the code.
 8. **Repeat.** The loop repeats until every step is done.
+9. **Leave a note.** When any agent finishes or stops, it appends where it left off to `08 Chat History/Agent Status Log.md`.
 
 **When the loop stops:**
 - Royalty says **stop**.
