@@ -1,0 +1,120 @@
+name: Build debug app
+
+on:
+  push:
+    branches:
+      - cursor/agent-01-step-0-08af
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+concurrency:
+  group: offgrid-debug-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build the debug app
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Get the code
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Android tools
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/android-sdk/cmdline-tools"
+          curl -fsSL -o /tmp/cmdtools.zip https://dl.google.com/android/repository/commandlinetools-linux-13114758_latest.zip
+          rm -rf /tmp/cmdline-tools
+          unzip -q /tmp/cmdtools.zip -d /tmp
+          rm -rf "$HOME/android-sdk/cmdline-tools/latest"
+          mv /tmp/cmdline-tools "$HOME/android-sdk/cmdline-tools/latest"
+          echo "ANDROID_HOME=$HOME/android-sdk" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$HOME/android-sdk" >> "$GITHUB_ENV"
+          yes | "$HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$HOME/android-sdk" --licenses >/dev/null || true
+          "$HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$HOME/android-sdk" --install "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+
+      - name: Check the new files for saved secrets
+        run: |
+          python3 - << 'PY'
+          import os
+          import re
+          import sys
+          pattern = re.compile(
+              r"(?i)(api[_-]?key|secret|password|passwd|stream[_-]?key|access[_-]?token)\s*[:=]\s*['\"][^'\"]{6,}['\"]"
+          )
+          roots = ["04 Build", ".github"]
+          bad = []
+          for root in roots:
+              for dirpath, dirnames, filenames in os.walk(root):
+                  dirnames[:] = [name for name in dirnames if name not in (".gradle", "build")]
+                  for name in filenames:
+                      path = os.path.join(dirpath, name)
+                      try:
+                          text = open(path, encoding="utf-8", errors="ignore").read()
+                      except OSError:
+                          continue
+                      if pattern.search(text):
+                          bad.append(path)
+          if bad:
+              print("A saved secret was found in:")
+              print("\n".join(bad))
+              sys.exit(1)
+          print("No saved secrets found.")
+          PY
+
+      - name: Build the debug app
+        working-directory: 04 Build
+        run: chmod +x ./gradlew && ./gradlew assembleDebug --stacktrace
+
+      - name: Name the app file
+        run: |
+          mkdir -p dist
+          cp "04 Build/app/build/outputs/apk/debug/app-debug.apk" "dist/OFFGRID Preview.apk"
+          test -s "dist/OFFGRID Preview.apk"
+
+      - name: Upload the app file
+        uses: actions/upload-artifact@v4
+        with:
+          name: OFFGRID Preview
+          path: dist/OFFGRID Preview.apk
+          if-no-files-found: error
+
+      - name: Attach the app file to the preview release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/cursor/agent-01-step-0-08af'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          cat > /tmp/release-notes.txt << 'EOF'
+          This is a test build of OFFGRID.
+          It opens the front camera.
+          It is not the full app yet.
+
+          Sign in to GitHub in your phone browser first. This project is private.
+
+          How to put it on your phone
+          1. Tap OFFGRID Preview.apk below.
+          2. If your phone asks, allow this browser to install apps.
+          3. Tap Install.
+          4. Open OFFGRID.
+          5. Tap Allow so the front camera can turn on.
+          EOF
+          if gh release view step-0-preview >/dev/null 2>&1; then
+            gh release delete step-0-preview --yes --cleanup-tag
+          fi
+          gh release create step-0-preview "dist/OFFGRID Preview.apk" \
+            --prerelease \
+            --target "${GITHUB_SHA}" \
+            --title "step-0-preview" \
+            --notes-file /tmp/release-notes.txt
