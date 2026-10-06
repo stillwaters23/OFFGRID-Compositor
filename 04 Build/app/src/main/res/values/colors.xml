@@ -2,5 +2,8 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
-    <color name="bar">#CC000000</color>
+    <!-- Step 2 look: cyan and gold glow lines on dark glass. -->
+    <color name="hud_cyan">#FF46F0FF</color>
+    <color name="hud_gold">#FFFFC34D</color>
+    <color name="hud_text">#FFDDF8FF</color>
 </resources>
