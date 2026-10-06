@@ -22,7 +22,8 @@ Every platform folder and every effect folder in the terminal panel opens with a
 > VPN: ProtonVPN Stealth — exit <country, e.g. Philippines for PH streams>
 > ORDER: 1) Create Cloaked number with VPN OFF  2) Turn on Stealth  3) Open the app
 > PHONE: <dummy phone 1 | dummy phone 2 | S24 | S25 Ultra | A37>
-> IP CHECK: <MASKED ✓ | LEAK ✗> — seen as <IP, country> (feature 25)█
+> IP CHECK: <MASKED ✓ | LEAK ✗> — seen as <IP, country> (feature 25)
+> RESULTS: <n> baked in as success | <n> failed (flagged for research) (feature 37)█
 ```
 
 ## Rules for filling it in
@@ -35,6 +36,7 @@ Every platform folder and every effect folder in the terminal panel opens with a
 6. No logins, passwords, numbers, keys, or stream keys ever appear in the panel, the repo, or the chat.
 7. IP check: shows the live result of the IP leak check (feature 25). Show the masked address and country only, never the real IP.
 8. The panel is guidance only. It has no buttons and doesn't change any settings.
+9. Results (feature 37): each test toggle in this folder shows "baked in as success" (only after the viewer-side success code check) or "failed" with a short note. Failed items are flagged for more research. Royalty screenshots failed results to review in a later session.
 
 ## Acceptance checks (for the HR Manager)
 
@@ -42,4 +44,5 @@ Every platform folder and every effect folder in the terminal panel opens with a
 - All lines are present: what, where, browser, VPN, phone, and IP check.
 - The text uses the laser typewriter style and cursor.
 - Every value is sourced or marked `UNCONFIRMED`.
+- The RESULTS line matches the folder's test toggle marks (feature 37).
 - No credentials or private numbers anywhere.
