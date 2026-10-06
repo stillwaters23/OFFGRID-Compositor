@@ -76,7 +76,7 @@ The HR Manager returns exactly one verdict per submission, always with evidence.
 
 ### Instant FAIL
 - Marking PASS without a viewer-confirmed success code
-- Any credential, API key, or stream key in the repo or the chat
+- Any credential (API key, password, token, or stream key) in the repo, the chat, or any document. Credentials live only in Android secure storage on the phone. See `Credentials Security Rule.md`.
 - Any slider instead of a typed number
 - A platform-folder effect that doesn't render into the outgoing video (core design rule)
 - Toggles that don't match each other

@@ -20,9 +20,10 @@ After reading Bootstrap, the agent reads `06 Prompts and Skills/Bootloader.md` a
 1. `06 Prompts and Skills/Bootstrap.md` (this file)
 2. `06 Prompts and Skills/Bootloader.md`
 3. `06 Prompts and Skills/Agent Lanes and HR Review.md`
-4. `01 Brainstorm/Feature Scope.md`
-5. The research in `02 Research` for the assigned step
-6. The design references in `03 Design/References`
+4. `06 Prompts and Skills/Credentials Security Rule.md`
+5. `01 Brainstorm/Feature Scope.md`
+6. The research in `02 Research` for the assigned step
+7. The design references in `03 Design/References`
 
 If any of these conflict, Bootstrap wins, then Bootloader, then Feature Scope.
 
@@ -46,7 +47,7 @@ If any of these conflict, Bootstrap wins, then Bootloader, then Feature Scope.
 
 ## Security rules
 
-1. Credentials, passwords, API keys, and stream keys never go in chat or in this repo. Use local config that's ignored by git, or a server-side proxy.
+1. **Hard rule: no credentials outside the phone.** No API keys, passwords, tokens, stream keys, or any other sensitive credentials go in the GitHub repo, the chat, or any documentation. Credentials live only in Android's secure storage on the phone (the Android Keystore). Any agent that puts a credential in the repo is an automatic FAIL in HR review. See `Credentials Security Rule.md`.
 2. Never edit or change the repository owner's email address or account email.
 3. Test only with a dummy account. Never touch the paid big-gifter account.
 4. Don't build anything meant to evade platform anti-cheat, root detection, or app-integrity checks.
