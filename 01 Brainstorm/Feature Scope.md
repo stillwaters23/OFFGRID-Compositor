@@ -4,7 +4,7 @@
 **Owner:** Royalty  
 **Status:** Scope only. Nothing is built yet.  
 **Target:** Royalty's private Android build first (Galaxy S25 Ultra and Galaxy A37). A PC and OBS version can come later.  
-**Updated:** 2026-10-06 (America/Chicago). Features up to 27. ElevenLabs removed from all voice options.
+**Updated:** 2026-10-06 (America/Chicago). Features up to 29. ElevenLabs removed from all voice options.
 
 ---
 
@@ -35,7 +35,7 @@ Everything the terminal says to Royalty, including guidance lines, IP leak alert
 6. **Soundboard toggle (new).** Each effect can have its own sound.
 7. **Replay buffer (new).** Keeps the last 30 seconds of the outgoing stream.
 8. **Typed-to-speech (new).** Royalty types text and it's spoken out loud in the outgoing stream. It includes a Rex voice preset.
-9. **Ghost mode (new).** Makes Royalty invisible to everyone. Details to come.
+9. **Ghost mode (new).** Makes Royalty invisible to everyone. Full ghost mode cuts both mic and camera, leaving a frozen frame or a blank box.
 10. **Cloaking effect (new).** Predator-style cloak. Royalty's video box looks like empty void to the other person.
 11. **Camera blackout and cloaking modes (new).** Pick solid black, the cloak void, or a status label like "CLOAKED."
 12. **Screen takeover and flip-flop switch (new).** Make Royalty's video fill the screen, and swap who's big and who's small.
@@ -54,6 +54,8 @@ Everything the terminal says to Royalty, including guidance lines, IP leak alert
 25. **IP leak check (new).** Shows what IP and country the other side sees, so Royalty can confirm ProtonVPN Stealth is masking the real IP. A leak sets off a red flash and a sound alert right away.
 26. **Time freeze (new).** Holds Royalty's outgoing video on one frame for a few seconds, then picks back up, like a glitch.
 27. **Optical illusions (new).** Impossible shapes, depth tricks, and shifting patterns inside Royalty's video box.
+28. **Kick detection and rejoin (new).** Flags a host kick right away, explains in plain words what to do, and gives a one-tap shortcut to ask to rejoin. There's no auto-rejoin, because of ban risk.
+29. **Red sweep kick animation (new).** An extra-long red carpet-style sweep rolls across Royalty's video box when the kick toggle flips, in all 11 platform folders.
 
 Related design references are in `03 Design/References`. The toggles there should all look exactly the same as each other, and the typewriter style follows the Grok Bot Laser Typewriter UI Spec.
 
@@ -104,6 +106,16 @@ Related design references are in `03 Design/References`. The toggles there shoul
 ## 9. Ghost mode
 
 **What it does:** makes Royalty invisible to everyone. Royalty's description is short so far, so more details are needed before this is designed.
+
+### Full ghost mode (mic and camera both off)
+
+- One toggle blocks both Royalty's microphone and camera completely. No live audio or live video goes out.
+- The viewer sees either a frozen still frame of Royalty in the box, or nothing (a blank or black box). Royalty picks which.
+- It's silent on the viewer's side, and Royalty's voice and room sound are fully cut, not just turned down.
+- It extends the camera modes in feature 11 (blackout, cloaked, status label), and it uses the same held-frame method as time freeze (feature 26), but with no time limit and with audio cut too.
+- It's baked into the outgoing video and audio, following the core design rule. OFFGRID keeps sending the still frame or blank picture plus silence, so the stream stays connected instead of dropping.
+- A clear "GHOST ON" light shows on Royalty's own terminal so Royalty always knows the mic is off. That text follows the Terminal Plain Language Rule.
+- Scope only. Nothing is built yet.
 
 ## 10. Cloaking effect (Predator style)
 
@@ -320,6 +332,32 @@ Related design references are in `03 Design/References`. The toggles there shoul
 - It's baked into the outgoing video, following the core design rule, so viewers see it.
 - On/off toggle, plus an illusion picker. Size, speed, and strength are typed numbers from 0 to 100, never sliders.
 - Safety limit: no fast flashing or strobing, and no more than 3 flashes per second, so it can't set off seizures for viewers with photosensitive epilepsy. This limit can't be turned off.
+- Scope only. Nothing is built yet.
+
+## 28. Kick detection and rejoin
+
+**What it does:** when a host kicks Royalty out of a battle box on a platform like Bigo Live, OFFGRID notices right away and shows a flag on the terminal.
+
+- **Flag:** a clear flag on the terminal panel, plus an optional sound cue (set like the soundboard, feature 6, with a typed volume).
+- **Research result:** none of the platforms checked (Bigo Live, Tango, TikTok Live, MeetMe, and Tagged) have a safe auto-rejoin. Rejoining only works the normal way, by sending a new request to join that the host can accept or deny. Automating taps risks a ban (TikTok's terms ban automated scripts outright), and spamming requests invites a block. MeetMe says a kicked user can't rejoin that same stream. So auto-rejoin is **off and not built** unless a platform adds an official, allowed rejoin later.
+- **How OFFGRID notices a kick:** the main way is a manual "I got kicked" button, which is the most reliable and has no risk. An extra hint is a drop in OFFGRID's own outgoing video, which asks "Were you removed?" Optional, opt-in extras are reading the platform's notifications, or reading its screen, read-only. OFFGRID never watches the platform's network traffic.
+- **What happens instead:** OFFGRID tells Royalty in plain words what happened and what to do, following the Terminal Plain Language Rule. For example: "The host removed you from the battle. You can ask to join again. Tap here to open Bigo." That includes a one-tap shortcut that opens the platform.
+- OFFGRID can't stop a host from kicking Royalty. Kicks are controlled by the host and the platform's servers.
+- Research on how kicks and rejoining work for each platform, and how OFFGRID can notice a kick, is in `02 Research/Battle Box Kick Research.md`. It has a table of rejoin rules for each platform and 25 sources.
+- Each platform folder's guidance panel (feature 19) explains how rejoining works there.
+- Scope only. Nothing is built yet.
+
+## 29. Red sweep kick animation
+
+**What it does:** when Royalty flips the kick toggle, a big, long red carpet-style sweep rolls across the screen, like the kick animations built into Bigo.
+
+- It's Royalty's own effect, baked into the outgoing video, following the core design rule, so viewers see it.
+- **Extra-long sweep:** the sweep is much longer than the platform's normal kick animation. It's a long, long, long red carpet that keeps rolling past the usual length to drown out the chat area. The length and how long it stays are typed numbers, with defaults set well beyond a normal kick animation.
+- **Platform folders:** all 11, which are Bigo Live, Tagged, MeetMe, SuperLive, TikTok, Twitch, Kick, YouTube Live, Trovo, Telegram, and Tango. Each folder gets its own copy of the kick toggle and its settings.
+- **MeetMe and Tagged:** effects there only work through the browser route, so the sweep is drawn into the outgoing video feed that's sent through the browser, on the web version (see `02 Research` and the folder guidance panel, feature 19).
+- Feasibility note: the platform draws its chat on each viewer's own phone, on top of the video. OFFGRID can't cover or hide the real chat. The sweep fills Royalty's own video box, so it can only cover chat in places where the chat sits on top of Royalty's video. Inside OFFGRID-to-OFFGRID calls, it can sweep over the whole screen, chat included.
+- It uses an original OFFGRID design inspired by platform kick animations, not a copy of Bigo's artwork, so it doesn't look like a real platform kick message.
+- On/off toggle. Sweep speed, width, and how long it stays on screen are typed numbers from 0 to 100, never sliders. An optional sound comes from the soundboard (feature 6).
 - Scope only. Nothing is built yet.
 
 ## Potential future feature: floating text overlay on calls
