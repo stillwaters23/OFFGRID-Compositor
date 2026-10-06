@@ -4,7 +4,7 @@
 **Owner:** Royalty  
 **Status:** Scope only. Nothing is built yet.  
 **Target:** Royalty's private Android build first (Galaxy S25 Ultra and Galaxy A37). A PC and OBS version can come later.  
-**Updated:** 2026-10-06 (America/Chicago)
+**Updated:** 2026-10-06 (America/Chicago). ElevenLabs removed from all voice options.
 
 ---
 
@@ -49,7 +49,11 @@ Related design references are in `03 Design/References`. The toggles there shoul
 
 **What it does:** Royalty types text, and it plays as spoken audio mixed into the outgoing Bigo stream, so the opponent and viewers hear it.
 
-- Provider options being compared: xAI TTS, ElevenLabs, Google Cloud Text-to-Speech, and Android's built-in TextToSpeech as a free offline fallback. Research is in progress and will be saved in `02 Research`.
+- Main provider: xAI text-to-speech API, streamed live, using the stock Rex voice (about $15 per million characters).
+- Backup: Google Cloud Text-to-Speech (first 1 million characters per month free).
+- Free offline backup: Android's built-in TextToSpeech.
+- ElevenLabs is not used anywhere in this project. Royalty doesn't want their synthetic voices.
+- Full research is in `02 Research/Voice Effects and Typed to Speech Research.md`.
 - It has to be fast enough for live use, so the speech should start soon after Royalty presses send.
 - The spoken audio mixes with the mic and the voice changer into the outgoing stream audio.
 - Volume and speed are typed numbers, never sliders.
@@ -58,8 +62,19 @@ Related design references are in `03 Design/References`. The toggles there shoul
 ### Rex voice preset
 - This is a named preset in the voice picker called **Rex**.
 - The style is warm, sharp, and concise, like a calm operator.
-- It's built from a stock or designed voice tuned to that tone, not a clone of a real person's voice.
+- It uses xAI's stock Rex voice, not a clone of a real person's voice.
 - Royalty's own voices can be added as more presets later.
+
+## Voice effects (live voice changer)
+
+**What it does:** changes Royalty's mic voice in real time, built into the app and mixed into the outgoing stream audio.
+
+- Main engine: Superpowered (real-time pitch and voice tone shifting; free for a private app under 1,000 installs).
+- Free open-source backup: SoundTouch.
+- Presets: alien, black hat hacker, robot, chipmunk, monster, smooth R&B crooner, and old western cowboy.
+- The crooner and cowboy are style-matched voices, not copies of real celebrities.
+- ElevenLabs is not used.
+- Every setting is a typed number, never a slider.
 
 ---
 
