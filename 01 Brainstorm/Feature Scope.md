@@ -4,7 +4,7 @@
 **Owner:** Royalty  
 **Status:** Scope only. Nothing is built yet.  
 **Target:** Royalty's private Android build first (Galaxy S25 Ultra and Galaxy A37). A PC and OBS version can come later.  
-**Updated:** 2026-10-06 (America/Chicago). ElevenLabs removed from all voice options.
+**Updated:** 2026-10-06 (America/Chicago). Features up to 24. ElevenLabs removed from all voice options.
 
 ---
 
@@ -42,6 +42,9 @@
 19. **Platform status prompt (new).** Each platform folder shows a read-only line: app or web only, the exact web address, and which Android browser to use.
 20. **Portals and wormholes (new).** A swirling portal or wormhole opens inside Royalty's video box.
 21. **Flying superheroes (new).** Original animated heroes fly around inside the video box, picked from a set.
+22. **Roller coaster (new).** An animated coaster track and cars ride through the video box.
+23. **Flying through clouds (new).** An aerial view soaring through clouds.
+24. **Beach theme (new).** Pure ocean beach scenery fills the whole box, with no person in frame.
 
 Related design references are in `03 Design/References`. The toggles there should all look exactly the same as each other, and the typewriter style follows the Grok Bot Laser Typewriter UI Spec.
 
@@ -239,6 +242,33 @@ Related design references are in `03 Design/References`. The toggles there shoul
 - The heroes are original OFFGRID characters, not Marvel, DC, or other trademarked heroes, to avoid copyright problems and takedowns.
 - It's baked into the outgoing video, following the core design rule, so viewers see it.
 - On/off toggle. Number of heroes, size, and flight speed are typed numbers from 0 to 100, never sliders.
+- Scope only. Nothing is built yet.
+
+## 22. Roller coaster
+
+**What it does:** an animated roller coaster track and cars appear and move inside Royalty's video box during a stream or call, so the viewer feels like they're riding or watching a coaster.
+
+- Views: watching the coaster go by, or a rider's-eye view where the box follows the track.
+- It's baked into the outgoing video, following the core design rule, so viewers see it.
+- On/off toggle. Speed, size, and number of cars are typed numbers from 0 to 100, never sliders.
+- Scope only. Nothing is built yet.
+
+## 23. Flying through clouds
+
+**What it does:** Royalty's outgoing video shows an aerial view flying through clouds, as if the camera is soaring above them.
+
+- It can fill the background behind Royalty or take over the whole box.
+- It's baked into the outgoing video, following the core design rule, so viewers see it.
+- On/off toggle. Flight speed, cloud thickness, and height are typed numbers from 0 to 100, never sliders.
+- Scope only. Nothing is built yet.
+
+## 24. Beach theme
+
+**What it does:** Royalty's outgoing video shows only a beautiful ocean beach, with sand, waves, and sky. It's pure scenery: Royalty isn't visible and no person is in frame. The beach fills the whole video box.
+
+- Royalty's camera image is fully replaced by the beach, not blended in as a background.
+- It's baked into the outgoing video, following the core design rule, so viewers see it.
+- On/off toggle. Wave motion and brightness are typed numbers from 0 to 100, never sliders.
 - Scope only. Nothing is built yet.
 
 ## Potential future feature: floating text overlay on calls
