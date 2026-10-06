@@ -22,8 +22,9 @@
 10. **Cloaking effect (new).** Predator-style cloak. Royalty's video box looks like empty void to the other person.
 11. **Camera blackout and cloaking modes (new).** Pick solid black, the cloak void, or a status label like "CLOAKED."
 12. **Screen takeover and flip-flop switch (new).** Make Royalty's video fill the screen, and swap who's big and who's small.
-13. **Terminal panel (new).** The draggable, see-through master control panel with five platform folders: Bigo Live, Tagged, MeetMe, SuperLive, and TikTok.
+13. **Terminal panel (new).** The draggable, see-through master control panel with platform folders for Bigo Live, Tagged, MeetMe, SuperLive, TikTok, Twitch, Kick, YouTube Live, Trovo, Telegram, and Tango.
 14. **Self-call and secure handshake (new, folder 8).** Phones swap 300-character codes before an OFFGRID call. The codes rotate after every call, and blocked people's codes stop working.
+15. **Platform test toggles (new, private).** Test toggles in every platform folder that check what each platform allows.
 
 Related design references are in `03 Design/References`. The toggles there should all look exactly the same as each other, and the typewriter style follows the Grok Bot Laser Typewriter UI Spec.
 
@@ -123,6 +124,12 @@ Related design references are in `03 Design/References`. The toggles there shoul
   3. MeetMe
   4. SuperLive
   5. TikTok
+  6. Twitch
+  7. Kick
+  8. YouTube Live
+  9. Trovo
+  10. Telegram
+  11. Tango
 - **Real time:** tapping a folder item or flipping a switch triggers that effect right away on the outgoing stream.
 - The folder style follows feature 5 (Termux-style nested folders with bioluminescent glow-stick folders) and the identical toggles in `03 Design/References`.
 - Each platform's research is in `02 Research` or on Rex's computer, and that research decides what goes in its folder.
@@ -139,6 +146,21 @@ Related design references are in `03 Design/References`. The toggles there shoul
 - If Royalty blocks or deletes someone, that person's codes stop working. Because the codes keep changing, they can't reach Royalty again.
 - It lives in the terminal panel as folder 8.
 - Design note for later: use real, standard encryption (key pairs that change every call) rather than plain text codes, and keep the keys in Android's secure key storage, never in chat or this repo.
+- Scope only. Nothing is built yet.
+
+## 15. Platform test toggles (private testing only)
+
+**What it does:** every platform folder in the terminal panel gets a set of test toggles that check what that platform allows. They're for Royalty's private testing only and don't ship as user-facing features.
+
+- Folders: Bigo Live, Tagged, MeetMe, SuperLive, TikTok, Twitch, Kick, YouTube Live, Trovo, Telegram, and Tango.
+- Example tests in each folder:
+  - Does burned-in video work?
+  - Does the site or app accept an outside video feed?
+  - Do chat and gifts connect?
+  - Does a stream key exist?
+- Each test is an on/off toggle, with typed 0 to 100 inputs where needed, matching the terminal panel design. Never sliders.
+- Test results decide which effects go into each platform's real folder.
+- Test only with the dummy account and never the paid big-gifter account.
 - Scope only. Nothing is built yet.
 
 ## Potential future feature: floating text overlay on calls
