@@ -22,6 +22,7 @@
 10. **Cloaking effect (new).** Predator-style cloak. Royalty's video box looks like empty void to the other person.
 11. **Camera blackout and cloaking modes (new).** Pick solid black, the cloak void, or a status label like "CLOAKED."
 12. **Screen takeover and flip-flop switch (new).** Make Royalty's video fill the screen, and swap who's big and who's small.
+13. **Terminal panel (new).** The draggable, see-through master control panel with five platform folders: Bigo Live, Tagged, MeetMe, SuperLive, and TikTok.
 
 Related design references are in `03 Design/References`. The toggles there should all look exactly the same as each other, and the typewriter style follows the Grok Bot Laser Typewriter UI Spec.
 
@@ -106,6 +107,24 @@ Related design references are in `03 Design/References`. The toggles there shoul
 - The controls live in the terminal panel's folder structure, like Windows or Samsung internal storage folders. Each folder has an on/off toggle.
 - Sizes are typed numbers from 0 to 100, never sliders, the same as emoji rain and the other features.
 - Feasibility note: Bigo and other apps draw the battle and call layout on each viewer's own phone, so OFFGRID can't resize the other person's box on their screen. Full takeover works inside an OFFGRID-to-OFFGRID call, or inside Royalty's own outgoing video (for example, Royalty fills the frame with the opponent shown as a small inset). Confirm the approach before building.
+- Scope only. Nothing is built yet.
+
+## 13. Terminal panel (master control UI)
+
+**What it does:** this is the master control panel for every feature. Royalty uses it during a call or stream to fire effects in real time.
+
+- **Draggable:** the terminal box can be moved anywhere on the screen during a call.
+- **See-through:** about 50% opacity, so it doesn't fully block the view. The opacity is a typed number from 0 to 100.
+- **Low-key:** it's small enough that it looks like Royalty isn't doing anything on the phone while in the date box.
+- **Platform folders:** each platform gets its own folder, and each folder holds only the effects and features that platform allows. That means every folder has its own set of toggles, typed 0 to 100 number inputs, and on/off switches.
+  1. Bigo Live
+  2. Tagged
+  3. MeetMe
+  4. SuperLive
+  5. TikTok
+- **Real time:** tapping a folder item or flipping a switch triggers that effect right away on the outgoing stream.
+- The folder style follows feature 5 (Termux-style nested folders with bioluminescent glow-stick folders) and the identical toggles in `03 Design/References`.
+- Each platform's research is in `02 Research` or on Rex's computer, and that research decides what goes in its folder.
 - Scope only. Nothing is built yet.
 
 ## Potential future feature: floating text overlay on calls
