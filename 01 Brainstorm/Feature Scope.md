@@ -4,7 +4,7 @@
 **Owner:** Royalty  
 **Status:** Scope only. Nothing is built yet.  
 **Target:** Royalty's private Android build first (Galaxy S25 Ultra and Galaxy A37). A PC and OBS version can come later.  
-**Updated:** 2026-10-06 (America/Chicago). Features up to 29. ElevenLabs removed from all voice options.
+**Updated:** 2026-10-06 (America/Chicago). Features up to 30. ElevenLabs removed from all voice options.
 
 ---
 
@@ -56,6 +56,7 @@ Everything the terminal says to Royalty, including guidance lines, IP leak alert
 27. **Optical illusions (new).** Impossible shapes, depth tricks, and shifting patterns inside Royalty's video box.
 28. **Kick detection and rejoin (new).** Flags a host kick right away, explains in plain words what to do, and gives a one-tap shortcut to ask to rejoin. There's no auto-rejoin, because of ban risk.
 29. **Red sweep kick animation (new).** An extra-long red carpet-style sweep rolls across Royalty's video box when the kick toggle flips, in all 11 platform folders.
+30. **Depth shift (new).** Royalty's video seems to burst out of the screen toward the viewer, then snaps back.
 
 Related design references are in `03 Design/References`. The toggles there should all look exactly the same as each other, and the typewriter style follows the Grok Bot Laser Typewriter UI Spec.
 
@@ -358,6 +359,15 @@ Related design references are in `03 Design/References`. The toggles there shoul
 - Feasibility note: the platform draws its chat on each viewer's own phone, on top of the video. OFFGRID can't cover or hide the real chat. The sweep fills Royalty's own video box, so it can only cover chat in places where the chat sits on top of Royalty's video. Inside OFFGRID-to-OFFGRID calls, it can sweep over the whole screen, chat included.
 - It uses an original OFFGRID design inspired by platform kick animations, not a copy of Bigo's artwork, so it doesn't look like a real platform kick message.
 - On/off toggle. Sweep speed, width, and how long it stays on screen are typed numbers from 0 to 100, never sliders. An optional sound comes from the soundboard (feature 6).
+- Scope only. Nothing is built yet.
+
+## 30. Depth shift (breaking the fourth wall)
+
+**What it does:** Royalty's video seems to push forward out of the screen toward the viewer, like breaking the fourth wall, then snaps back.
+
+- How it looks real: OFFGRID can't make the box physically bigger on the viewer's phone, so it fakes depth inside the video. It draws a frame inside the picture, quickly zooms in, and adds a shadow and slight tilt. Royalty, cut out from the background, pops past the edge of that frame, then everything snaps back.
+- It's baked into the outgoing video, following the core design rule, so viewers see it.
+- On/off toggle, or a one-tap trigger. Push distance, speed, hold time, and snap-back speed are typed numbers from 0 to 100, never sliders. An optional whoosh sound comes from the soundboard (feature 6).
 - Scope only. Nothing is built yet.
 
 ## Potential future feature: floating text overlay on calls
