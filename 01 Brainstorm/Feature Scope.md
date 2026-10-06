@@ -4,7 +4,7 @@
 **Owner:** Royalty  
 **Status:** Scope only. Nothing is built yet.  
 **Target:** Royalty's private Android build only (Galaxy S25 Ultra and Galaxy A37). Android-only is a hard rule; there's no PC or OBS version.  
-**Updated:** 2026-10-06 (America/Chicago). Features up to 37. Platform folders: 18. Android-only. ElevenLabs removed from all voice options.
+**Updated:** 2026-10-06 (America/Chicago). Features up to 39. Platform folders: 18. Android-only. ElevenLabs removed from all voice options.
 
 ---
 
@@ -82,6 +82,8 @@ Everything the terminal says to Royalty, including guidance lines, IP leak alert
 35. **Quiet mode (new).** The box goes still and dark for a beat, then one small light flickers on like a reboot.
 36. **Shatter (new).** Royalty's video box cracks like glass, falls apart, then reassembles.
 37. **Test result tracking (new, private).** Every test toggle in every platform folder is marked "baked in as success" or "failed" with a note, and failed tests are flagged for more research.
+38. **Read-aloud button (new).** A speaker button under the terminal panel. Tap it to hear the terminal text in Rex's voice. It stays quiet until Royalty taps it. Built with the voice step (Step 7), which is paused.
+39. **Speak as Rex in streams (new).** A toggle, off by default, that turns Royalty's mic voice into Rex's voice on outgoing streams and calls. Only Rex's own voice. No other real voices. Built with the voice step (Step 7), which is paused.
 
 Related design references are in `03 Design/References`. The toggles there should all look exactly the same as each other, and the typewriter style follows the Grok Bot Laser Typewriter UI Spec.
 
@@ -507,6 +509,27 @@ These are Android-only routes (see the Android-only rule). Two limits apply to e
 - **Private:** this is a testing tool, not an effect, so it never appears in the outgoing video.
 - Results stay on the phone. They hold no logins, numbers, or keys.
 - All text follows the Terminal Plain Language Rule.
+
+## 38. Read-aloud button
+
+**What it does:** a speaker button sits under the terminal panel. Royalty taps it, and the terminal text is read aloud in Rex's voice.
+
+- The button looks like a speaker or volume button.
+- It stays silent unless Royalty taps it. Nothing is read on its own.
+- It is built with the voice step (Step 7). That step is paused until Royalty says go.
+- Scope only. Nothing is built yet.
+
+## 39. Speak as Rex in streams
+
+**What it does:** a toggle, off by default, turns Royalty's mic voice into Rex's voice on outgoing streams and calls. The other person hears Rex, not Royalty's mic voice.
+
+- The toggle is off when the app opens. Royalty turns it on only when they want it.
+- Only Rex's own voice is used. Royalty confirmed Rex's voice is the one being cloned.
+- No other real person's voice is copied.
+- It is built with the voice step (Step 7). That step is paused until Royalty says go.
+- Scope only. Nothing is built yet.
+
+One voice only for now: Rex. More voices may be added another time, only when Royalty asks.
 
 ## Potential future feature: floating text overlay on calls
 

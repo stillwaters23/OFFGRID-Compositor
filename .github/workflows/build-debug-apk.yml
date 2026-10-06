@@ -3,7 +3,7 @@ name: Build debug app
 on:
   push:
     branches:
-      - cursor/agent-01-step-0-08af
+      - cursor/agent-03-step-1-f660
   pull_request:
     branches:
       - main
@@ -73,9 +73,28 @@ jobs:
           print("No saved secrets found.")
           PY
 
+      - name: Check the mic stays off
+        run: |
+          set -euo pipefail
+          if grep -R -n -E "RECORD_AUDIO|withAudioEnabled" "04 Build/app/src/main/java"; then
+            echo "This step must not use the mic."
+            exit 1
+          fi
+
       - name: Build the debug app
         working-directory: 04 Build
         run: chmod +x ./gradlew && ./gradlew assembleDebug --stacktrace
+
+      - name: Check the built app has no mic permission
+        run: |
+          set -euo pipefail
+          merged="$(find "04 Build/app/build" -path "*merged_manifest*" -name AndroidManifest.xml | head -n 1)"
+          test -n "$merged"
+          if grep -q "android.permission.RECORD_AUDIO" "$merged"; then
+            echo "This step must not use the mic."
+            exit 1
+          fi
+          echo "Mic permission is not in the app."
 
       - name: Name the app file
         run: |
@@ -91,7 +110,7 @@ jobs:
           if-no-files-found: error
 
       - name: Attach the app file to the preview release
-        if: github.event_name == 'push' && github.ref == 'refs/heads/cursor/agent-01-step-0-08af'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/cursor/agent-03-step-1-f660'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -99,7 +118,8 @@ jobs:
           cat > /tmp/release-notes.txt << 'EOF'
           This is a test build of OFFGRID.
           It opens the front camera.
-          It is not the full app yet.
+          A bright yellow diamond is drawn on the picture.
+          The mic stays off.
 
           Sign in to GitHub in your phone browser first. This project is private.
 
@@ -109,12 +129,16 @@ jobs:
           3. Tap Install.
           4. Open OFFGRID.
           5. Tap Allow so the front camera can turn on.
+          6. Look near the top for a bright yellow diamond.
+          7. Tap Record 5 seconds.
+          8. Tap Play last video.
+          9. The yellow diamond should be in the video.
           EOF
-          if gh release view step-0-preview >/dev/null 2>&1; then
-            gh release delete step-0-preview --yes --cleanup-tag
+          if gh release view step-1-preview >/dev/null 2>&1; then
+            gh release delete step-1-preview --yes --cleanup-tag
           fi
-          gh release create step-0-preview "dist/OFFGRID Preview.apk" \
+          gh release create step-1-preview "dist/OFFGRID Preview.apk" \
             --prerelease \
             --target "${GITHUB_SHA}" \
-            --title "step-0-preview" \
+            --title "step-1-preview" \
             --notes-file /tmp/release-notes.txt
