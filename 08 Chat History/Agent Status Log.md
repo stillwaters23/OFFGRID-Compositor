@@ -43,3 +43,19 @@ States: passed, waiting for review, blocked, or waiting for Royalty's phone test
 - **PR / commit:** Pull request #3, not merged. Commit `7e6604b`.
 - **State:** Waiting for Royalty's phone test
 - **Next:** Rex (Agent 04) reviews pull request #3 and does not merge it. Royalty installs the step-1-preview build, taps Record 5 seconds, taps Play last video, and checks that the yellow diamond is in the video. Do not start Step 2 or Step 7.
+
+## 2026-10-06 4:32 AM CT — Claude Code (Step 2 build lane, lane number not given)
+
+- **Bootloader step:** Step 1. Outgoing video compositor, build part
+- **What was done:** Recorded that Royalty's phone test of the step-1-preview build passed. The yellow diamond showed in the saved 5 second video. Agent 04 returned PASS.
+- **PR / commit:** Pull request #3.
+- **State:** passed
+- **Next:** Nothing left to test on Step 1.
+
+## 2026-10-06 4:32 AM CT — Claude Code (Step 2 build lane, lane number not given)
+
+- **Bootloader step:** Step 1. Outgoing video compositor, build part
+- **What was done:** Recorded that pull request #3 was merged into main at 3:40 AM CT, as commit `be02dd7`. Step 1 is done.
+- **PR / commit:** Pull request #3, merged. Commit `be02dd7`.
+- **State:** passed
+- **Next:** Step 2 build, Terminal panel and controls. Claude Code picked that up.
