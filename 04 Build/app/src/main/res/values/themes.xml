@@ -7,4 +7,17 @@
         <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
         <item name="colorAccent">@color/white</item>
     </style>
+
+    <!-- Step 2. The record bar buttons, in the terminal look. -->
+    <style name="HudButton" parent="Widget.AppCompat.Button.Borderless">
+        <item name="android:background">@drawable/hud_button</item>
+        <item name="android:fontFamily">@font/jetbrains_mono</item>
+        <item name="android:minHeight">48dp</item>
+        <item name="android:paddingStart">8dp</item>
+        <item name="android:paddingEnd">8dp</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textColor">@color/hud_button_text</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
 </resources>

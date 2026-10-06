@@ -16,3 +16,6 @@ output-metadata.json
 .DS_Store
 *.hprof
 dist/
+
+# Kotlin compiler cache
+**/.kotlin/

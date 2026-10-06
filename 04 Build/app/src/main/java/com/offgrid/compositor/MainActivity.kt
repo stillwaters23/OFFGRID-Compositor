@@ -46,14 +46,17 @@ import androidx.camera.video.VideoRecordEvent
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.core.util.Consumer
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import com.offgrid.compositor.terminal.TerminalPanel
 import java.io.File
 
 /**
  * Step 1. Shows the painted camera picture, records a few seconds, and plays it back.
  * The mic stays off.
+ * Step 2. The floating terminal panel sits on top. It is not painted into the video.
  */
 class MainActivity : AppCompatActivity() {
 
@@ -68,6 +71,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var playbackBar: View
     private lateinit var playbackHint: TextView
     private lateinit var backButton: Button
+    private lateinit var terminalPanel: TerminalPanel
 
     private var cameraProvider: ProcessCameraProvider? = null
     private var processor: CompositorProcessor? = null
@@ -115,7 +119,13 @@ class MainActivity : AppCompatActivity() {
         playbackBar = findViewById(R.id.playback_bar)
         playbackHint = findViewById(R.id.playback_hint)
         backButton = findViewById(R.id.back_button)
+        terminalPanel = findViewById(R.id.terminal_panel)
 
+        onBackPressedDispatcher.addCallback(this, terminalPanel.backCallback)
+        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.root)) { _, insets ->
+            terminalPanel.onKeyboardInset(insets.getInsets(WindowInsetsCompat.Type.ime()).bottom)
+            insets
+        }
         recordButton.setOnClickListener { startFiveSecondRecording() }
         playButton.setOnClickListener { showPlayback() }
         backButton.setOnClickListener { hidePlayback() }
@@ -345,6 +355,7 @@ class MainActivity : AppCompatActivity() {
         }
         playRequested = true
         controlBar.visibility = View.GONE
+        terminalPanel.setHiddenForPlayback(true)
         playbackBackdrop.visibility = View.VISIBLE
         playbackView.visibility = View.VISIBLE
         playbackBar.visibility = View.VISIBLE
@@ -370,6 +381,7 @@ class MainActivity : AppCompatActivity() {
         playbackBackdrop.visibility = View.GONE
         playbackView.visibility = View.GONE
         playbackBar.visibility = View.GONE
+        terminalPanel.setHiddenForPlayback(false)
         if (controlBar.visibility != View.VISIBLE && hasCameraPermission()) {
             controlBar.visibility = View.VISIBLE
             refreshPlayButton()
