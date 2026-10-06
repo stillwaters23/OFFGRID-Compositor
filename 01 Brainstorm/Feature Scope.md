@@ -4,7 +4,7 @@
 **Owner:** Royalty  
 **Status:** Scope only. Nothing is built yet.  
 **Target:** Royalty's private Android build first (Galaxy S25 Ultra and Galaxy A37). A PC and OBS version can come later.  
-**Updated:** 2026-10-06 (America/Chicago). Features up to 30. ElevenLabs removed from all voice options.
+**Updated:** 2026-10-06 (America/Chicago). Features up to 31. ElevenLabs removed from all voice options.
 
 ---
 
@@ -14,6 +14,7 @@
 
 - In every platform folder (Bigo Live, Tagged, MeetMe, SuperLive, TikTok, Twitch, Kick, YouTube Live, Trovo, Telegram, and Tango), every effect must render into the outgoing video so the other person sees it on their end. Nothing in those folders stays local-only.
 - Each platform folder is its own lane, with only what that platform allows.
+- **If viewers can't see it on their phone, it's rejected.** Every effect must pass the viewer-side success code check (see `06 Prompts and Skills/Agent Lanes and HR Review.md`) before it's accepted.
 - **OFFGRID-to-OFFGRID calling is the exception and the premium lane.** There, everything is visible to everyone on both sides: all effects, toggles, the terminal UI, audio-reactive pulses, everything.
 - The private platform test toggles (feature 15) are testing tools, not effects, so they don't break this rule.
 
@@ -57,6 +58,7 @@ Everything the terminal says to Royalty, including guidance lines, IP leak alert
 28. **Kick detection and rejoin (new).** Flags a host kick right away, explains in plain words what to do, and gives a one-tap shortcut to ask to rejoin. There's no auto-rejoin, because of ban risk.
 29. **Red sweep kick animation (new).** An extra-long red carpet-style sweep rolls across Royalty's video box when the kick toggle flips, in all 11 platform folders.
 30. **Depth shift (new).** Royalty's video seems to burst out of the screen toward the viewer, then snaps back.
+31. **Laser calligraphy writing (new).** A laser beam writes Royalty's typed words in calligraphy across the video box in real time.
 
 Related design references are in `03 Design/References`. The toggles there should all look exactly the same as each other, and the typewriter style follows the Grok Bot Laser Typewriter UI Spec.
 
@@ -368,6 +370,16 @@ Related design references are in `03 Design/References`. The toggles there shoul
 - How it looks real: OFFGRID can't make the box physically bigger on the viewer's phone, so it fakes depth inside the video. It draws a frame inside the picture, quickly zooms in, and adds a shadow and slight tilt. Royalty, cut out from the background, pops past the edge of that frame, then everything snaps back.
 - It's baked into the outgoing video, following the core design rule, so viewers see it.
 - On/off toggle, or a one-tap trigger. Push distance, speed, hold time, and snap-back speed are typed numbers from 0 to 100, never sliders. An optional whoosh sound comes from the soundboard (feature 6).
+- Scope only. Nothing is built yet.
+
+## 31. Laser calligraphy writing
+
+**What it does:** Royalty types text on the keypad, and a bright laser beam writes the words in flowing calligraphy across the video box in real time, like a laser pointer carving the letters.
+
+- The beam's bright tip traces each letter stroke by stroke, leaving a glowing trail that fades slowly. It matches the OFFGRID laser look.
+- It's baked into the outgoing video, following the core design rule, so viewers see it. Following Royalty's rule, if viewers can't see it on their phone, it's rejected. It has to pass the viewer-side success code check before HR can mark it PASS.
+- Text is typed into the terminal panel. Message length, writing speed, letter size, glow strength, and how long the words stay are typed numbers, never sliders. Laser color is a picker.
+- An optional laser buzz sound comes from the soundboard (feature 6).
 - Scope only. Nothing is built yet.
 
 ## Potential future feature: floating text overlay on calls
