@@ -108,3 +108,21 @@ States: passed, waiting for review, blocked, or waiting for Royalty's phone test
 - **PR / commit:** Pull request #6, not merged. It is stacked on pull request #5. Commits `956899c`, `f5b9972`, and `74deffb`.
 - **State:** waiting for review
 - **Next:** Same as Step 2.2. Rex reviews pull request #6. Royalty runs the cursor steps in it.
+
+## 2026-10-07 12:08 PM CT — Agent 05, Claude Code
+
+- **Bootloader step:** Step 2.2. Premium Panel Polish (with Step 2.3)
+- **What was done:** Step 2.2 phone feedback received. Royalty tested the Step 2.2 build on her Galaxy S25 Ultra and wants to keep going, one section at a time. Small changes she notices on the phone wait until the app is finished. She asked for a plain start look: OLED black with a solid white Laser Jet cursor, like before the titanium skin, and the titanium look kept as a choice. She filled in the Step 2.4 prompt with her answers: full screen at Width and Height 100, Typing speed 1, Font size 50, Opacity and Glow 50, a stronger Glow 100, no cut words at Font 100, Pulse off with its own toggle, the swirl removed, ROYGBIV plus White and Black, important folders first, and a ⋮ menu like Samsung My Files. Pull request #6 is still open and not merged, so Step 2.4 is built on its head.
+- **PR / commit:** Pull request #6, not merged. Commit `f75089e`.
+- **State:** waiting for review
+- **Next:** Step 2.4. Agent 05 picked that up.
+
+## 2026-10-07 12:08 PM CT — Agent 05, Claude Code
+
+- **Bootloader step:** Step 2.4. Presets and Layouts (Royalty's Step 2.2 phone-test feedback)
+- **What was done:** Step 2.4 stop point. The start look, for the first open and Reset all, is plain OLED Bioluminescent: true black, a solid white cursor with glow 0, and Width and Height 100 filling the screen inside the system bars. Opacity, Glow strength, and Font size are 50, Typing speed 1, and Corner roundness 4. Test diamond and Scan line are off, and Center guide is on. Pulse is off with its own toggle and Pulse speed, and a master Glow toggle was added. Titanium frame and Sapphire glass are toggles in 📁 Display, off at first. Titanium Sapphire stays a theme. Glow strength 100 is now big and bright, while the middle of the glass stays dark. The glass swirl and its settings are removed. Colors are now nine: Red, Orange, Yellow, Green, Blue, Indigo, Violet, White, and Black. Hex codes work both ways, and old six-number saves still load. Words never split or end in "…" at Font size 0, 50, or 100. A new ⋮ menu holds the view (List, Big list, Grid 2, Grid 3), the sort (Important first, A to Z, Custom, with Move folders to drag), Folder size, and the side list (Show, Swipe to open, Hidden), all saved. Folders are in important-first order. The Record bar fades while the full panel covers it. Three independent reviewers checked the work, and every real finding was fixed. Grok handoff notes were added in `09 Grok Handoff/`. No sliders, no mic, no voice. CAMERA is still the only permission. GitHub built the app and published it again as step-2-preview.
+- **PR / commit:** Pull request #7, not merged. It is stacked on pull request #6. Commits `6d3b82a` and `2c797fb`.
+- **State:** waiting for review
+- **Next:** Rex (Agent 04) reviews pull request #7 and does not merge it. Then Royalty installs step-2-preview on the Galaxy S25 Ultra and runs the test steps in pull request #7. Do not start Step 3 or Step 7.
+- **Asked for next (not built):** Royalty asked for a camera button and a mic button next to −, each a white symbol in a glowing white ring on black, with 📁 Camera and 📁 Sound folders. Camera off would really stop the camera. A call can't send a see-through picture, so viewers would see black, a background picture, or effects only. The mic needs the mic permission, which stays off until Royalty says go. Proposed as Step 2.5, waiting for her two answers.
+- **Later:** a new toggle design Royalty will share. App icons in her new `OFFGRID_App_Icons` repo, tested on black and white backgrounds first. Nobody touches that repo yet.

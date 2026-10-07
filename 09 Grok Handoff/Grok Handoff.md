@@ -96,6 +96,10 @@ Royalty tested 2.2 on her S25 Ultra and wrote a prompt with answers. That prompt
 
 ## 5. Waiting for later (not built yet)
 
+- **Camera and mic buttons (asked for next, as Step 2.5).** Royalty wants a camera button and a mic button right next to −. Each is a white symbol inside a glowing white ring on black, like a power button. 📁 Camera and 📁 Sound folders change what happens when they are on or off.
+  - Camera off would really stop the camera, so her face never shows. A live stream or call can't send a see-through picture, because every app shows a box. Viewers would see black, a background picture, or her effects only. She is choosing which.
+  - The mic needs the mic permission. That stays off until she says go, so for now the mic button can only show "mic off."
+- **Neon ideas.** She shared a pink UV Index app and neon palettes, like #00E5FC, #0032FF, #FF00A6, and #7B02B3. They could become a Neon Pink theme and one-tap colors in 📁 Colors later.
 - **New toggle design.** Royalty will share a new toggle switch design. Use it when she sends it.
 - **App icons.** Royalty made a new repo, `OFFGRID_App_Icons`, to test app icons on black and white backgrounds first. Nobody touches that repo until she says so.
 - **Folder icon art.** When her final folder art lands in `03 Design/References`, it replaces the drawn folder (`FolderIconView.kt`).
