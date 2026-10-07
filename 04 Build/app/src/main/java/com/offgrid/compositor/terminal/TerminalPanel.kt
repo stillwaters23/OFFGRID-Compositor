@@ -157,6 +157,7 @@ class TerminalPanel @JvmOverloads constructor(
 
     /** The bars the open panel covers now. They fade away, so their words never show through the glass. */
     private val coveredBars = HashSet<View>()
+    private val barMoved = OnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> refreshCoveredBars() }
     private val barTexts = ArrayList<TextView>()
     private val barButtons = ArrayList<TextView>()
 
@@ -297,8 +298,11 @@ class TerminalPanel @JvmOverloads constructor(
      * [bars] are the bar backgrounds, [texts] the messages, and [buttons] the bar's buttons.
      */
     fun matchLook(bars: List<View>, texts: List<TextView>, buttons: List<TextView>) {
+        barViews.forEach { it.removeOnLayoutChangeListener(barMoved) }
         barViews.clear()
         barViews += bars
+        // A bar that grows or shrinks, like when the Record buttons show, is checked again.
+        bars.forEach { it.addOnLayoutChangeListener(barMoved) }
         barTexts.clear()
         barTexts += texts
         barButtons.clear()
@@ -767,6 +771,7 @@ class TerminalPanel @JvmOverloads constructor(
     /** The bottom gap leaves room for the resize corner, and for the keyboard when it covers the panel. */
     private fun setDetailPadding() {
         detailContent.setPadding(dpi(10f), dpi(6f), dpi(10f), dpi(DETAIL_BOTTOM_DP) + keyboardCover)
+        menu.setKeyboardRoom(keyboardCover)
     }
 
     private fun buildPill() {
@@ -1060,7 +1065,10 @@ class TerminalPanel @JvmOverloads constructor(
                 bar.getLocationInWindow(there)
                 val across = minOf(glassRight, there[0] + bar.width) - maxOf(glassLeft, there[0])
                 val down = minOf(glassBottom, there[1] + bar.height) - maxOf(glassTop, there[1])
-                covered = across > 0 && down > bar.height * COVER_SHARE
+                // Only a bar the glass hides completely fades. A bar that peeks out stays,
+                // so a button you can tap is always a button you can see.
+                val slack = dpi(COVER_SLACK_DP)
+                covered = across >= bar.width - slack && down >= bar.height - slack
             }
             if (covered == bar in coveredBars) continue
             if (covered) coveredBars += bar else coveredBars -= bar
@@ -1093,7 +1101,7 @@ class TerminalPanel @JvmOverloads constructor(
         val glassTop = userY + margin
         val glassBottom = userY + height - margin
         keyboardLift = if (keyboardHeight > 0 && glassBottom > visibleBottom) {
-            (glassBottom - visibleBottom).coerceAtMost(glassTop.coerceAtLeast(0f))
+            (glassBottom - visibleBottom).coerceAtMost((glassTop - safe.top).coerceAtLeast(0f))
         } else {
             0f
         }
@@ -1117,7 +1125,9 @@ class TerminalPanel @JvmOverloads constructor(
         focused.getLocationOnScreen(spot)
         val hidden = spot[1] + focused.height - keyboardTop
         if (hidden > 0f) {
-            detailScroll.smoothScrollBy(0, hidden.toInt())
+            // The box's own list scrolls: an open folder, or the ⋮ menu card.
+            val list = generateSequence(focused.parent) { it.parent }.filterIsInstance<ScrollView>().firstOrNull() ?: detailScroll
+            list.smoothScrollBy(0, hidden.toInt())
         }
     }
 
@@ -1902,8 +1912,8 @@ class TerminalPanel @JvmOverloads constructor(
         const val SWEEP_MS = 520L
         const val GRID_FADE_MS = 220L
 
-        /** A bar counts as covered when the glass hides more than this share of its height. */
-        const val COVER_SHARE = 0.3f
+        /** A bar counts as covered when the glass hides all of it but this much. */
+        const val COVER_SLACK_DP = 2f
         const val COVER_MS = 180L
     }
 }

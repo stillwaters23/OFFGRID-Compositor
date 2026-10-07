@@ -710,7 +710,10 @@ internal class TileGrid(
         val inner = (width - paddingLeft - paddingRight).coerceAtLeast(0)
         columns = (inner / Hud.dp(context, minCellDp)).toInt().coerceAtLeast(1)
         if (evenRows && childCount > 0) {
-            columns = (columns.coerceAtMost(childCount) downTo 1).first { childCount % it == 0 }
+            // Rows that are all full, like 3 by 3 for nine boxes. If only one column would
+            // do that, keep the columns that fit, so nine boxes never become one long column.
+            val even = (columns.coerceAtMost(childCount) downTo 1).first { childCount % it == 0 }
+            columns = if (even == 1) columns.coerceAtMost(childCount) else even
         }
         val cell = inner / columns
         var height = paddingTop + paddingBottom

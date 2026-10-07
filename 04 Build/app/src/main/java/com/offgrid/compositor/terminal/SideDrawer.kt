@@ -49,6 +49,7 @@ internal class SideDrawer(context: Context) : FrameLayout(context), Styled {
     private var downY = 0f
     private var startShift = 0f
     private var dragging = false
+    private var sliding = false
 
     init {
         clipChildren = false
@@ -63,6 +64,8 @@ internal class SideDrawer(context: Context) : FrameLayout(context), Styled {
         sheet.isClickable = true
         sheet.visibility = INVISIBLE
         addView(sheet, LayoutParams(Hud.dpi(context, SHEET_DP), LayoutParams.MATCH_PARENT, Gravity.START))
+        // It starts tucked away, so the first swipe slides it out from the edge.
+        sheet.translationX = -sheetWidth()
         handle.contentDescription = context.getString(R.string.terminal_side_open)
         handle.setOnClickListener { open(animate = true) }
         addView(handle, LayoutParams(Hud.dpi(context, HANDLE_DP), LayoutParams.MATCH_PARENT, Gravity.START))
@@ -70,11 +73,12 @@ internal class SideDrawer(context: Context) : FrameLayout(context), Styled {
 
     /** How wide the sheet is. The panel sets it to fit the side list. */
     fun setSheetWidth(width: Int) {
+        // Tucked away at the new width, unless a slide is still moving it.
+        if (!isOpen && !sliding) sheet.translationX = -width.toFloat()
         val params = sheet.layoutParams
         if (params.width == width) return
         params.width = width
         sheet.layoutParams = params
-        if (!isOpen) sheet.translationX = -width.toFloat()
     }
 
     /** How wide the handle is. The folders start past it, so a tap on a folder never opens the drawer. */
@@ -108,12 +112,14 @@ internal class SideDrawer(context: Context) : FrameLayout(context), Styled {
         scrim.animate().cancel()
         val showing = 1f - (-shift / sheetWidth()).coerceIn(0f, 1f)
         val after = Runnable {
+            sliding = false
             if (!isOpen) {
                 sheet.visibility = INVISIBLE
                 scrim.visibility = GONE
             }
         }
         if (animate && ValueAnimator.areAnimatorsEnabled()) {
+            sliding = true
             sheet.animate().translationX(shift).setDuration(SLIDE_MS).setInterpolator(DecelerateInterpolator()).withEndAction(after).start()
             scrim.animate().alpha(showing).setDuration(SLIDE_MS).start()
         } else {
@@ -155,6 +161,11 @@ internal class SideDrawer(context: Context) : FrameLayout(context), Styled {
                 val fromHandle = !isOpen && downX <= handle.width + slop && dx > 0f
                 val onSheet = isOpen && downX <= sheetWidth() && dx < 0f
                 if (sideways && (fromHandle || onSheet)) {
+                    // A finger takes over from a slide that is still moving, right where it is.
+                    sheet.animate().cancel()
+                    scrim.animate().cancel()
+                    sliding = false
+                    startShift = sheet.translationX - dx
                     dragging = true
                     parent?.requestDisallowInterceptTouchEvent(true)
                     return true

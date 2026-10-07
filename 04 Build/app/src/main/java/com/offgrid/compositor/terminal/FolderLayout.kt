@@ -257,6 +257,8 @@ internal class FolderLayout(context: Context, private val sub: Boolean) : ViewGr
             if (moved != 0) {
                 fingerY += moved
                 follow(held)
+                // The list moved under a still finger, so the folder can land on a new spot too.
+                moveTo(held)
             }
             postOnAnimation(this)
         }
@@ -456,7 +458,10 @@ internal class FolderLayout(context: Context, private val sub: Boolean) : ViewGr
         order.forEachIndexed { index, folder ->
             val other = cells[folder.id] ?: return@forEachIndexed
             slot.set(other.left, other.top, other.right, other.bottom)
-            if (slot.contains(centerX, centerY)) target = index
+            // Only the middle of a spot counts, so folders of different heights never
+            // swap back and forth on the line between them.
+            slot.inset(other.width / 4, other.height / 4)
+            if (other !== cell && slot.contains(centerX, centerY)) target = index
         }
         if (target < 0 || target == from) return
         order.add(target, order.removeAt(from))

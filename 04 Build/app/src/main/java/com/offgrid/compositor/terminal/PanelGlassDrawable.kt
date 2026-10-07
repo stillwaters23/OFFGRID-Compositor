@@ -10,6 +10,8 @@ import android.graphics.Matrix
 import android.graphics.Outline
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
 import android.graphics.PixelFormat
 import android.graphics.Rect
 import android.graphics.RectF
@@ -331,9 +333,16 @@ internal class PanelGlassDrawable(
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Hud.WHITE }
         paint.maskFilter = BlurMaskFilter((margin * 0.9f * MASK_SCALE).coerceAtLeast(1f), BlurMaskFilter.Blur.OUTER)
         Canvas(outer).drawPath(local, paint)
-        // Light that spreads inward from the edge, across the glass.
+        // Light that spreads inward from the edge and fades out toward the middle.
+        // An inner blur is soft only at the rim and solid inside, so it is taken away
+        // from a solid fill. What stays is a band of light just inside the edge.
+        val washCanvas = Canvas(wash)
+        paint.maskFilter = null
+        washCanvas.drawPath(local, paint)
         paint.maskFilter = BlurMaskFilter(dp(WASH_DP) * MASK_SCALE, BlurMaskFilter.Blur.INNER)
-        Canvas(wash).drawPath(local, paint)
+        paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_OUT)
+        washCanvas.drawPath(local, paint)
+        paint.xfermode = null
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = dp(2.5f) * MASK_SCALE
         paint.maskFilter = BlurMaskFilter(dp(5f) * MASK_SCALE, BlurMaskFilter.Blur.NORMAL)

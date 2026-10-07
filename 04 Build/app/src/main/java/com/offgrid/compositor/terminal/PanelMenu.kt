@@ -361,6 +361,12 @@ internal class PanelMenu(
         styled(TextRole.SECTION, 9.5f)
     }
 
+    /** Extra room at the bottom while the keyboard covers the panel, so Folder size can scroll above it. */
+    fun setKeyboardRoom(room: Int) {
+        val pad = Hud.dpi(context, 10f)
+        if (content.paddingBottom != pad + room) content.setPadding(pad, content.paddingTop, pad, pad + room)
+    }
+
     /** Shows the saved choices. Called after any change, and after Reset all. */
     fun refresh() {
         val view = settings.view
