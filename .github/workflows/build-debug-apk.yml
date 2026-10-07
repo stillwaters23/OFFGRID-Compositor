@@ -5,10 +5,12 @@ on:
     branches:
       - ccr-c441a76e-hgt5wa
       - step-2-2-premium-panel
+      - step-2-4-presets-layouts
   pull_request:
     branches:
       - main
       - ccr-c441a76e-hgt5wa
+      - step-2-2-premium-panel
 
 permissions:
   contents: write
@@ -134,15 +136,17 @@ jobs:
       - name: Attach the app file to the preview release
         if: >-
           github.event_name == 'push' &&
-          (github.ref == 'refs/heads/ccr-c441a76e-hgt5wa' || github.ref == 'refs/heads/step-2-2-premium-panel')
+          (github.ref == 'refs/heads/ccr-c441a76e-hgt5wa' ||
+           github.ref == 'refs/heads/step-2-2-premium-panel' ||
+           github.ref == 'refs/heads/step-2-4-presets-layouts')
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           cat > /tmp/release-notes.txt << 'EOF'
-          This is the Step 2.2 test build of OFFGRID. Step 2.3 is in it too.
-          The terminal panel is now premium: dark titanium, carbon fiber, and thick sapphire glass.
-          Every panel setting now lives in a folder.
+          This is the Step 2.4 test build of OFFGRID.
+          The panel now starts plain and simple: true black, a solid white laser cursor, full screen.
+          The ⋮ menu changes how folders look, like the three dots in Samsung My Files.
           The mic stays off.
 
           Sign in to GitHub in your phone browser first. This project is private.
@@ -157,47 +161,51 @@ jobs:
           5. Open OFFGRID. Tap Allow so the front camera can turn on.
 
           What to look for first
-          1. The panel opens in the exact middle of the screen.
-          2. A dark titanium frame, a carbon fiber top bar, and deep sapphire glass inside.
-          3. Titles and typed words are bright laser teal with a strong glow.
-          4. The laser cursor is one solid white block. No soft glow around it.
-          5. The corners are sharp. Corner roundness starts at 4.
-          6. The toggles are the original red OFF and green ON pictures. The swirl inside them is gone.
+          1. The panel fills the screen, like a terminal window. Width 100 and Height 100.
+          2. True black glass, half see-through. No titanium frame. No sapphire glass.
+          3. The laser cursor is one solid white block. It types slowly, at Typing speed 1.
+          4. The glow is steady. It does not breathe. Pulse is off until you turn it on.
+          5. The Record bar hides behind the full panel, so its words never show through.
+             Tap − at the top right to shrink the panel. The Record bar comes back.
 
           How to test the panel
-          1. At the top, tap the WIDTH box. Type 30. Tap Done. The panel gets narrower.
-             Type 150. Tap Done. The panel says the number is too big. Nothing changes.
-          2. Tap the HEIGHT box. Type 60. Tap Done. The panel gets taller.
-          3. Put two fingers on the panel and spread them sideways. The panel gets wider.
-             Spread them up and down. It gets taller. Spread them on a slant. Both change.
-             Watch the WIDTH and HEIGHT numbers change while you pinch.
-          4. Drag the top bar. A soft cross shows the middle of the screen.
-             Near the middle, the panel clicks into place.
-          5. Tap Panel settings. Every setting is in a folder now.
-          6. Tap 📁 Size. Width and Height here match the top boxes.
-             Tap Center panel. The panel glides to the middle.
-          7. Tap any number box. The edge of its row glows while you type.
-             If touch vibration is on, your phone ticks when the number is saved.
-          8. Touch the edge of the panel. Light ripples where your finger is.
-          9. Tap BACK. Tap 📁 Themes. Tap Titanium Sapphire for the full teal look.
-             Tap OLED Bioluminescent to go back.
-          10. Tap BACK. Tap 📁 Colors, then 📁 Laser cursor color.
-              In HEX CODE, type #00FF66. Tap Done. The cursor turns solid green.
-              Type 40 in Cursor glow. A soft glow shows. Type 0 to turn it off.
-          11. Tap BACK twice. Tap 📁 Display. Test diamond is red, so it is off.
-          12. Tap BACK. Tap 📁 Reset. Tap Reset all to default. Tap Yes, reset all.
-              The cursor is solid white again. The panel goes back to its start size.
-          13. Swipe OFFGRID away from your recent apps. Open it again.
-              Your size, place, and settings are kept.
-          14. In your phone's Settings, search for Remove animations. Turn it on.
-              The glow stops breathing and touching the edge makes no ripple. The cursor glow stays off.
-              Turn Remove animations off again when you are done.
+          1. Tap Panel settings. The folders are in this order:
+             Size, Display, Glow effects, Colors, Themes, Reset.
+          2. Tap 📁 Size. Type 0 in Width and 0 in Height. Tap Done.
+             The panel is now the smallest size. Type 100 in both to fill the screen again.
+          3. Type 100 in Font size. Every word stays whole. Nothing is cut off.
+             Type 50 to go back.
+          4. Tap BACK. Tap 📁 Glow effects. Type 100 in Glow strength.
+             The glow gets big and bright. 50 is normal. 0 is no glow.
+             The Glow toggle at the top turns all the glow off and on.
+             Turn on Pulse to make the glow breathe. Pulse speed sets how fast.
+          5. Tap BACK. Tap 📁 Colors, then 📁 Laser cursor color.
+             There are nine colors now: Red, Orange, Yellow, Green, Blue, Indigo, Violet, White, Black.
+             Type #FF8000 in HEX CODE. Tap Done. Orange shows 100.
+
+          How to test the ⋮ menu
+          1. Tap ⋮ at the top. Tap Big list, then Grid 2, then Grid 3, then List.
+             The folders change at once. Tap outside the menu, or press Back, to close it.
+          2. Tap ⋮. Tap A to Z. The folders sort by name.
+          3. Turn on Move folders. Press a folder and drag it to a new spot.
+             The other folders slide out of the way, and your phone ticks.
+             Close the app and open it again. Your order is kept.
+             Turn Move folders off when you are done.
+          4. Type 100 in Folder size. The folders get bigger. 50 is normal.
+          5. Tap Swipe to open. The side list tucks away.
+             Swipe right from the glowing line in the middle of the left edge. The side list slides out.
+             Swipe it left, tap outside it, or press Back to close it.
+          6. Tap Hidden. The side list is gone. Tap Show to bring it back.
+          7. Tap BACK until you are home. Tap Panel settings, then 📁 Reset.
+             Tap Reset all to default. Tap Yes, reset all.
+             Everything goes back to the start, the ⋮ menu choices too.
 
           How to check the video
-          1. Tap Record 5 seconds.
-          2. Tap Play last video.
-          3. The panel is not in the video. That is on purpose.
-          4. To see the diamond in a video, turn on Test diamond in 📁 Display first.
+          1. Tap − to shrink the panel.
+          2. Tap Record 5 seconds.
+          3. Tap Play last video.
+          4. The panel is not in the video. That is on purpose.
+          5. To see the diamond in a video, turn on Test diamond in 📁 Display first.
           EOF
           if gh release view step-2-preview >/dev/null 2>&1; then
             gh release delete step-2-preview --yes --cleanup-tag

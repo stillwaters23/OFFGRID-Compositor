@@ -60,6 +60,15 @@ internal class LaserTypeView(context: Context) : AppCompatTextView(context) {
             invalidate()
         }
 
+    /** 0 to 1. Extra glow above Glow strength 50: each glow layer spreads wider and burns brighter. */
+    var glowBoost = 0f
+        set(value) {
+            val clamped = value.coerceIn(0f, 1f)
+            if (field == clamped) return
+            field = clamped
+            invalidate()
+        }
+
     private var shownCount = 0
     private var typing: ValueAnimator? = null
     private var caretOn = true
@@ -275,15 +284,16 @@ internal class LaserTypeView(context: Context) : AppCompatTextView(context) {
         val size = laserPaint.textSize
         // The glow climbs fast at low strengths, so the default already burns harsh and bright.
         val power = sqrt(glowStrength)
+        val spread = 1f + GLOW_SPREAD * glowBoost
         target.save()
         target.translate(dx, dy)
         for (pass in GLOW_PASSES) {
             laserPaint.color = color
-            laserPaint.setShadowLayer(size * pass[0], 0f, 0f, Hud.withAlpha(color, pass[1] * power))
+            laserPaint.setShadowLayer(size * pass[0] * spread, 0f, 0f, Hud.withAlpha(color, minOf(1f, pass[1] * power + GLOW_LIFT * glowBoost)))
             single.draw(target)
         }
         laserPaint.clearShadowLayer()
-        laserPaint.color = Hud.lighten(color, CORE_LIGHTEN * power)
+        laserPaint.color = Hud.lighten(color, CORE_LIGHTEN * power + CORE_BOOST * glowBoost)
         single.draw(target)
         target.restore()
     }
@@ -322,6 +332,7 @@ internal class LaserTypeView(context: Context) : AppCompatTextView(context) {
         key = key * 31 + System.identityHashCode(paint.typeface)
         key = key * 31 + currentTextColor
         key = key * 31 + glowStrength.toBits()
+        key = key * 31 + glowBoost.toBits()
         key = key * 31 + (PanelLook.current?.label ?: 0)
         key = key * 31 + width
         key = key * 31 + height
@@ -384,6 +395,11 @@ internal class LaserTypeView(context: Context) : AppCompatTextView(context) {
 
         /** How much brighter than the text color the core of each letter burns. */
         const val CORE_LIGHTEN = 0.35f
+
+        /** At Glow strength 100: how much wider each glow layer spreads, how much brighter it is, and the core. */
+        const val GLOW_SPREAD = 0.8f
+        const val GLOW_LIFT = 0.25f
+        const val CORE_BOOST = 0.2f
 
         /** Each glow pass: blur size as a share of the text size, then strength. Wide, then tight. */
         val GLOW_PASSES = arrayOf(

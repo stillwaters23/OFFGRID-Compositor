@@ -12,7 +12,7 @@ import com.offgrid.compositor.R
 /**
  * The color mixer inside each color folder of the theme office.
  *
- * A live swatch, a hex code box, six typed numbers that mix like light,
+ * A live swatch, a hex code box, nine typed numbers that mix like light,
  * "Use system color", and Reset. Every change is saved and shows on the panel at once.
  * Bad input gets a plain message and changes nothing.
  */
@@ -105,14 +105,15 @@ internal class ColorEditorView(
         styled(TextRole.SECTION, 9.5f)
     }
 
-    /** "● Red", with the dot in that color. */
+    /** "● Red", with the dot in that color. Black gets a hollow ring, so it shows on black glass. */
     private fun dotted(name: String, color: Int): CharSequence {
-        val text = SpannableStringBuilder("● ").append(name)
-        text.setSpan(ForegroundColorSpan(color), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        val dark = color and 0x00FFFFFF == 0
+        val text = SpannableStringBuilder(if (dark) "○ " else "● ").append(name)
+        text.setSpan(ForegroundColorSpan(if (dark) RING_GRAY else color), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         return text
     }
 
-    /** Shows the saved color in the swatch, the hex box, the toggle, and all six numbers. */
+    /** Shows the saved color in the swatch, the hex box, the toggle, and all nine numbers. */
     private fun refresh() {
         val color = store.color(part)
         swatch.color = color
@@ -160,5 +161,6 @@ internal class ColorEditorView(
 
     private companion object {
         const val MIX_CELL_DP = 76f
+        const val RING_GRAY = 0xFFB0B0B0.toInt()
     }
 }

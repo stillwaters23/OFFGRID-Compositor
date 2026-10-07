@@ -13,8 +13,8 @@ android {
         // 33 lets the app install on both phones even if a system update is still waiting.
         minSdk = 33
         targetSdk = 36
-        versionCode = 5
-        versionName = "0.3.2"
+        versionCode = 6
+        versionName = "0.3.3"
     }
 
     buildTypes {

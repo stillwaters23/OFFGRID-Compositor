@@ -14,15 +14,18 @@ import android.graphics.PixelFormat
 import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Shader
-import android.graphics.SweepGradient
 import android.graphics.drawable.Drawable
 
 /**
  * The panel's glass.
  *
  * The glass sits [margin] inside the drawable's edges. That margin is room for the
- * outer glow. The soft glows are blurred once into small gray masks, then tinted
- * each frame, so the pulse and the swirl stay cheap on the phone.
+ * outer glow. The soft glows are blurred once into small gray masks, at half size,
+ * then tinted each frame, so the pulse stays cheap on the phone.
+ *
+ * Glow strength 50 is the normal look. Above 50 the glow grows: a second layer of
+ * outer and edge glow, a wash of light inside the edge, and a brighter, thicker edge
+ * line, so 100 is big and bright even when the panel fills the screen.
  *
  * Titanium frame (Step 2.2): a band of dark brushed titanium around the glass, with a
  * light bevel on the outside, a dark bevel on the inside, and a thin line of light.
@@ -51,9 +54,6 @@ internal class PanelGlassDrawable(
 
     /** 0 to 1. How bright the breathing glow is right now. */
     var breath = 0.8f
-
-    /** Degrees. Turns the liquid swirl of light around the edge. */
-    var swirlAngle = 0f
 
     /** While the panel is being resized, keep the old glow masks stretched instead of redrawing them. */
     var holdMasks = false
@@ -103,9 +103,6 @@ internal class PanelGlassDrawable(
     private val maskPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val maskTarget = RectF()
     private val masks = LinkedHashMap<String, Masks>()
-    private var swirlShader: SweepGradient? = null
-    private var swirlKey = 0L
-    private val swirlMatrix = Matrix()
 
     // Sapphire pane layers, built when the size or the look changes.
     private var topShadow: LinearGradient? = null
@@ -114,7 +111,7 @@ internal class PanelGlassDrawable(
     private var glassSheen: LinearGradient? = null
     private var titleShadow: LinearGradient? = null
 
-    private class Masks(val outer: Bitmap, val edge: Bitmap)
+    private class Masks(val outer: Bitmap, val edge: Bitmap, val wash: Bitmap)
 
     private fun dp(value: Float) = value * density
 
@@ -322,18 +319,26 @@ internal class PanelGlassDrawable(
         val key = "${b.width()}x${b.height()}:${look?.roundness}:${look?.holo}"
         masks[key]?.let { return it }
         if (holdMasks) return masks.values.lastOrNull()
-        val outer = Bitmap.createBitmap(b.width(), b.height(), Bitmap.Config.ALPHA_8)
-        val edge = Bitmap.createBitmap(b.width(), b.height(), Bitmap.Config.ALPHA_8)
+        // The masks are soft, so half size looks the same and uses a quarter of the memory.
+        val maskWidth = (b.width() * MASK_SCALE).toInt().coerceAtLeast(1)
+        val maskHeight = (b.height() * MASK_SCALE).toInt().coerceAtLeast(1)
+        val outer = Bitmap.createBitmap(maskWidth, maskHeight, Bitmap.Config.ALPHA_8)
+        val edge = Bitmap.createBitmap(maskWidth, maskHeight, Bitmap.Config.ALPHA_8)
+        val wash = Bitmap.createBitmap(maskWidth, maskHeight, Bitmap.Config.ALPHA_8)
         val local = Path(shape)
         local.offset(-b.left.toFloat(), -b.top.toFloat())
+        local.transform(Matrix().apply { setScale(MASK_SCALE, MASK_SCALE) })
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Hud.WHITE }
-        paint.maskFilter = BlurMaskFilter((margin * 0.9f).coerceAtLeast(1f), BlurMaskFilter.Blur.OUTER)
+        paint.maskFilter = BlurMaskFilter((margin * 0.9f * MASK_SCALE).coerceAtLeast(1f), BlurMaskFilter.Blur.OUTER)
         Canvas(outer).drawPath(local, paint)
+        // Light that spreads inward from the edge, across the glass.
+        paint.maskFilter = BlurMaskFilter(dp(WASH_DP) * MASK_SCALE, BlurMaskFilter.Blur.INNER)
+        Canvas(wash).drawPath(local, paint)
         paint.style = Paint.Style.STROKE
-        paint.strokeWidth = dp(2.5f)
-        paint.maskFilter = BlurMaskFilter(dp(5f), BlurMaskFilter.Blur.NORMAL)
+        paint.strokeWidth = dp(2.5f) * MASK_SCALE
+        paint.maskFilter = BlurMaskFilter(dp(5f) * MASK_SCALE, BlurMaskFilter.Blur.NORMAL)
         Canvas(edge).drawPath(local, paint)
-        val made = Masks(outer, edge)
+        val made = Masks(outer, edge, wash)
         masks[key] = made
         while (masks.size > 2) {
             val oldest = masks.keys.first()
@@ -342,34 +347,8 @@ internal class PanelGlassDrawable(
         return made
     }
 
-    /** A slow wheel of brighter and dimmer light that turns around the edge. */
-    private fun swirl(color: Int): Shader {
-        val cx = glass.centerX()
-        val cy = glass.centerY()
-        val key = color.toLong() xor (cx.toBits().toLong() shl 32) xor cy.toBits().toLong()
-        val shader = swirlShader?.takeIf { swirlKey == key } ?: SweepGradient(
-            cx,
-            cy,
-            intArrayOf(
-                Hud.withAlpha(color, 1f),
-                Hud.withAlpha(color, 0.25f),
-                Hud.withAlpha(color, 0.85f),
-                Hud.withAlpha(color, 0.15f),
-                Hud.withAlpha(color, 0.7f),
-                Hud.withAlpha(color, 1f),
-            ),
-            floatArrayOf(0f, 0.22f, 0.45f, 0.63f, 0.82f, 1f),
-        ).also {
-            swirlShader = it
-            swirlKey = key
-        }
-        swirlMatrix.setRotate(swirlAngle, cx, cy)
-        shader.setLocalMatrix(swirlMatrix)
-        return shader
-    }
-
-    private fun drawMask(canvas: Canvas, mask: Bitmap, color: Int, alpha: Float, swirl: Boolean) {
-        maskPaint.shader = if (swirl) swirl(color) else null
+    private fun drawMask(canvas: Canvas, mask: Bitmap, color: Int, alpha: Float) {
+        if (alpha <= 0f) return
         maskPaint.color = color
         maskPaint.alpha = (alpha.coerceIn(0f, 1f) * 255f).toInt()
         maskTarget.set(bounds)
@@ -384,10 +363,13 @@ internal class PanelGlassDrawable(
             return
         }
         val strength = current.glowStrength
+        val boost = current.glowBoost
         val breathing = if (current.pulse) breath else 0.8f
         val glow = masksFor()
         if (glow != null && current.outerGlowOn && strength > 0f) {
-            drawMask(canvas, glow.outer, current.outerGlow, strength * (0.35f + 0.65f * breathing), current.swirl)
+            drawMask(canvas, glow.outer, current.outerGlow, strength * (0.35f + 0.65f * breathing))
+            // Above 50, a second layer makes the outer glow brighter and fuller.
+            drawMask(canvas, glow.outer, Hud.lighten(current.outerGlow, 0.2f * boost), boost * (0.5f + 0.5f * breathing))
         }
         val titanium = titaniumOn() && !frameBand.isEmpty
         if (titanium) {
@@ -402,10 +384,12 @@ internal class PanelGlassDrawable(
             }
         }
         if (glow != null && current.edgeGlow && strength > 0f) {
-            drawMask(canvas, glow.edge, current.edge, strength * (0.4f + 0.6f * breathing), current.swirl)
+            drawMask(canvas, glow.wash, current.edge, (WASH_NORMAL * strength + WASH_BOOST * boost) * (0.4f + 0.6f * breathing))
+            drawMask(canvas, glow.edge, current.edge, strength * (0.4f + 0.6f * breathing))
+            drawMask(canvas, glow.edge, Hud.lighten(current.edge, 0.3f * boost), boost * (0.5f + 0.5f * breathing))
         }
-        line.strokeWidth = dp(if (pane) 1f else 1.25f)
-        line.color = Hud.withAlpha(current.edge, if (pane) 0.5f else 0.92f)
+        line.strokeWidth = dp(if (pane) 1f else 1.25f + 1.25f * boost)
+        line.color = Hud.withAlpha(Hud.lighten(current.edge, if (pane) 0f else 0.35f * boost), if (pane) 0.5f else 0.92f)
         canvas.drawPath(shape, line)
         if (titanium) {
             // A thin line of light where the frame meets the glass, like the edge of an inset screen.
@@ -514,6 +498,14 @@ internal class PanelGlassDrawable(
     private companion object {
         /** How wide the titanium frame is. */
         const val FRAME_DP = 6f
+
+        /** The glow masks are built at this share of full size. They are soft, so it does not show. */
+        const val MASK_SCALE = 0.5f
+
+        /** How far the wash of light reaches in from the edge, and how bright it is at 50 and at 100. */
+        const val WASH_DP = 26f
+        const val WASH_NORMAL = 0.14f
+        const val WASH_BOOST = 0.6f
 
         val grainBitmap: Bitmap get() = PanelTextures.grain
         val brushedBitmap: Bitmap get() = PanelTextures.brushed
