@@ -39,6 +39,10 @@ class SnapGuideView @JvmOverloads constructor(
     private var snappedY = false
     private var fade: ValueAnimator? = null
 
+    /** The middle the panel snaps to. Until the panel says, it is the middle of this view. */
+    private var middleX = Float.NaN
+    private var middleY = Float.NaN
+
     init {
         isClickable = false
         isFocusable = false
@@ -53,6 +57,22 @@ class SnapGuideView @JvmOverloads constructor(
             invalidate()
         }
     }
+
+    /**
+     * The middle of the screen between the status bar and the navigation bar, where the
+     * panel snaps (Step 2.4). The cross is drawn there.
+     */
+    fun setMiddle(x: Float, y: Float) {
+        if (x == middleX && y == middleY) return
+        middleX = x
+        middleY = y
+        buildShaders(width, height)
+        invalidate()
+    }
+
+    private fun centerX(): Float = if (middleX.isNaN()) width / 2f else middleX
+
+    private fun centerY(): Float = if (middleY.isNaN()) height / 2f else middleY
 
     /** Fades the cross in. Called when a drag starts. */
     fun showGuides() {
@@ -106,14 +126,17 @@ class SnapGuideView @JvmOverloads constructor(
         val clear = Hud.withAlpha(color, 0f)
         val stops = floatArrayOf(0f, 0.3f, 0.5f, 0.7f, 1f)
         val colors = intArrayOf(clear, Hud.withAlpha(color, 0.55f), color, Hud.withAlpha(color, 0.55f), clear)
-        across = LinearGradient(0f, 0f, w.toFloat(), 0f, colors, stops, Shader.TileMode.CLAMP)
-        down = LinearGradient(0f, 0f, 0f, h.toFloat(), colors, stops, Shader.TileMode.CLAMP)
+        // Brightest at the middle, wherever the middle is.
+        val x = centerX()
+        val y = centerY()
+        across = LinearGradient(x - w / 2f, 0f, x + w / 2f, 0f, colors, stops, Shader.TileMode.CLAMP)
+        down = LinearGradient(0f, y - h / 2f, 0f, y + h / 2f, colors, stops, Shader.TileMode.CLAMP)
     }
 
     override fun onDraw(canvas: Canvas) {
         if (shown <= 0f) return
-        val centerX = width / 2f
-        val centerY = height / 2f
+        val centerX = centerX()
+        val centerY = centerY()
         drawLine(canvas, down, centerX, 0f, centerX, height.toFloat(), snappedX)
         drawLine(canvas, across, 0f, centerY, width.toFloat(), centerY, snappedY)
         // A small ring marks the exact middle.

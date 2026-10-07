@@ -37,9 +37,9 @@ internal enum class PanelAction { RESET_ALL, CENTER_PANEL }
 /** One ready-made theme. Tapping it applies it. */
 internal class ThemeItem(val theme: Theme) : PanelItem()
 
-/** The color editor for one part: hex code, six typed numbers, swatch, Use system color, and Reset. */
+/** The color editor for one part: hex code, nine typed numbers, swatch, Use system color, and Reset. */
 internal class ColorItem(val part: ColorPart) : PanelItem() {
-    override val count: Int get() = 9
+    override val count: Int get() = 12
 }
 
 /** The mark next to a private test toggle (feature 37). */
@@ -137,9 +137,9 @@ internal object PanelTree {
         folders = listOf(
             sizeFolder(),
             displayFolder(),
-            themesFolder(),
-            colorsFolder(),
             glowFolder(),
+            colorsFolder(),
+            themesFolder(),
             resetFolder(),
         ),
         notes = listOf(
@@ -156,9 +156,13 @@ internal object PanelTree {
         tag = null,
         kind = FolderKind.OFFICE,
         items = listOf(
-            NumberItem(LookKeys.WIDTH, "Width", "0 is the narrowest panel. 100 is the widest."),
-            NumberItem(LookKeys.HEIGHT, "Height", "0 is the shortest panel. 100 is the tallest."),
+            NumberItem(LookKeys.WIDTH, "Width", "0 is the narrowest panel. 100 fills the screen from side to side."),
+            NumberItem(LookKeys.HEIGHT, "Height", "0 is the shortest panel. 100 fills the screen from top to bottom."),
             ActionItem(PanelAction.CENTER_PANEL, "Center panel", "Moves the panel to the middle of the screen."),
+            NumberItem(LookKeys.OPACITY, "Opacity", "How solid the panel looks. 0 is clear. 50 is half see-through. 100 is solid."),
+            NumberItem(LookKeys.FONT_SIZE, "Font size", "How big the words are. 50 is normal."),
+            NumberItem(LookKeys.TYPING, "Typing speed", "How fast the laser types. 1 is slow. 100 is very fast."),
+            NumberItem(LookKeys.CORNERS, "Corner roundness", "0 is square. 100 is very round."),
             ToggleItem(
                 LookKeys.CENTER_GUIDE,
                 "Center guide",
@@ -166,10 +170,6 @@ internal object PanelTree {
                 true,
                 isTest = false,
             ),
-            NumberItem(LookKeys.OPACITY, "Opacity", "How solid the panel looks. 0 is clear. 100 is solid."),
-            NumberItem(LookKeys.FONT_SIZE, "Font size", "How big the words are. 50 is normal."),
-            NumberItem(LookKeys.CORNERS, "Corner roundness", "0 is square. 100 is very round."),
-            NumberItem(LookKeys.TYPING, "Typing speed", "How fast the laser types."),
         ),
         notes = listOf(
             "Width and Height are also at the top of the panel.",
@@ -190,8 +190,8 @@ internal object PanelTree {
                 false,
                 isTest = false,
             ),
-            ToggleItem(LookKeys.SCAN_LINE, "Scan line", "A soft line sweeps across the panel.", true, isTest = false),
             ToggleItem(LookKeys.LASER_TYPING, "Laser typing", "Off shows the text all at once.", true, isTest = false),
+            ToggleItem(LookKeys.SCAN_LINE, "Scan line", "A soft line sweeps across the panel.", false, isTest = false),
             ToggleItem(LookKeys.RING, "Ring", "A soft ring turns around the open folder.", true, isTest = false),
             ToggleItem(
                 LookKeys.UNFOLD,
@@ -200,21 +200,21 @@ internal object PanelTree {
                 true,
                 isTest = false,
             ),
+            ToggleItem(LookKeys.TICK, "Tick when saved", "Your phone ticks softly when a setting is saved.", true, isTest = false),
             ToggleItem(
                 LookKeys.TITANIUM_FRAME,
                 "Titanium frame",
-                "Dark titanium and carbon fiber around the glass.",
-                true,
+                "Dark titanium and carbon fiber around the glass. It starts off.",
+                false,
                 isTest = false,
             ),
             ToggleItem(
                 LookKeys.SAPPHIRE_GLASS,
                 "Sapphire glass",
-                "Thick, deep glass behind open folders.",
-                true,
+                "Thick, deep teal glass behind open folders. It starts off.",
+                false,
                 isTest = false,
             ),
-            ToggleItem(LookKeys.TICK, "Tick when saved", "Your phone ticks softly when a setting is saved.", true, isTest = false),
         ),
         notes = listOf(
             "These change what the panel shows.",
@@ -257,7 +257,7 @@ internal object PanelTree {
         folders = ColorPart.entries.map { colorFolder("colors", it) },
         notes = listOf(
             "Each folder changes the color of one part.",
-            "Open one to type a hex code, or mix six colors.",
+            "Open one to type a hex code, or mix nine colors.",
         ),
     )
 
@@ -270,7 +270,7 @@ internal object PanelTree {
         notes = listOf(
             PART_HELP.getValue(part),
             "Type a hex code like #00FF66, then tap Done.",
-            "Or mix the six colors below, each from 0 to 100.",
+            "Or mix the nine colors below, each from 0 to 100.",
             "Use system color follows your phone's own colors.",
         ),
     )
@@ -299,25 +299,18 @@ internal object PanelTree {
         tag = null,
         kind = FolderKind.OFFICE,
         items = listOf(
+            ToggleItem(LookKeys.GLOW_ON, "Glow", "All the panel's glow, on or off.", true, isTest = false),
+            NumberItem(LookKeys.GLOW, "Glow strength", "0 is no glow. 50 is normal. 100 is big and bright."),
+            ToggleItem(LookKeys.PULSE, "Pulse", "The glow breathes in and out. Off keeps it steady.", false, isTest = false),
+            NumberItem(LookKeys.PULSE_SPEED, "Pulse speed", "How fast the glow breathes. 0 is slow. 100 is fast."),
             ToggleItem(LookKeys.EDGE_GLOW, "Edge glow", "A soft glow along the panel's edge.", true, isTest = false),
             ToggleItem(LookKeys.OUTER_GLOW, "Outer glow", "A soft glow outside the panel.", true, isTest = false),
-            ToggleItem(LookKeys.PULSE, "Pulse", "The glow breathes in and out.", true, isTest = false),
-            NumberItem(LookKeys.PULSE_SPEED, "Pulse speed", "How fast the glow breathes."),
-            NumberItem(LookKeys.GLOW, "Glow strength", "How bright the glow is. 0 turns it off."),
-            ToggleItem(
-                LookKeys.SWIRL,
-                "Bioluminescent liquid swirl",
-                "Light flows around the edge, like living sea light.",
-                true,
-                isTest = false,
-            ),
-            NumberItem(LookKeys.SWIRL_SPEED, "Swirl speed", "How fast the liquid light moves."),
             ToggleItem(LookKeys.TOUCH_GLOW, "Touch glow", "Light ripples where you touch the panel's edge.", true, isTest = false),
-            ToggleItem(LookKeys.TYPING_GLOW, "Typing glow", "The box you are typing in glows softly.", true, isTest = false),
+            ToggleItem(LookKeys.TYPING_GLOW, "Typing glow", "The row you are typing in glows softly.", true, isTest = false),
         ),
         notes = listOf(
-            "Bioluminescent means it glows like living sea light.",
-            "Pulse makes the glow breathe slowly.",
+            "Glow turns all the glow on or off. Glow strength sets how bright.",
+            "Pulse makes the glow breathe. Pulse speed sets how fast.",
         ),
     )
 

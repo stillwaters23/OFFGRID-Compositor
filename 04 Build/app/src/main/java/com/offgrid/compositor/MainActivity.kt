@@ -135,6 +135,9 @@ class MainActivity : AppCompatActivity() {
         describeCamera(terminalPanel.testDiamondOn)
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.root)) { _, insets ->
             terminalPanel.onKeyboardInset(insets.getInsets(WindowInsetsCompat.Type.ime()).bottom)
+            // Full screen for the panel stays clear of the bars and the camera hole.
+            val safe = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
+            terminalPanel.onSystemInsets(safe.left, safe.top, safe.right, safe.bottom)
             insets
         }
         recordButton.setOnClickListener { startFiveSecondRecording() }

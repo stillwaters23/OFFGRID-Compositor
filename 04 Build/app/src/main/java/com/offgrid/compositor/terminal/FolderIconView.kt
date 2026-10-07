@@ -52,6 +52,7 @@ internal class FolderIconView(
     private var titanium = true
     private var roundness = 0.04f
     private var glowStrength = 0.7f
+    private var glowBoost = 0f
 
     init {
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
@@ -60,11 +61,13 @@ internal class FolderIconView(
     override fun applyLook(look: PanelLook) {
         val next = if (special) look.specialFolder else look.folder
         val reshape = look.roundness != roundness
-        val repaint = next != accent || look.titanium != titanium || look.glowStrength != glowStrength
+        val repaint = next != accent || look.titanium != titanium || look.glowStrength != glowStrength ||
+            look.glowBoost != glowBoost
         accent = next
         titanium = look.titanium
         roundness = look.roundness
         glowStrength = look.glowStrength
+        glowBoost = look.glowBoost
         if (reshape) buildShapes(width, height)
         if (reshape || repaint) {
             buildPaints(width, height)
@@ -166,7 +169,7 @@ internal class FolderIconView(
     override fun onDraw(canvas: Canvas) {
         if (width == 0 || height == 0) return
         val unit = minOf(width, height).toFloat()
-        val glow = 0.4f + 0.6f * glowStrength
+        val glow = 0.4f + 0.6f * glowStrength + 0.5f * glowBoost
 
         // The two folder sheets behind, dimmer the farther back they are.
         canvas.drawPath(backFar, back)

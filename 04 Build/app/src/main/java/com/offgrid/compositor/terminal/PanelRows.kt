@@ -16,7 +16,6 @@ import android.text.Editable
 import android.text.InputFilter
 import android.text.InputType
 import android.text.TextPaint
-import android.text.TextUtils
 import android.text.TextWatcher
 import android.util.TypedValue
 import android.view.Gravity
@@ -84,16 +83,18 @@ internal fun applyTextStyle(view: TextView, style: StyleTag, look: PanelLook) {
  */
 private fun applyLaserTitle(view: LaserTitleView, role: TextRole, look: PanelLook) {
     val strength = look.glowStrength
+    val boost = look.glowBoost
     when (role) {
-        TextRole.TITLE -> view.setLaser(if (look.holo) look.edge else look.text, null, strength)
-        TextRole.PILL -> view.setLaser(if (look.holo) look.decor else look.text, null, strength)
+        TextRole.TITLE -> view.setLaser(if (look.holo) look.edge else look.text, null, strength, boost)
+        TextRole.PILL -> view.setLaser(if (look.holo) look.decor else look.text, null, strength, boost)
         TextRole.HEADING -> view.setLaser(
             if (look.holo) look.sideText else look.text,
             if (look.holo) look.folder else null,
             strength,
+            boost,
         )
-        TextRole.SECTION -> view.setLaser(if (look.holo) look.decor else look.text, null, strength * 0.6f)
-        else -> view.setLaser(look.text, null, strength)
+        TextRole.SECTION -> view.setLaser(if (look.holo) look.decor else look.text, null, strength * 0.6f, boost * 0.6f)
+        else -> view.setLaser(look.text, null, strength, boost)
     }
 }
 
@@ -113,12 +114,12 @@ internal fun pressGlow(context: Context, color: Int, radius: Float = Hud.dp(cont
     return RippleDrawable(ColorStateList.valueOf(Hud.withAlpha(color, 0.28f)), null, mask)
 }
 
-private fun rowTitle(context: Context, text: String) = TextView(context).apply {
+private fun rowTitle(context: Context, text: String) = FitTextView(context).apply {
     this.text = text
     typeface = Hud.condensedBold
 }
 
-private fun rowNote(context: Context, text: String) = TextView(context).apply {
+private fun rowNote(context: Context, text: String) = FitTextView(context).apply {
     this.text = text
     typeface = Hud.mono(context)
     visibility = if (text.isEmpty()) View.GONE else View.VISIBLE
@@ -134,7 +135,7 @@ private fun styleRowWords(title: TextView, note: TextView, look: PanelLook) {
 /** A big glowing folder in a grid, with its name under it. */
 internal class FolderTile(context: Context, private val folder: PanelFolder, iconDp: Float) : LinearLayout(context), Styled {
     private val ring = HoloRingView(context, folder.special)
-    private val name = TextView(context)
+    private val name = FitTextView(context)
     private var active = false
     private var look: PanelLook? = null
 
@@ -155,8 +156,6 @@ internal class FolderTile(context: Context, private val folder: PanelFolder, ico
             text = folder.title
             typeface = Hud.condensed
             gravity = Gravity.CENTER_HORIZONTAL
-            maxLines = 2
-            ellipsize = TextUtils.TruncateAt.END
         }
         addView(name, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
         isClickable = true
@@ -217,9 +216,7 @@ internal class SideRow(context: Context, folder: PanelFolder) : LinearLayout(con
         name.apply {
             text = folder.label
             typeface = Hud.condensed
-            maxLines = 2
-            ellipsize = TextUtils.TruncateAt.END
-            // Break lines only between words. A name too long for two lines ends with "…".
+            // Break lines only between words. Long names take another line instead of "…".
             breakStrategy = LineBreaker.BREAK_STRATEGY_SIMPLE
         }
         addView(name, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = Hud.dpi(context, 3f) })
@@ -713,7 +710,10 @@ internal class TileGrid(
         val inner = (width - paddingLeft - paddingRight).coerceAtLeast(0)
         columns = (inner / Hud.dp(context, minCellDp)).toInt().coerceAtLeast(1)
         if (evenRows && childCount > 0) {
-            columns = (columns.coerceAtMost(childCount) downTo 1).first { childCount % it == 0 }
+            // Rows that are all full, like 3 by 3 for nine boxes. If only one column would
+            // do that, keep the columns that fit, so nine boxes never become one long column.
+            val even = (columns.coerceAtMost(childCount) downTo 1).first { childCount % it == 0 }
+            columns = if (even == 1) columns.coerceAtMost(childCount) else even
         }
         val cell = inner / columns
         var height = paddingTop + paddingBottom

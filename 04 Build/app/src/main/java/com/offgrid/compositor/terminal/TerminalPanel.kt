@@ -11,10 +11,10 @@ import android.graphics.Canvas
 import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.RadialGradient
+import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Shader
 import android.graphics.drawable.GradientDrawable
-import android.text.TextUtils
 import android.util.AttributeSet
 import android.util.TypedValue
 import android.view.Gravity
@@ -92,8 +92,21 @@ class TerminalPanel @JvmOverloads constructor(
     private val widthBox: SizeBox
     private val heightBox: SizeBox
 
-    private val gridTiles = HashMap<String, FolderTile>()
     private val listRows = HashMap<String, SideRow>()
+
+    /** Step 2.4: the ⋮ menu's choices, the folder views, the side list drawer, and the menu. */
+    private val folderSettings = FolderSettings(prefs)
+    private val mainFolders = FolderLayout(context, sub = false)
+    private var subFolders: FolderLayout? = null
+    private val sideRows = LinearLayout(context)
+    private val body = LinearLayout(context)
+    private val drawer = SideDrawer(context)
+    private val moreButton = MoreButton(context)
+    private val menu: PanelMenu
+    private var sideMode = folderSettings.side
+
+    /** The phone's status bar, navigation bar, and camera cutout. Full screen stays inside them. */
+    private val safe = Rect()
     private val themeRows = ArrayList<ThemeRow>()
 
     /** Width and Height boxes inside the open Size folder, kept in step with the top boxes. */
@@ -141,6 +154,10 @@ class TerminalPanel @JvmOverloads constructor(
     private var guides: SnapGuideView? = null
 
     private val barViews = ArrayList<View>()
+
+    /** The bars the open panel covers now. They fade away, so their words never show through the glass. */
+    private val coveredBars = HashSet<View>()
+    private val barMoved = OnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> refreshCoveredBars() }
     private val barTexts = ArrayList<TextView>()
     private val barButtons = ArrayList<TextView>()
 
@@ -150,13 +167,21 @@ class TerminalPanel @JvmOverloads constructor(
     /** True when the Step 1 test diamond is painted into the video. It starts off. */
     val testDiamondOn: Boolean get() = store.toggle(LookKeys.TEST_DIAMOND)
 
-    /** The phone's Back key closes one folder at a time. */
+    /** The phone's Back key closes the ⋮ menu or the side drawer first, then one folder at a time. */
     val backCallback = object : OnBackPressedCallback(false) {
-        override fun handleOnBackPressed() = goUp()
+        override fun handleOnBackPressed() {
+            when {
+                menu.isOpen -> menu.close(animate = true)
+                drawer.isOpen -> drawer.close(animate = true)
+                else -> goUp()
+            }
+        }
     }
 
-    private val focusWatcher = ViewTreeObserver.OnGlobalFocusChangeListener { _, now ->
+    private val focusWatcher = ViewTreeObserver.OnGlobalFocusChangeListener { old, now ->
         showTypingGlow(now)
+        // A top box that was kept for typing may now tuck away on a narrow panel.
+        if (old === widthBox.box || old === heightBox.box) requestLayout()
         if (now is EditText && keyboardHeight > 0) post { keepFocusAboveKeyboard() }
     }
 
@@ -183,6 +208,8 @@ class TerminalPanel @JvmOverloads constructor(
         focusSink.isFocusableInTouchMode = true
         focusSink.importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
         addView(focusSink, LayoutParams(1, 1))
+
+        menu = PanelMenu(context, folderSettings, menuListener())
 
         widthBox = SizeBox(
             context,
@@ -213,7 +240,7 @@ class TerminalPanel @JvmOverloads constructor(
                 marginEnd = dpi(12f)
             },
         )
-        val body = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
+        body.orientation = LinearLayout.HORIZONTAL
         body.addView(buildSideList(), LinearLayout.LayoutParams(dpi(SIDE_MAX_DP), MATCH))
         body.addView(
             sideRule,
@@ -223,7 +250,16 @@ class TerminalPanel @JvmOverloads constructor(
             },
         )
         body.addView(buildMainArea(), LinearLayout.LayoutParams(0, MATCH, 1f))
-        expanded.addView(body, LinearLayout.LayoutParams(MATCH, 0, 1f))
+        // The body, with the side list drawer over it for Swipe to open.
+        val bodyFrame = FrameLayout(context)
+        bodyFrame.addView(body, LayoutParams(MATCH, MATCH))
+        drawer.visibility = GONE
+        drawer.onOpenChanged = { open ->
+            refreshBack()
+            if (open) say(context.getString(R.string.terminal_side_opened))
+        }
+        bodyFrame.addView(drawer, LayoutParams(MATCH, MATCH))
+        expanded.addView(bodyFrame, LinearLayout.LayoutParams(MATCH, 0, 1f))
         addView(expanded, LayoutParams(MATCH, MATCH))
 
         addView(scanLine, LayoutParams(MATCH, dpi(22f), Gravity.TOP).apply {
@@ -246,7 +282,12 @@ class TerminalPanel @JvmOverloads constructor(
         }
         addView(resizeGrip, LayoutParams(dpi(GRIP_DP), dpi(GRIP_DP), Gravity.BOTTOM or Gravity.END))
 
+        // The ⋮ menu sits over everything inside the glass.
+        addView(menu, LayoutParams(MATCH, MATCH))
+
         applyLook()
+        applySideMode(announce = false)
+        applyFolderLayout()
         markActive(activeId)
         showMinimized(minimized, animate = false)
         say(context.getString(R.string.terminal_welcome))
@@ -257,19 +298,33 @@ class TerminalPanel @JvmOverloads constructor(
      * [bars] are the bar backgrounds, [texts] the messages, and [buttons] the bar's buttons.
      */
     fun matchLook(bars: List<View>, texts: List<TextView>, buttons: List<TextView>) {
+        barViews.forEach { it.removeOnLayoutChangeListener(barMoved) }
         barViews.clear()
         barViews += bars
+        // A bar that grows or shrinks, like when the Record buttons show, is checked again.
+        bars.forEach { it.addOnLayoutChangeListener(barMoved) }
         barTexts.clear()
         barTexts += texts
         barButtons.clear()
         barButtons += buttons
         RecordBarLook.apply(look, barViews, barTexts, barButtons)
+        post { refreshCoveredBars() }
     }
 
     /** The full-screen view that draws the soft center cross while the panel is dragged. */
     fun useGuides(view: SnapGuideView) {
         guides = view
         view.applyLook(look)
+    }
+
+    /**
+     * The phone's status bar, navigation bar, and camera cutout. Width 100 and Height 100
+     * fill the screen inside them, like a terminal window, so nothing hides behind the bars.
+     */
+    fun onSystemInsets(left: Int, top: Int, right: Int, bottom: Int) {
+        if (safe.left == left && safe.top == top && safe.right == right && safe.bottom == bottom) return
+        safe.set(left, top, right, bottom)
+        requestLayout()
     }
 
     /** Lifts the panel above the keyboard while a number or color code is typed. */
@@ -283,20 +338,38 @@ class TerminalPanel @JvmOverloads constructor(
         if (hidden) {
             hideKeyboard()
         }
+        if (hidden) {
+            menu.close(animate = false)
+            drawer.close(animate = false)
+        }
         visibility = if (hidden) GONE else VISIBLE
-        backCallback.isEnabled = !hidden && !minimized && openFolder != null
+        refreshBack()
+        refreshCoveredBars()
     }
 
-    /** The widths the glass may take on this screen, in pixels: smallest readable, then widest. */
+    /** Back is on only while there is something to close. */
+    private fun refreshBack() {
+        backCallback.isEnabled = visibility == VISIBLE && !minimized &&
+            (menu.isOpen || drawer.isOpen || openFolder != null)
+    }
+
+    /** The widths the glass may take on this screen, in pixels: smallest readable, then the full screen. */
     private fun widthRange(areaWidth: Int): Pair<Int, Int> {
-        val most = (areaWidth - dpi(EDGE_DP) * 2).coerceAtLeast(0)
+        val most = (areaWidth - safe.left - safe.right).coerceAtLeast(0)
         return minOf(dpi(MIN_WIDTH_DP), most) to most
     }
 
-    /** The heights the glass may take. The tallest still leaves some camera picture showing. */
+    /** The heights the glass may take: smallest readable, then the full screen between the bars. */
     private fun heightRange(areaHeight: Int): Pair<Int, Int> {
-        val most = (areaHeight * MAX_HEIGHT_SHARE).toInt().coerceAtLeast(0)
+        val most = (areaHeight - safe.top - safe.bottom).coerceAtLeast(0)
         return minOf(dpi(MIN_HEIGHT_DP), most) to most
+    }
+
+    /** Where the glass's top left corner goes to sit in the middle of the screen, between the bars. */
+    private fun middleFor(glassWidth: Int, glassHeight: Int): Pair<Float, Float> {
+        val usableWidth = areaWidth() - safe.left - safe.right
+        val usableHeight = areaHeight() - safe.top - safe.bottom
+        return (safe.left + (usableWidth - glassWidth) / 2f) to (safe.top + (usableHeight - glassHeight) / 2f)
     }
 
     private fun sizeFor(percent: Int, range: Pair<Int, Int>): Int =
@@ -333,12 +406,32 @@ class TerminalPanel @JvmOverloads constructor(
         // The side list shrinks a little with the panel, so the open folder keeps its room.
         // A very narrow panel hides it. The big folders still show every top folder.
         val glassDp = glassWidth / density
-        val showSide = glassDp >= SIDE_SHOW_DP
-        if (sideList.isVisible != showSide) {
-            sideList.isVisible = showSide
-            sideRule.isVisible = showSide
+        val sideWidth = dpi((glassDp * SIDE_SHARE).coerceIn(SIDE_MIN_DP, SIDE_MAX_DP))
+        when (sideMode) {
+            SideMode.SHOW -> {
+                val showSide = glassDp >= SIDE_SHOW_DP
+                if (sideList.isVisible != showSide) sideList.isVisible = showSide
+                if (sideRule.isVisible != showSide) sideRule.isVisible = showSide
+                sideList.layoutParams.width = sideWidth
+            }
+            SideMode.SWIPE -> {
+                if (!sideList.isVisible) sideList.isVisible = true
+                if (sideRule.isVisible) sideRule.isVisible = false
+                drawer.setSheetWidth(sideWidth + dpi(DRAWER_EXTRA_DP))
+            }
+            SideMode.HIDDEN -> {
+                if (sideList.isVisible) sideList.isVisible = false
+                if (sideRule.isVisible) sideRule.isVisible = false
+            }
         }
-        sideList.layoutParams.width = dpi((glassDp * SIDE_SHARE).coerceIn(SIDE_MIN_DP, SIDE_MAX_DP))
+        // A narrow panel keeps its title readable. Width and Height are still in 📁 Size.
+        // A box being typed in stays until the typing is done.
+        val typing = widthBox.box.hasFocus() || heightBox.box.hasFocus()
+        val showBoxes = glassDp >= HEADER_BOXES_DP || typing
+        if (widthBox.isVisible != showBoxes) {
+            widthBox.isVisible = showBoxes
+            heightBox.isVisible = showBoxes
+        }
         super.onMeasure(
             MeasureSpec.makeMeasureSpec(glassWidth + margin * 2, MeasureSpec.EXACTLY),
             MeasureSpec.makeMeasureSpec(glassHeight + margin * 2, MeasureSpec.EXACTLY),
@@ -360,7 +453,8 @@ class TerminalPanel @JvmOverloads constructor(
                 moveGlassTo(saved.first * area.width, saved.second * area.height)
             } else {
                 // The first time, the panel opens in the exact middle of the screen.
-                moveGlassTo((area.width - glassWidth) / 2f, (area.height - glassHeight) / 2f)
+                val (middleX, middleY) = middleFor(glassWidth, glassHeight)
+                moveGlassTo(middleX, middleY)
             }
         } else if (pinching != null) {
             // A pinch grows and shrinks the panel around its middle.
@@ -465,13 +559,11 @@ class TerminalPanel @JvmOverloads constructor(
         finishLiveSize()
     }
 
-    /** Sets the breathing glow and the swirl for this moment, then draws. */
+    /** Sets the breathing glow for this moment, then draws. */
     override fun draw(canvas: Canvas) {
         val current = look
         val live = ticking && GlowClock.motionAllowed
-        val seconds = GlowClock.seconds
-        glass.breath = if (live && current.pulse) breathAt(seconds, current.pulseSpeed) else STILL_BREATH
-        glass.swirlAngle = if (live && current.swirl) (seconds * swirlDegreesPerSecond(current.swirlSpeed)) % 360f else 0f
+        glass.breath = if (live && current.pulse) breathAt(GlowClock.seconds, current.pulseSpeed) else STILL_BREATH
         super.draw(canvas)
     }
 
@@ -614,54 +706,48 @@ class TerminalPanel @JvmOverloads constructor(
             text = context.getString(R.string.terminal_title)
             typeface = Hud.monoBold(context)
             letterSpacing = 0.12f
-            maxLines = 1
-            ellipsize = TextUtils.TruncateAt.END
+            fitWholeLine = true
             setPadding(0, dpi(4f), 0, dpi(4f))
             styled(TextRole.TITLE, 12.5f)
         }
         header.addView(title, LinearLayout.LayoutParams(0, WRAP, 1f))
         header.addView(widthBox, LinearLayout.LayoutParams(WRAP, WRAP).apply { marginStart = dpi(4f) })
         header.addView(heightBox, LinearLayout.LayoutParams(WRAP, WRAP).apply { marginStart = dpi(4f) })
+        moreButton.contentDescription = context.getString(R.string.terminal_menu_button)
+        moreButton.setOnClickListener { if (menu.isOpen) menu.close(animate = true) else openMenu() }
+        header.addView(moreButton, LinearLayout.LayoutParams(dpi(TARGET_DP), dpi(TARGET_DP)).apply { marginStart = dpi(2f) })
         val shrink = ShrinkButton(context).apply {
             contentDescription = context.getString(R.string.terminal_shrink)
             setOnClickListener { showMinimized(true, animate = true) }
         }
-        header.addView(shrink, LinearLayout.LayoutParams(dpi(48f), dpi(48f)).apply { marginStart = dpi(2f) })
+        header.addView(shrink, LinearLayout.LayoutParams(dpi(TARGET_DP), dpi(TARGET_DP)))
         header.setOnTouchListener(dragHandle())
         return header
     }
 
     private fun buildSideList(): View {
-        val rows = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dpi(6f), dpi(6f), dpi(2f), dpi(12f))
-        }
+        sideRows.orientation = LinearLayout.VERTICAL
+        sideRows.setPadding(dpi(6f), dpi(6f), dpi(2f), dpi(12f))
         for (folder in home.folders) {
             val row = SideRow(context, folder)
             row.setOnClickListener { openFromTop(folder, row) }
             listRows[folder.id] = row
-            rows.addView(row, LinearLayout.LayoutParams(MATCH, WRAP))
         }
         sideList.isVerticalScrollBarEnabled = false
         sideList.overScrollMode = OVER_SCROLL_NEVER
-        sideList.addView(rows)
+        sideList.addView(sideRows)
         return sideList
     }
 
     private fun buildMainArea(): View {
         val area = FrameLayout(context)
-        val grid = TileGrid(context, GRID_CELL_DP).apply {
-            setPadding(dpi(4f), dpi(6f), dpi(4f), dpi(GRIP_DP))
-        }
-        for (folder in home.folders) {
-            val tile = FolderTile(context, folder, GRID_ICON_DP)
-            tile.setOnClickListener { openFromTop(folder, tile) }
-            gridTiles[folder.id] = tile
-            grid.addView(tile)
-        }
+        mainFolders.setPadding(dpi(4f), dpi(6f), dpi(4f), dpi(GRIP_DP))
+        mainFolders.onOpen = { folder, from -> openFromTop(folder, from) }
+        mainFolders.onMoved = { order -> foldersMoved(home, order) }
+        mainFolders.styler = { restyle(it, look) }
         gridScroll.isVerticalScrollBarEnabled = false
         gridScroll.overScrollMode = OVER_SCROLL_NEVER
-        gridScroll.addView(grid)
+        gridScroll.addView(mainFolders)
         area.addView(gridScroll, LayoutParams(MATCH, MATCH))
 
         detailPane.background = paneGlass
@@ -685,6 +771,7 @@ class TerminalPanel @JvmOverloads constructor(
     /** The bottom gap leaves room for the resize corner, and for the keyboard when it covers the panel. */
     private fun setDetailPadding() {
         detailContent.setPadding(dpi(10f), dpi(6f), dpi(10f), dpi(DETAIL_BOTTOM_DP) + keyboardCover)
+        menu.setKeyboardRoom(keyboardCover)
     }
 
     private fun buildPill() {
@@ -749,7 +836,12 @@ class TerminalPanel @JvmOverloads constructor(
                         dragging = true
                         view.isPressed = false
                         parent?.requestDisallowInterceptTouchEvent(true)
-                        if (look.centerGuide) guides?.showGuides()
+                        if (look.centerGuide) {
+                            val usableWidth = areaWidth() - safe.left - safe.right
+                            val usableHeight = areaHeight() - safe.top - safe.bottom
+                            guides?.setMiddle(safe.left + usableWidth / 2f, safe.top + usableHeight / 2f)
+                            guides?.showGuides()
+                        }
                     }
                     if (dragging) {
                         var x = startX + dx
@@ -757,8 +849,7 @@ class TerminalPanel @JvmOverloads constructor(
                         if (look.centerGuide) {
                             val glassWidth = width - margin * 2
                             val glassHeight = height - margin * 2
-                            val middleX = (areaWidth() - glassWidth) / 2f
-                            val middleY = (areaHeight() - glassHeight) / 2f
+                            val (middleX, middleY) = middleFor(glassWidth, glassHeight)
                             val near = dp(SNAP_DP)
                             val nowX = kotlin.math.abs(x - middleX) < near
                             val nowY = kotlin.math.abs(y - middleY) < near
@@ -844,8 +935,8 @@ class TerminalPanel @JvmOverloads constructor(
         val area = parent as? View ?: return
         val widths = widthRange(area.width)
         val heights = heightRange(area.height)
-        val roomWidth = (area.width - (translationX + margin)).coerceIn(widths.first.toFloat(), widths.second.toFloat())
-        val roomHeight = (area.height - (userY + margin)).coerceIn(heights.first.toFloat(), heights.second.toFloat())
+        val roomWidth = (area.width - safe.right - (translationX + margin)).coerceIn(widths.first.toFloat(), widths.second.toFloat())
+        val roomHeight = (area.height - safe.bottom - (userY + margin)).coerceIn(heights.first.toFloat(), heights.second.toFloat())
         val glassWidth = newWidth.coerceIn(widths.first.toFloat(), roomWidth)
         val glassHeight = newHeight.coerceIn(heights.first.toFloat(), roomHeight)
         liveSize = glassWidth to glassHeight
@@ -909,8 +1000,8 @@ class TerminalPanel @JvmOverloads constructor(
         stopCentering()
         val fromX = translationX + margin
         val fromY = userY + margin
-        val toX = (area.width - (width - margin * 2)) / 2f
-        val toY = (area.height - (height - margin * 2)) / 2f
+        if (area.width == 0) return
+        val (toX, toY) = middleFor(width - margin * 2, height - margin * 2)
         if (!ValueAnimator.areAnimatorsEnabled()) {
             moveGlassTo(toX, toY)
             savePosition()
@@ -946,11 +1037,51 @@ class TerminalPanel @JvmOverloads constructor(
         val area = parent as? View ?: return
         val glassWidth = (width - margin * 2).toFloat()
         val glassHeight = (height - margin * 2).toFloat()
-        val glassX = x.coerceIn(0f, (area.width - glassWidth).coerceAtLeast(0f))
-        val glassY = y.coerceIn(0f, (area.height - glassHeight).coerceAtLeast(0f))
+        val glassX = x.coerceIn(safe.left.toFloat(), (area.width - safe.right - glassWidth).coerceAtLeast(safe.left.toFloat()))
+        val glassY = y.coerceIn(safe.top.toFloat(), (area.height - safe.bottom - glassHeight).coerceAtLeast(safe.top.toFloat()))
         translationX = glassX - margin
         userY = glassY - margin
         translationY = userY - keyboardLift
+        refreshCoveredBars()
+    }
+
+    /**
+     * A bar under the open panel fades away while the glass covers it, and comes back when
+     * the panel moves off it, shrinks to its tag, or hides. Taps there already go to the panel.
+     */
+    private fun refreshCoveredBars() {
+        if (barViews.isEmpty()) return
+        val open = isAttachedToWindow && visibility == VISIBLE && !minimized
+        val here = IntArray(2)
+        val there = IntArray(2)
+        if (open) getLocationInWindow(here)
+        val glassLeft = here[0] + margin
+        val glassTop = here[1] + margin
+        val glassRight = here[0] + width - margin
+        val glassBottom = here[1] + height - margin
+        for (bar in barViews) {
+            var covered = false
+            if (open && bar.height > 0) {
+                bar.getLocationInWindow(there)
+                val across = minOf(glassRight, there[0] + bar.width) - maxOf(glassLeft, there[0])
+                val down = minOf(glassBottom, there[1] + bar.height) - maxOf(glassTop, there[1])
+                // Only a bar the glass hides completely fades. A bar that peeks out stays,
+                // so a button you can tap is always a button you can see.
+                val slack = dpi(COVER_SLACK_DP)
+                covered = across >= bar.width - slack && down >= bar.height - slack
+            }
+            if (covered == bar in coveredBars) continue
+            if (covered) coveredBars += bar else coveredBars -= bar
+            bar.importantForAccessibility =
+                if (covered) IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS else IMPORTANT_FOR_ACCESSIBILITY_AUTO
+            val target = if (covered) 0f else 1f
+            bar.animate().cancel()
+            if (ValueAnimator.areAnimatorsEnabled()) {
+                bar.animate().alpha(target).setDuration(COVER_MS).start()
+            } else {
+                bar.alpha = target
+            }
+        }
     }
 
     private fun savePosition() {
@@ -970,11 +1101,12 @@ class TerminalPanel @JvmOverloads constructor(
         val glassTop = userY + margin
         val glassBottom = userY + height - margin
         keyboardLift = if (keyboardHeight > 0 && glassBottom > visibleBottom) {
-            (glassBottom - visibleBottom).coerceAtMost(glassTop.coerceAtLeast(0f))
+            (glassBottom - visibleBottom).coerceAtMost((glassTop - safe.top).coerceAtLeast(0f))
         } else {
             0f
         }
         translationY = userY - keyboardLift
+        refreshCoveredBars()
         val cover = if (keyboardHeight > 0) (glassBottom - keyboardLift - visibleBottom).coerceAtLeast(0f) else 0f
         if (cover.toInt() != keyboardCover) {
             keyboardCover = cover.toInt()
@@ -993,7 +1125,9 @@ class TerminalPanel @JvmOverloads constructor(
         focused.getLocationOnScreen(spot)
         val hidden = spot[1] + focused.height - keyboardTop
         if (hidden > 0f) {
-            detailScroll.smoothScrollBy(0, hidden.toInt())
+            // The box's own list scrolls: an open folder, or the ⋮ menu card.
+            val list = generateSequence(focused.parent) { it.parent }.filterIsInstance<ScrollView>().firstOrNull() ?: detailScroll
+            list.smoothScrollBy(0, hidden.toInt())
         }
     }
 
@@ -1002,6 +1136,8 @@ class TerminalPanel @JvmOverloads constructor(
         prefs.minimized = value
         if (value) {
             hideKeyboard()
+            menu.close(animate = false)
+            drawer.close(animate = false)
         }
         expanded.isVisible = !value
         pill.isVisible = value
@@ -1009,8 +1145,9 @@ class TerminalPanel @JvmOverloads constructor(
         scanLine.isVisible = !value && look.scanLine
         pillRing.isVisible = look.ring
         pillRing.spinning = value && look.ring
-        backCallback.isEnabled = !value && openFolder != null && isVisible
+        refreshBack()
         requestLayout()
+        refreshCoveredBars()
         if (animate && !value) {
             post { hologramIn(this, margin.toFloat(), margin.toFloat(), isDetail = false) }
             say(context.getString(R.string.terminal_panel_open))
@@ -1046,6 +1183,9 @@ class TerminalPanel @JvmOverloads constructor(
         guidance?.let { styleGuidance(it) }
         RecordBarLook.apply(current, barViews, barTexts, barButtons)
         guides?.applyLook(current)
+        mainFolders.tick = current.tick
+        subFolders?.tick = current.tick
+        drawer.tick = current.tick
         val host = focusHost
         val box = focusBox
         if (host != null && box != null) {
@@ -1075,6 +1215,7 @@ class TerminalPanel @JvmOverloads constructor(
         typer.cursorColor = current.cursor
         typer.cursorGlow = current.cursorGlow
         typer.glowStrength = current.glowStrength
+        typer.glowBoost = current.glowBoost
         typer.speed = current.lettersPerSecond
         typer.animateTyping = current.laserTyping
     }
@@ -1098,7 +1239,7 @@ class TerminalPanel @JvmOverloads constructor(
     private fun refreshClock() {
         val current = look
         val glowing = current.glowStrength > 0f && (current.outerGlowOn || current.edgeGlow)
-        val want = shownOnScreen && glowing && (current.pulse || current.swirl) && GlowClock.motionAllowed
+        val want = shownOnScreen && glowing && current.pulse && GlowClock.motionAllowed
         if (want && !ticking) {
             ticking = true
             GlowClock.join(this)
@@ -1114,20 +1255,171 @@ class TerminalPanel @JvmOverloads constructor(
         return 0.5f - 0.5f * cos(seconds / period * 2f * PI.toFloat())
     }
 
-    private fun swirlDegreesPerSecond(speed: Float): Float = 6f + 84f * speed
-
     private fun say(message: String) {
         statusLine.type(PanelText.line(message))
+    }
+
+    /** What the ⋮ menu does. Every choice works at once, is saved, and is said in plain words. */
+    private fun menuListener() = object : PanelMenu.Listener {
+        override fun onViewChosen(view: FolderView) {
+            folderSettings.view = view
+            menu.refresh()
+            applyFolderLayout()
+            savedTick()
+            say(context.getString(R.string.terminal_view_chosen, view.title))
+        }
+
+        override fun onSortChosen(sort: FolderSort) {
+            folderSettings.sort = sort
+            // Folders move only in your own order, so another sort locks them again.
+            if (sort != FolderSort.CUSTOM) folderSettings.unlocked = false
+            menu.refresh()
+            applyFolderLayout()
+            savedTick()
+            val message = if (sort == FolderSort.CUSTOM && !folderSettings.unlocked) {
+                R.string.terminal_sort_custom
+            } else {
+                R.string.terminal_sort_chosen
+            }
+            say(context.getString(message, sort.title))
+        }
+
+        override fun onUnlockChanged(unlocked: Boolean) {
+            if (unlocked && folderSettings.sort != FolderSort.CUSTOM) {
+                // Moving starts from the order on screen now, so nothing jumps.
+                keepOrderAsCustom()
+                folderSettings.sort = FolderSort.CUSTOM
+            }
+            folderSettings.unlocked = unlocked
+            menu.refresh()
+            applyFolderLayout()
+            say(context.getString(if (unlocked) R.string.terminal_folders_unlocked else R.string.terminal_folders_locked))
+        }
+
+        override fun onFolderSize(value: Int, announce: Boolean) {
+            folderSettings.size = value
+            applyFolderLayout()
+            if (announce) {
+                say(context.getString(R.string.terminal_number_saved, context.getString(R.string.terminal_menu_size_label), value))
+            }
+        }
+
+        override fun onSideChosen(mode: SideMode) {
+            folderSettings.side = mode
+            menu.refresh()
+            applySideMode(announce = true)
+            savedTick()
+        }
+
+        override fun onMenuClosed() {
+            refreshBack()
+        }
+
+        override fun onProblem(message: String) {
+            say(message)
+        }
+    }
+
+    private fun openMenu() {
+        hideKeyboard()
+        if (drawer.isOpen) drawer.close(animate = false)
+        menu.open(header.height)
+        refreshBack()
+        say(context.getString(R.string.terminal_menu_opened))
+    }
+
+    private fun savedTick() {
+        if (look.tick) performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+    }
+
+    /** Folders can be dragged only while Move folders is on, in your own order. */
+    private fun canMoveFolders(): Boolean = folderSettings.unlocked && folderSettings.sort == FolderSort.CUSTOM
+
+    /** Saves the order on screen now as your own order, for the top folders and the open folder. */
+    private fun keepOrderAsCustom() {
+        folderSettings.saveOrder(home, folderSettings.arrange(home))
+        val open = openFolder
+        if (open != null && open.folders.isNotEmpty()) folderSettings.saveOrder(open, folderSettings.arrange(open))
+    }
+
+    /** Shows the folders in the chosen view, sort, and size, in the main area, the open folder, and the side list. */
+    private fun applyFolderLayout() {
+        val view = folderSettings.view
+        val size = folderSettings.size
+        val moving = canMoveFolders()
+        mainFolders.dragOn = moving
+        mainFolders.show(folderSettings.arrange(home), view, size)
+        mainFolders.setActive(activeId)
+        val open = openFolder
+        val inside = subFolders
+        if (open != null && inside != null) {
+            inside.dragOn = moving
+            inside.show(folderSettings.arrange(open), view, size)
+        }
+        arrangeSideRows()
+    }
+
+    /** The side list follows the same order as the folders. */
+    private fun arrangeSideRows() {
+        val wanted = folderSettings.arrange(home).mapNotNull { listRows[it.id] }
+        val same = sideRows.childCount == wanted.size && wanted.indices.all { sideRows.getChildAt(it) === wanted[it] }
+        if (same) return
+        sideRows.removeAllViews()
+        for (row in wanted) sideRows.addView(row, LinearLayout.LayoutParams(MATCH, WRAP))
+        // Rows join the list here, so they take the current look here too.
+        restyle(sideRows, look)
+    }
+
+    /** A folder was dragged to a new spot. The new order is saved at once. */
+    private fun foldersMoved(parent: PanelFolder, order: List<PanelFolder>) {
+        folderSettings.saveOrder(parent, order)
+        if (parent === home) arrangeSideRows()
+        say(context.getString(R.string.terminal_folders_moved))
+    }
+
+    /** Puts the side list where the ⋮ menu says: always there, in a swipe drawer, or hidden. */
+    private fun applySideMode(announce: Boolean) {
+        val mode = folderSettings.side
+        sideMode = mode
+        val holder = sideList.parent as? ViewGroup
+        if (mode == SideMode.SWIPE) {
+            if (holder !== drawer.sheet) {
+                holder?.removeView(sideList)
+                drawer.sheet.addView(sideList, LayoutParams(MATCH, MATCH))
+            }
+            drawer.visibility = VISIBLE
+            // The folders start just past the drawer's handle, so a tap on a folder never opens the drawer.
+            body.setPadding(drawer.handleWidth(), 0, 0, 0)
+        } else {
+            drawer.close(animate = false)
+            drawer.visibility = GONE
+            if (holder !== body) {
+                holder?.removeView(sideList)
+                body.addView(sideList, 0, LinearLayout.LayoutParams(dpi(SIDE_MAX_DP), MATCH))
+            }
+            body.setPadding(0, 0, 0, 0)
+        }
+        refreshBack()
+        requestLayout()
+        if (announce) {
+            val message = when (mode) {
+                SideMode.SHOW -> R.string.terminal_side_show
+                SideMode.SWIPE -> R.string.terminal_side_swipe
+                SideMode.HIDDEN -> R.string.terminal_side_hidden
+            }
+            say(context.getString(message))
+        }
     }
 
     private fun markActive(id: String) {
         activeId = id
         prefs.activeFolder = id
-        gridTiles.forEach { (key, tile) -> tile.setActive(key == id) }
+        mainFolders.setActive(id)
         listRows.forEach { (key, row) -> row.setActive(key == id) }
     }
 
     private fun openFromTop(folder: PanelFolder, from: View) {
+        if (drawer.isOpen) drawer.close(animate = true)
         markActive(folder.id)
         showFolder(folder, from)
     }
@@ -1137,7 +1429,7 @@ class TerminalPanel @JvmOverloads constructor(
         val (pivotX, pivotY) = pivotIn(detailPane, from)
         val wasOpen = openFolder != null
         openFolder = folder
-        backCallback.isEnabled = true
+        refreshBack()
         buildDetail(folder)
         detailScroll.scrollTo(0, 0)
         detailPane.visibility = VISIBLE
@@ -1171,7 +1463,7 @@ class TerminalPanel @JvmOverloads constructor(
         val folder = openFolder ?: return
         hideKeyboard()
         openFolder = null
-        backCallback.isEnabled = false
+        refreshBack()
         gridScroll.animate().cancel()
         gridScroll.visibility = VISIBLE
         detailAnim?.cancel()
@@ -1183,7 +1475,7 @@ class TerminalPanel @JvmOverloads constructor(
             return
         }
         gridScroll.animate().alpha(1f).setDuration(GRID_FADE_MS).start()
-        val (pivotX, pivotY) = pivotIn(detailPane, gridTiles[folder.topLevel().id])
+        val (pivotX, pivotY) = pivotIn(detailPane, mainFolders.cellFor(folder.topLevel().id))
         detailPane.pivotX = pivotX
         detailPane.pivotY = pivotY
         detailPane.animate()
@@ -1208,6 +1500,7 @@ class TerminalPanel @JvmOverloads constructor(
         headingRing = null
         themeRows.clear()
         sizeRows.clear()
+        subFolders = null
     }
 
     /** True when folders should unfold like a hologram. Off, or reduced motion, opens them at once. */
@@ -1291,6 +1584,7 @@ class TerminalPanel @JvmOverloads constructor(
         detailContent.removeAllViews()
         themeRows.clear()
         sizeRows.clear()
+        subFolders = null
         headingRing = null
         detailContent.addView(pathBar(folder), LinearLayout.LayoutParams(MATCH, WRAP))
         detailContent.addView(folderHeading(folder), LinearLayout.LayoutParams(MATCH, WRAP))
@@ -1303,13 +1597,16 @@ class TerminalPanel @JvmOverloads constructor(
 
         if (folder.folders.isNotEmpty()) {
             detailContent.addView(sectionLabel(R.string.terminal_section_folders))
-            val tiles = TileGrid(context, SUB_CELL_DP)
-            for (child in folder.folders) {
-                val tile = FolderTile(context, child, SUB_ICON_DP)
-                tile.setOnClickListener { showFolder(child, tile) }
-                tiles.addView(tile)
-            }
-            detailContent.addView(tiles, LinearLayout.LayoutParams(MATCH, WRAP))
+            // Folders inside folders follow the ⋮ menu too: the same view, sort, and size.
+            val folders = FolderLayout(context, sub = true)
+            folders.onOpen = { child, from -> showFolder(child, from) }
+            folders.onMoved = { order -> foldersMoved(folder, order) }
+            folders.styler = { restyle(it, look) }
+            folders.tick = look.tick
+            folders.dragOn = canMoveFolders()
+            folders.show(folderSettings.arrange(folder), folderSettings.view, folderSettings.size)
+            subFolders = folders
+            detailContent.addView(folders, LinearLayout.LayoutParams(MATCH, WRAP))
         }
         if (folder.items.isNotEmpty()) {
             detailContent.addView(sectionLabel(sectionFor(folder)))
@@ -1432,6 +1729,10 @@ class TerminalPanel @JvmOverloads constructor(
         refreshLook()
         showSizeNumbers(store.number(LookKeys.WIDTH), store.number(LookKeys.HEIGHT))
         onTestDiamond?.invoke(testDiamondOn)
+        // The ⋮ menu's choices are back to the start too: List, Important first, side list shown.
+        menu.refresh()
+        applySideMode(announce = false)
+        applyFolderLayout()
         requestLayout()
         openFolder?.let {
             buildDetail(it)
@@ -1457,12 +1758,11 @@ class TerminalPanel @JvmOverloads constructor(
             styled(TextRole.BACK, 11f)
         }
         bar.addView(back)
-        val path = TextView(context).apply {
+        // The whole path shows. A long one wraps between words instead of being cut.
+        val path = FitTextView(context).apply {
             text = (listOf(context.getString(R.string.terminal_home)) + folder.trail().map { it.label })
                 .joinToString(" › ")
             typeface = Hud.mono(context)
-            maxLines = 1
-            ellipsize = TextUtils.TruncateAt.START
             styled(TextRole.PATH, 9.5f)
         }
         bar.addView(path, LinearLayout.LayoutParams(0, WRAP, 1f))
@@ -1579,9 +1879,6 @@ class TerminalPanel @JvmOverloads constructor(
         const val MIN_WIDTH_DP = 280f
         const val MIN_HEIGHT_DP = 260f
 
-        /** Height 100 is this share of the screen, so some camera picture always shows. */
-        const val MAX_HEIGHT_SHARE = 0.8f
-
         /** How close the panel comes to the middle before it clicks into place. */
         const val SNAP_DP = 12f
 
@@ -1591,15 +1888,20 @@ class TerminalPanel @JvmOverloads constructor(
         const val CENTER_MS = 420L
         const val STEP_DP = 40f
         const val GRIP_DP = 30f
+
+        /** The smallest comfortable touch target, for the ⋮ and − buttons. */
+        const val TARGET_DP = 48f
         const val DETAIL_BOTTOM_DP = 30f
         const val SIDE_SHARE = 0.29f
         const val SIDE_SHOW_DP = 340f
         const val SIDE_MIN_DP = 100f
         const val SIDE_MAX_DP = 116f
-        const val GRID_CELL_DP = 76f
-        const val GRID_ICON_DP = 54f
-        const val SUB_CELL_DP = 84f
-        const val SUB_ICON_DP = 50f
+
+        /** Below this glass width, the title bar hides the Width and Height boxes so the title stays whole. */
+        const val HEADER_BOXES_DP = 340f
+
+        /** The swipe drawer is this much wider than the side list, for breathing room. */
+        const val DRAWER_EXTRA_DP = 16f
         const val STATUS_SP = 11f
         const val GUIDE_SP = 10.5f
         const val STILL_BREATH = 0.8f
@@ -1609,5 +1911,9 @@ class TerminalPanel @JvmOverloads constructor(
         const val CLOSE_MS = 220L
         const val SWEEP_MS = 520L
         const val GRID_FADE_MS = 220L
+
+        /** A bar counts as covered when the glass hides all of it but this much. */
+        const val COVER_SLACK_DP = 2f
+        const val COVER_MS = 180L
     }
 }
