@@ -7,6 +7,11 @@
     <uses-permission
         android:name="android.permission.RECORD_AUDIO"
         tools:node="remove" />
+    <!-- Final build: the camera is the only permission. A video library asks for this one,
+         but the app never goes online, so it is taken out. -->
+    <uses-permission
+        android:name="android.permission.ACCESS_NETWORK_STATE"
+        tools:node="remove" />
 
     <uses-feature
         android:name="android.hardware.camera"

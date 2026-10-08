@@ -14,14 +14,24 @@ import androidx.camera.core.CameraEffect
 import androidx.camera.core.SurfaceOutput
 import androidx.camera.core.SurfaceProcessor
 import androidx.camera.core.SurfaceRequest
+import com.offgrid.compositor.effects.EffectEngine
+import com.offgrid.compositor.effects.OverlayLayer
+import com.offgrid.compositor.effects.StagePlan
 import java.util.concurrent.Executor
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Takes the front camera, paints the layer stack, and hands the
  * finished picture to the preview and to the video recorder.
+ *
+ * Final build, M4: the camera stage changes the picture for the camera effects, and the
+ * drawn effects from [layers] go on top. Both follow [engine]. The same finished picture
+ * goes to the screen and the video, so what Royalty sees is what viewers get.
  */
-class CompositorProcessor : SurfaceProcessor, SurfaceTexture.OnFrameAvailableListener {
+class CompositorProcessor(
+    private val engine: EffectEngine = EffectEngine(),
+    private val layers: List<OverlayLayer> = emptyList(),
+) : SurfaceProcessor, SurfaceTexture.OnFrameAvailableListener {
     val effectList = EffectList()
 
     @Volatile
@@ -34,6 +44,14 @@ class CompositorProcessor : SurfaceProcessor, SurfaceTexture.OnFrameAvailableLis
     @Volatile
     var testShapeOn = false
 
+    /** True when the phone asks for less motion. Effects stay, but calmer. */
+    @Volatile
+    var reducedMotion = false
+        set(value) {
+            field = value
+            effects?.reducedMotion = value
+        }
+
     private val thread = HandlerThread("OffgridCompositor")
     private val handler: Handler
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -44,6 +62,9 @@ class CompositorProcessor : SurfaceProcessor, SurfaceTexture.OnFrameAvailableLis
     private var dummy = EGL14.EGL_NO_SURFACE
     private var config: android.opengl.EGLConfig? = null
     private var drawer: CompositorDrawer? = null
+    private var stage: StagePainter? = null
+    private var effects: OverlayRenderer? = null
+    private val plan = StagePlan()
     private var ready = false
     private var released = false
     private val failed = AtomicBoolean(false)
@@ -143,11 +164,63 @@ class CompositorProcessor : SurfaceProcessor, SurfaceTexture.OnFrameAvailableLis
         }
         val stamp = surfaceTexture.timestamp
         val snapshot = outputs.toList()
+        val painted = paintStage(snapshot)
         for (slot in snapshot) {
             if (!outputs.contains(slot)) {
                 continue
             }
-            drawSlot(slot, stamp)
+            drawSlot(slot, stamp, painted)
+        }
+    }
+
+    /**
+     * Paints the camera stage once for every output, when any effect is on.
+     * Returns the stage picture, or null when the camera goes out untouched.
+     */
+    private fun paintStage(slots: List<OutputSlot>): GlTarget? {
+        val painter = stage ?: return null
+        val textureId = inputTextureId
+        if (textureId == 0 || slots.isEmpty()) return null
+        val overlay = effects
+        val time = engine.now()
+        plan.update(
+            time = time,
+            settings = engine.settings,
+            fired = engine.firedNow(),
+            face = engine.freshFace(time),
+            modeChangedAt = engine.modeChangedAt,
+            previousMode = engine.previousMode,
+        )
+        // The biggest output sets the stage size. The others get the same picture, scaled.
+        val main = slots.maxBy { it.width * it.height }
+        val scale = minOf(1f, MAX_STAGE_SIDE / maxOf(main.width, main.height).toFloat())
+        val stageWidth = maxOf(2, (main.width * scale).toInt())
+        val stageHeight = maxOf(2, (main.height * scale).toInt())
+        overlay?.latch()
+        overlay?.request(stageWidth, stageHeight)
+        val drawn = overlay != null && overlay.hasPicture
+        if (plan.plain && !drawn) return null
+        if (!EGL14.eglMakeCurrent(display, main.eglSurface, main.eglSurface, context)) {
+            fail("Could not draw a frame")
+            return null
+        }
+        main.surfaceOutput.updateTransformMatrix(updatedTransform, textureTransform)
+        return try {
+            painter.paint(
+                cameraTexture = textureId,
+                cameraMatrix = updatedTransform,
+                w = stageWidth,
+                h = stageHeight,
+                plan = plan,
+                time = time,
+                overlayTexture = if (drawn) overlay?.texture ?: 0 else 0,
+                overlayMatrix = overlay?.matrix ?: updatedTransform,
+            )
+        } catch (error: IllegalStateException) {
+            Log.e(TAG, "Effects stage failed", error)
+            stage?.release()
+            stage = null
+            null
         }
     }
 
@@ -155,7 +228,7 @@ class CompositorProcessor : SurfaceProcessor, SurfaceTexture.OnFrameAvailableLis
         executor.execute { releaseOnThread() }
     }
 
-    private fun drawSlot(slot: OutputSlot, stamp: Long) {
+    private fun drawSlot(slot: OutputSlot, stamp: Long, painted: GlTarget?) {
         if (slot.width == 0 || slot.height == 0) {
             return
         }
@@ -172,7 +245,12 @@ class CompositorProcessor : SurfaceProcessor, SurfaceTexture.OnFrameAvailableLis
         if (textureId == 0 || painter == null) {
             return
         }
-        painter.drawCamera(textureId, updatedTransform)
+        val staged = stage
+        if (painted != null && staged != null) {
+            staged.present(painted, slot.width, slot.height)
+        } else {
+            painter.drawCamera(textureId, updatedTransform)
+        }
         GLES20.glEnable(GLES20.GL_BLEND)
         GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
         effectList.drawAll(slot.width, slot.height)
@@ -253,6 +331,15 @@ class CompositorProcessor : SurfaceProcessor, SurfaceTexture.OnFrameAvailableLis
             fail("Picture setup failed")
             return
         }
+        // The effects are extra. If the phone can't build them, the plain camera still works.
+        try {
+            stage = StagePainter()
+            effects = OverlayRenderer(engine, layers, handler).also { it.reducedMotion = reducedMotion }
+        } catch (error: RuntimeException) {
+            Log.e(TAG, "Effects setup failed. The camera works without them.", error)
+            stage?.release()
+            stage = null
+        }
         ready = true
     }
 
@@ -274,6 +361,10 @@ class CompositorProcessor : SurfaceProcessor, SurfaceTexture.OnFrameAvailableLis
             }
             drawer?.release()
             drawer = null
+            stage?.release()
+            stage = null
+            effects?.release()
+            effects = null
             if (dummy != EGL14.EGL_NO_SURFACE) {
                 EGL14.eglDestroySurface(display, dummy)
                 dummy = EGL14.EGL_NO_SURFACE
@@ -342,5 +433,8 @@ class CompositorProcessor : SurfaceProcessor, SurfaceTexture.OnFrameAvailableLis
 
     private companion object {
         const val TAG = "OffgridCompositor"
+
+        /** The stage picture's longest side, in pixels. The video is 1280 tall, so this keeps it sharp. */
+        const val MAX_STAGE_SIDE = 1920f
     }
 }
