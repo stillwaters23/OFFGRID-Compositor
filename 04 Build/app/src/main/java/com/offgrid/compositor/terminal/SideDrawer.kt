@@ -53,6 +53,10 @@ internal class SideDrawer(context: Context) : FrameLayout(context), Styled {
 
     init {
         clipChildren = false
+        // The handle sits under the dim layer and the sheet, so an open sheet's rows get every tap.
+        handle.contentDescription = context.getString(R.string.terminal_side_open)
+        handle.setOnClickListener { open(animate = true) }
+        addView(handle, LayoutParams(Hud.dpi(context, HANDLE_DP), LayoutParams.MATCH_PARENT, Gravity.START))
         scrim.background = ColorDrawable(SCRIM)
         scrim.alpha = 0f
         scrim.visibility = GONE
@@ -66,9 +70,6 @@ internal class SideDrawer(context: Context) : FrameLayout(context), Styled {
         addView(sheet, LayoutParams(Hud.dpi(context, SHEET_DP), LayoutParams.MATCH_PARENT, Gravity.START))
         // It starts tucked away, so the first swipe slides it out from the edge.
         sheet.translationX = -sheetWidth()
-        handle.contentDescription = context.getString(R.string.terminal_side_open)
-        handle.setOnClickListener { open(animate = true) }
-        addView(handle, LayoutParams(Hud.dpi(context, HANDLE_DP), LayoutParams.MATCH_PARENT, Gravity.START))
     }
 
     /** How wide the sheet is. The panel sets it to fit the side list. */
@@ -89,6 +90,7 @@ internal class SideDrawer(context: Context) : FrameLayout(context), Styled {
     fun open(animate: Boolean) {
         val was = isOpen
         isOpen = true
+        handle.isClickable = false
         sheet.visibility = VISIBLE
         scrim.visibility = VISIBLE
         slideTo(0f, animate)
@@ -102,6 +104,7 @@ internal class SideDrawer(context: Context) : FrameLayout(context), Styled {
     fun close(animate: Boolean) {
         val was = isOpen
         isOpen = false
+        handle.isClickable = true
         slideTo(-sheetWidth(), animate)
         if (was) onOpenChanged?.invoke(false)
     }

@@ -246,6 +246,12 @@ internal class PanelMenu(
         fun onSideChosen(mode: SideMode)
         fun onMenuClosed()
         fun onProblem(message: String)
+
+        /** Final build: put the last folder move back. */
+        fun onUndoMove()
+
+        /** Final build: the answer to "replace your saved order?". True uses the order on screen. */
+        fun onReplaceOrder(replace: Boolean)
     }
 
     private val density = resources.displayMetrics.density
@@ -258,6 +264,8 @@ internal class PanelMenu(
     private val sideRows = LinkedHashMap<SideMode, ChoiceRow>()
     private val unlockRow: ToggleRow
     private val sizeRow: NumberRow
+    private val undoButton: ActionButton
+    private val askBox = LinearLayout(context)
 
     var isOpen = false
         private set
@@ -310,6 +318,38 @@ internal class PanelMenu(
         unlockRow = ToggleRow(context, unlockItem, unlockItem.help, settings.unlocked) { on -> listener.onUnlockChanged(on) }
         unlockRow.setPadding(Hud.dpi(context, 6f), unlockRow.paddingTop, Hud.dpi(context, 2f), unlockRow.paddingBottom)
         content.addView(unlockRow, LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+
+        // Asked before your own saved order is replaced by the order on screen.
+        askBox.orientation = LinearLayout.VERTICAL
+        askBox.visibility = GONE
+        askBox.addView(FitTextView(context).apply {
+            text = context.getString(R.string.terminal_menu_replace_question)
+            typeface = Hud.mono(context)
+            setPadding(Hud.dpi(context, 6f), Hud.dpi(context, 4f), Hud.dpi(context, 6f), Hud.dpi(context, 6f))
+            styled(TextRole.MESSAGE, 10.5f)
+        })
+        val replace = ActionButton(context, context.getString(R.string.terminal_menu_replace_yes))
+        val keep = ActionButton(context, context.getString(R.string.terminal_menu_replace_no))
+        replace.setOnClickListener {
+            askBox.visibility = GONE
+            listener.onReplaceOrder(true)
+        }
+        keep.setOnClickListener {
+            askBox.visibility = GONE
+            listener.onReplaceOrder(false)
+        }
+        askBox.addView(replace, LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+        askBox.addView(keep, LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply {
+            topMargin = Hud.dpi(context, 6f)
+        })
+        content.addView(askBox, LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+
+        undoButton = ActionButton(context, context.getString(R.string.terminal_menu_undo))
+        undoButton.visibility = GONE
+        undoButton.setOnClickListener { listener.onUndoMove() }
+        content.addView(undoButton, LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply {
+            topMargin = Hud.dpi(context, 4f)
+        })
 
         content.addView(section(R.string.terminal_menu_size))
         val sizeItem = NumberItem(
@@ -367,6 +407,17 @@ internal class PanelMenu(
     fun setKeyboardRoom(room: Int) {
         val pad = Hud.dpi(context, 10f)
         if (content.paddingBottom != pad + room) content.setPadding(pad, content.paddingTop, pad, pad + room)
+    }
+
+    /** Shows Undo last move while there is a move to put back. */
+    fun setUndoAvailable(available: Boolean) {
+        undoButton.visibility = if (available) VISIBLE else GONE
+    }
+
+    /** Asks before your own saved order is replaced. Move folders stays off until you answer. */
+    fun askReplaceOrder() {
+        if (unlockRow.toggle.isOn) unlockRow.toggle.setOn(false)
+        askBox.visibility = VISIBLE
     }
 
     /** Shows the saved choices. Called after any change, and after Reset all. */

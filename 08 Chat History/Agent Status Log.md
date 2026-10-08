@@ -142,3 +142,18 @@ States: passed, waiting for review, blocked, or waiting for Royalty's phone test
 - **PR / commit:** Branch `final-build`, not merged.
 - **State:** waiting for review
 - **Next:** Milestone 3, the fixes from Rex's pull request #7 review.
+
+## 2026-10-08 4:09 PM CT — Agent 05, Claude Code
+
+- **Bootloader step:** FINAL full build. Milestone 3 of 5: fixes from Rex's pull request #7 review.
+- **What was done:**
+  - The side list drawer's handle now sits under the open sheet, so a tap on a row's left edge opens that folder.
+  - When the camera needs a tap (Try again or Open settings), the record bar never fades, and the panel moves aside to its tag so the button can be tapped. It comes back when the camera is live.
+  - Turning on Move folders from A to Z saves the order of every folder, not just two. It asks first before replacing a custom order you already saved. A new Undo last move button in the ⋮ menu puts the last move back.
+  - With Move folders on, a swipe still scrolls. A folder moves after a long press, or right away from its grip handle. A drag that changes nothing says nothing.
+  - Words never split. A very long word shrinks just enough to fit on its own line. Fitting never asks for a second layout from inside measuring, so it can't loop.
+  - Installing over an older build now lets the old settings go once, so the new start look shows. The private test marks stay.
+  - New unit tests, in the repo, check the start look, saving and loading, that one-time settings move, Reset all, and folder order. GitHub runs them on every push.
+- **PR / commit:** Branch `final-build`, not merged.
+- **State:** waiting for review
+- **Next:** Milestone 4, the effects and the rest of the roadmap (everything except voice).

@@ -12,8 +12,13 @@ import androidx.appcompat.widget.AppCompatTextView
  *
  * Text here wraps only between words, never inside one, and never ends in "…".
  * If one word is wider than the room it has, the text gets a little smaller, just enough
- * for that word to fit, down to [MIN_SHARE] of its size. With [fitWholeLine] on, the
- * whole text is kept on one line the same way, for titles.
+ * for that word to fit on its own line. Real words in the panel stay above about 60% of
+ * their size. A very long word shrinks as much as it must, so it is never split (final
+ * build, Rex's review). With [fitWholeLine] on, the whole text is kept
+ * on one line the same way, for titles.
+ *
+ * The size only changes when it really differs, and fitting never asks for a second
+ * layout from inside measuring, so the text can't measure itself over and over.
  *
  * The size the panel asks for, from Font size, is always the starting point, so the
  * text grows back when there is room again.
@@ -47,13 +52,21 @@ internal open class FitTextView(context: Context) : AppCompatTextView(context) {
         val room = MeasureSpec.getSize(widthMeasureSpec) - compoundPaddingLeft - compoundPaddingRight
         if (mode != MeasureSpec.UNSPECIFIED && room > 0) {
             val fitted = fittedSize(room.toFloat())
-            if (fitted != textSize) {
+            if (kotlin.math.abs(fitted - textSize) > SIZE_STEP) {
                 fitting = true
-                super.setTextSize(TypedValue.COMPLEX_UNIT_PX, fitted)
-                fitting = false
+                try {
+                    super.setTextSize(TypedValue.COMPLEX_UNIT_PX, fitted)
+                } finally {
+                    fitting = false
+                }
             }
         }
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+    }
+
+    /** While fitting inside measure, the new size is used by this same pass. No second layout is asked for. */
+    override fun requestLayout() {
+        if (!fitting) super.requestLayout()
     }
 
     private fun fittedSize(room: Float): Float {
@@ -62,7 +75,8 @@ internal open class FitTextView(context: Context) : AppCompatTextView(context) {
         val text = text?.toString().orEmpty()
         val needed = if (fitWholeLine) probe.measureText(text) else widestWord(text)
         if (needed <= room || needed <= 0f) return askedSize
-        return (askedSize * room / needed * SAFETY).coerceAtLeast(askedSize * MIN_SHARE)
+        // Just small enough for the widest word to fit whole on its own line, never split.
+        return askedSize * room / needed * SAFETY
     }
 
     private fun widestWord(text: String): Float {
@@ -79,10 +93,11 @@ internal open class FitTextView(context: Context) : AppCompatTextView(context) {
     }
 
     private companion object {
-        /** Text never shrinks below this share of the size Font size asks for. */
-        const val MIN_SHARE = 0.6f
 
         /** A hair of room, so rounding never pushes a word onto two lines. */
         const val SAFETY = 0.98f
+
+        /** Sizes closer than this many pixels count as the same, so tiny rounding never re-measures. */
+        const val SIZE_STEP = 0.5f
     }
 }

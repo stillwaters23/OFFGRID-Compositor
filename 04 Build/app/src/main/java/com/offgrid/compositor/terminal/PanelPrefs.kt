@@ -11,18 +11,29 @@ internal class PanelPrefs(context: Context) {
     private val prefs = context.getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE)
 
     init {
-        // Step 2.2 saves the size as Width and Height from 0 to 100, and opens the panel in the
-        // exact middle the first time. The old size and place from Step 2.1 are let go once.
-        if (prefs.getInt(LAYOUT, 0) < LAYOUT_NOW) {
-            prefs.edit {
-                remove(OLD_SIZE_W)
-                remove(OLD_SIZE_H)
-                remove(POSITION_X)
-                remove(POSITION_Y)
-                putInt(LAYOUT, LAYOUT_NOW)
+        migrate()
+    }
+
+    /**
+     * Settings from an older build are let go once, so the final build's start look shows
+     * when it is installed over an older one (final build, Rex's review). That means plain
+     * OLED black, Pure White toggles, and Width and Height 100. The private test marks stay.
+     * Step 2.2 already let go of the Step 2.1 size and place the same way.
+     */
+    private fun migrate() {
+        val was = prefs.getInt(LAYOUT, 0)
+        if (was >= LAYOUT_NOW) return
+        val keep = TOGGLE + TEST_PREFIX
+        prefs.edit {
+            for (key in prefs.all.keys) {
+                if (!key.startsWith(keep) && key != LAYOUT) remove(key)
             }
+            putInt(LAYOUT, LAYOUT_NOW)
         }
     }
+
+    /** The settings version on the phone. The final build is 3. */
+    val layoutVersion: Int get() = prefs.getInt(LAYOUT, 0)
 
     fun number(key: String, default: Int): Int {
         return prefs.getInt(NUMBER + key, default).coerceIn(0, 100)
@@ -127,9 +138,9 @@ internal class PanelPrefs(context: Context) {
         private const val ACTIVE_FOLDER = "active_folder"
         private const val POSITION_X = "position_x"
         private const val POSITION_Y = "position_y"
-        private const val OLD_SIZE_W = "size_w_dp"
-        private const val OLD_SIZE_H = "size_h_dp"
-        private const val LAYOUT = "layout_version"
-        private const val LAYOUT_NOW = 2
+        const val LAYOUT = "layout_version"
+
+        /** 2 was Step 2.2 to 2.4. 3 is the final build. */
+        const val LAYOUT_NOW = 3
     }
 }

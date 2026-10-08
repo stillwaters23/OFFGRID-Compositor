@@ -11,11 +11,9 @@ import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.RippleDrawable
 import android.graphics.drawable.StateListDrawable
-import android.graphics.text.LineBreaker
 import android.text.Editable
 import android.text.InputFilter
 import android.text.InputType
-import android.text.TextPaint
 import android.text.TextWatcher
 import android.util.TypedValue
 import android.view.Gravity
@@ -30,7 +28,6 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.widget.AppCompatEditText
 import com.offgrid.compositor.R
-import kotlin.math.abs
 
 /** A view that redraws itself in the current theme, without being rebuilt. */
 internal interface Styled {
@@ -185,18 +182,16 @@ internal class FolderTile(context: Context, private val folder: PanelFolder, ico
 
 /**
  * One line in the side list: a small folder, its name, and how many items it holds.
- * If a word in the name is wider than the room, the name gets a little smaller,
- * so words never break in the middle.
+ * The name wraps only between words. A word wider than the room makes the name a little
+ * smaller, so words never break in the middle (FitTextView).
  */
 internal class SideRow(context: Context, folder: PanelFolder) : LinearLayout(context), Styled {
     private val bar = View(context)
     private val ring = HoloRingView(context, folder.special)
-    private val name = TextView(context)
+    private val name = FitTextView(context)
     private val count = TextView(context)
     private var active = false
     private var look: PanelLook? = null
-    private var fullTextPx = 0f
-    private val probe = TextPaint()
 
     init {
         orientation = HORIZONTAL
@@ -216,8 +211,6 @@ internal class SideRow(context: Context, folder: PanelFolder) : LinearLayout(con
         name.apply {
             text = folder.label
             typeface = Hud.condensed
-            // Break lines only between words. Long names take another line instead of "…".
-            breakStrategy = LineBreaker.BREAK_STRATEGY_SIMPLE
         }
         addView(name, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = Hud.dpi(context, 3f) })
         count.apply {
@@ -246,11 +239,7 @@ internal class SideRow(context: Context, folder: PanelFolder) : LinearLayout(con
         foreground = pressGlow(context, look.edge)
         bar.setBackgroundColor(look.decor)
         bar.visibility = if (active) VISIBLE else INVISIBLE
-        val full = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 10.5f * look.fontScale, resources.displayMetrics)
-        if (full != fullTextPx) {
-            fullTextPx = full
-            name.setTextSize(TypedValue.COMPLEX_UNIT_PX, full)
-        }
+        name.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10.5f * look.fontScale)
         name.setTextColor(if (active) look.decor else look.sideText)
         count.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f * look.fontScale)
         count.setTextColor(Hud.withAlpha(look.folder, 0.85f))
@@ -258,42 +247,6 @@ internal class SideRow(context: Context, folder: PanelFolder) : LinearLayout(con
         val showRing = active && look.ring
         ring.visibility = if (showRing) VISIBLE else INVISIBLE
         ring.spinning = showRing
-    }
-
-    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
-        val room = name.measuredWidth - name.totalPaddingLeft - name.totalPaddingRight
-        if (fullTextPx <= 0f || room <= 0) return
-        probe.set(name.paint)
-        probe.textSize = fullTextPx
-        val widest = widestWord(name.text)
-        val fitted = if (widest <= room * ROOM_SHARE) {
-            fullTextPx
-        } else {
-            maxOf(fullTextPx * room * ROOM_SHARE / widest, fullTextPx * SMALLEST_SHARE)
-        }
-        if (abs(fitted - name.textSize) > 0.5f) {
-            name.setTextSize(TypedValue.COMPLEX_UNIT_PX, fitted)
-            super.onMeasure(widthMeasureSpec, heightMeasureSpec)
-        }
-    }
-
-    private fun widestWord(text: CharSequence): Float {
-        var widest = 0f
-        var start = 0
-        for (index in 0..text.length) {
-            if (index == text.length || text[index] == ' ') {
-                if (index > start) widest = maxOf(widest, probe.measureText(text, start, index))
-                start = index + 1
-            }
-        }
-        return widest
-    }
-
-    private companion object {
-        /** A little room to spare, so a word never lands exactly on the edge. */
-        const val ROOM_SHARE = 0.95f
-        const val SMALLEST_SHARE = 0.7f
     }
 }
 

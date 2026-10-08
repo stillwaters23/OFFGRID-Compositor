@@ -92,6 +92,24 @@ internal class FolderSettings(private val prefs: PanelPrefs) {
         prefs.write { text(ORDER + parent.id, folders.joinToString(",") { it.id }) }
     }
 
+    /** True when any folder under [root] already has your own saved order. */
+    fun hasSavedOrder(root: PanelFolder): Boolean {
+        fun walk(folder: PanelFolder): Boolean =
+            prefs.text(ORDER + folder.id) != null || folder.folders.any { walk(it) }
+        return walk(root)
+    }
+
+    /** Saves the order on screen now as your own order, for every folder that holds folders. */
+    fun keepEveryOrder(root: PanelFolder) {
+        val orders = LinkedHashMap<String, String>()
+        fun walk(folder: PanelFolder) {
+            if (folder.folders.size > 1) orders[ORDER + folder.id] = arrange(folder).joinToString(",") { it.id }
+            folder.folders.forEach { walk(it) }
+        }
+        walk(root)
+        prefs.write { orders.forEach { (key, value) -> text(key, value) } }
+    }
+
     private fun custom(parent: PanelFolder): List<PanelFolder> {
         val saved = prefs.text(ORDER + parent.id)?.split(",").orEmpty()
         val byId = parent.folders.associateBy { it.id }
@@ -133,12 +151,14 @@ internal class FolderRow(
     private val count = TextView(context)
     private var active = false
     private var look: PanelLook? = null
+    private var endPad = 0
 
     init {
         orientation = HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
         val pad = Hud.dpi(context, if (big) 6f else 3f)
         setPadding(0, pad, Hud.dpi(context, 8f), pad)
+        endPad = Hud.dpi(context, 8f)
         bar.visibility = INVISIBLE
         addView(bar, LayoutParams(Hud.dpi(context, 2f), Hud.dpi(context, (if (big) 44f else 26f) * scale)))
         val iconDp = (if (big) BIG_ICON_DP else ICON_DP) * scale
@@ -178,6 +198,12 @@ internal class FolderRow(
         look?.let { applyLook(it) }
     }
 
+    /** Extra room at the right end for the grip handle while folders can move. */
+    fun setGripRoom(room: Int) {
+        val wanted = endPad + room
+        if (paddingRight != wanted) setPadding(paddingLeft, paddingTop, wanted, paddingBottom)
+    }
+
     override fun applyLook(look: PanelLook) {
         this.look = look
         foreground = pressGlow(context, look.edge)
@@ -204,18 +230,19 @@ internal class FolderRow(
 /**
  * Folders laid out as a list, a big list, or a grid of 2 or 3 across (Step 2.4).
  *
- * With [dragOn], a folder can be pressed and dragged into a new spot. The other folders
- * slide out of the way, the phone ticks softly as it lands on each new spot, and the
- * new order is handed to [onMoved] when the finger lifts. Near the top or bottom of the
- * scrolling area, the list scrolls by itself so a folder can travel all the way.
- * A tap still opens the folder.
+ * With [dragOn], a folder moves after a long press, or right away from its grip handle
+ * (the three short lines). Anywhere else, a swipe still scrolls the list (final build,
+ * Rex's review). The other folders slide out of the way, the phone ticks softly as the
+ * folder lands on each new spot, and the new order is handed to [onMoved] when the finger
+ * lifts, only if it really changed. Near the top or bottom of the scrolling area, the list
+ * scrolls by itself so a folder can travel all the way. A tap still opens the folder.
  */
 internal class FolderLayout(context: Context, private val sub: Boolean) : ViewGroup(context) {
     /** Opens a folder. The view is where the hologram unfolds from. */
     var onOpen: ((PanelFolder, View) -> Unit)? = null
 
-    /** The new order, after a drag. */
-    var onMoved: ((List<PanelFolder>) -> Unit)? = null
+    /** The new order and the order from before, after a drag that changed something. */
+    var onMoved: ((List<PanelFolder>, List<PanelFolder>) -> Unit)? = null
 
     /** Paints new folder views in the current look. */
     var styler: ((View) -> Unit)? = null
@@ -224,6 +251,12 @@ internal class FolderLayout(context: Context, private val sub: Boolean) : ViewGr
     var tick = true
 
     var dragOn = false
+        set(value) {
+            if (field == value) return
+            field = value
+            gripRoom()
+            invalidate()
+        }
 
     private val order = ArrayList<PanelFolder>()
     private val cells = HashMap<String, View>()
@@ -245,6 +278,20 @@ internal class FolderLayout(context: Context, private val sub: Boolean) : ViewGr
     private var grabX = 0f
     private var grabY = 0f
     private var slideNext = false
+    private var grabbedByHandle = false
+    private var orderBefore: List<PanelFolder> = emptyList()
+    private val grip = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        strokeCap = android.graphics.Paint.Cap.ROUND
+    }
+    private val longPress = Runnable {
+        val held = candidate ?: return@Runnable
+        if (dragged != null) return@Runnable
+        // A long press lifts the folder. Its own tap is cancelled, so it doesn't open.
+        held.cancelPendingInputEvents()
+        held.isPressed = false
+        if (tick) performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+        lift(held, downX, downY)
+    }
     private val autoScroll = object : Runnable {
         override fun run() {
             val scroller = scroller() ?: return
@@ -287,6 +334,7 @@ internal class FolderLayout(context: Context, private val sub: Boolean) : ViewGr
                 styler?.invoke(cell)
             }
             setActive(activeId)
+            gripRoom()
             if (ValueAnimator.areAnimatorsEnabled() && isAttachedToWindow) {
                 alpha = 0f
                 animate().alpha(1f).setDuration(FADE_MS).start()
@@ -377,29 +425,55 @@ internal class FolderLayout(context: Context, private val sub: Boolean) : ViewGr
 
     override fun onInterceptTouchEvent(event: MotionEvent): Boolean {
         if (!dragOn) return false
+        val held = dragged
+        if (held != null) {
+            // A folder lifted by a long press: this view handles the rest of the touch.
+            handleDrag(held, event)
+            return true
+        }
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 downX = event.x
                 downY = event.y
-                candidate = cellAt(event.x, event.y)
-                // While folders can move, a finger on a folder moves that folder. The list
-                // around it does not scroll away under the finger.
-                if (candidate != null) parent?.requestDisallowInterceptTouchEvent(true)
-            }
-            MotionEvent.ACTION_MOVE -> {
-                val held = candidate
-                if (dragged == null && held != null && hypot(event.x - downX, event.y - downY) > slop) {
-                    startDrag(held, event)
-                    return true
+                val cell = cellAt(event.x, event.y)
+                candidate = cell
+                grabbedByHandle = cell != null && onGrip(cell, event.x, event.y)
+                if (cell != null) {
+                    if (grabbedByHandle) {
+                        // The grip moves the folder right away. The list doesn't scroll from it.
+                        parent?.requestDisallowInterceptTouchEvent(true)
+                    } else {
+                        postDelayed(longPress, ViewConfiguration.getLongPressTimeout().toLong())
+                    }
                 }
             }
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> candidate = null
+            MotionEvent.ACTION_MOVE -> {
+                val cell = candidate
+                if (cell != null && hypot(event.x - downX, event.y - downY) > slop) {
+                    if (grabbedByHandle) {
+                        lift(cell, event.x, event.y)
+                        return true
+                    }
+                    // A swipe before the long press: it scrolls the list as usual.
+                    removeCallbacks(longPress)
+                    candidate = null
+                }
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                removeCallbacks(longPress)
+                candidate = null
+            }
         }
-        return dragged != null
+        return false
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         val held = dragged ?: return false
+        handleDrag(held, event)
+        return true
+    }
+
+    private fun handleDrag(held: View, event: MotionEvent) {
         when (event.actionMasked) {
             MotionEvent.ACTION_MOVE -> {
                 fingerX = event.x
@@ -411,7 +485,45 @@ internal class FolderLayout(context: Context, private val sub: Boolean) : ViewGr
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> endDrag(held)
         }
-        return true
+    }
+
+    /** The grip handle: the right end of a row, or the top right corner of a tile. */
+    private fun onGrip(cell: View, x: Float, y: Float): Boolean {
+        val reach = Hud.dp(context, GRIP_TOUCH_DP)
+        return if (cell is FolderRow) {
+            x >= cell.right - reach
+        } else {
+            x >= cell.right - reach && y <= cell.top + reach
+        }
+    }
+
+    /** Rows leave room at their right end for the grip while folders can move. */
+    private fun gripRoom() {
+        val room = if (dragOn) Hud.dpi(context, GRIP_ROOM_DP) else 0
+        for (cell in cells.values) if (cell is FolderRow) cell.setGripRoom(room)
+    }
+
+    override fun dispatchDraw(canvas: android.graphics.Canvas) {
+        super.dispatchDraw(canvas)
+        if (!dragOn) return
+        val look = PanelLook.current ?: return
+        grip.color = Hud.withAlpha(look.decor, 0.85f)
+        grip.strokeWidth = Hud.dp(context, 2f)
+        val half = Hud.dp(context, 7f)
+        val gap = Hud.dp(context, 4.5f)
+        for (cell in cells.values) {
+            if (cell === dragged) continue
+            val cx: Float
+            val cy: Float
+            if (cell is FolderRow) {
+                cx = cell.right - Hud.dp(context, GRIP_ROOM_DP) / 2f + cell.translationX
+                cy = (cell.top + cell.bottom) / 2f + cell.translationY
+            } else {
+                cx = cell.right - Hud.dp(context, 16f) + cell.translationX
+                cy = cell.top + Hud.dp(context, 16f) + cell.translationY
+            }
+            for (step in -1..1) canvas.drawLine(cx - half, cy + step * gap, cx + half, cy + step * gap, grip)
+        }
     }
 
     private fun cellAt(x: Float, y: Float): View? {
@@ -421,12 +533,15 @@ internal class FolderLayout(context: Context, private val sub: Boolean) : ViewGr
         return null
     }
 
-    private fun startDrag(cell: View, event: MotionEvent) {
+    /** Lifts [cell] under the finger at [x], [y]. */
+    private fun lift(cell: View, x: Float, y: Float) {
+        removeCallbacks(longPress)
         dragged = cell
         candidate = null
+        orderBefore = order.toList()
         parent?.requestDisallowInterceptTouchEvent(true)
-        fingerX = event.x
-        fingerY = event.y
+        fingerX = x
+        fingerY = y
         grabX = downX - cell.left
         grabY = downY - cell.top
         cell.animate().cancel()
@@ -485,7 +600,9 @@ internal class FolderLayout(context: Context, private val sub: Boolean) : ViewGr
             cell.alpha = 1f
         }
         if (tick) performHapticFeedback(HapticFeedbackConstants.CONFIRM)
-        onMoved?.invoke(order.toList())
+        // Only a drag that really changed the order is saved and said.
+        if (order.map { it.id } != orderBefore.map { it.id }) onMoved?.invoke(order.toList(), orderBefore)
+        invalidate()
     }
 
     private fun scroller(): ScrollView? {
@@ -512,6 +629,7 @@ internal class FolderLayout(context: Context, private val sub: Boolean) : ViewGr
     }
 
     override fun onDetachedFromWindow() {
+        removeCallbacks(longPress)
         removeCallbacks(autoScroll)
         super.onDetachedFromWindow()
     }
@@ -528,6 +646,10 @@ internal class FolderLayout(context: Context, private val sub: Boolean) : ViewGr
         const val LIFT_SCALE = 1.06f
         const val LIFT_ALPHA = 0.92f
         const val EDGE_ZONE_DP = 48f
+
+        /** The grip's touch area and the room rows leave for it. */
+        const val GRIP_TOUCH_DP = 48f
+        const val GRIP_ROOM_DP = 40f
         const val SCROLL_STEP_DP = 6f
     }
 }

@@ -604,6 +604,8 @@ class MainActivity : AppCompatActivity() {
             recordButton.setText(R.string.record_five)
         }
         refreshPlayButton()
+        // A button to tap must never hide behind the panel (final build, Rex's review).
+        terminalPanel.setBarNeedsTap(buttonMode == ButtonMode.TRY_AGAIN || buttonMode == ButtonMode.SETTINGS)
         when (buttonMode) {
             ButtonMode.NONE, ButtonMode.LIVE, ButtonMode.RECORDING -> {
                 actionButton.visibility = View.GONE

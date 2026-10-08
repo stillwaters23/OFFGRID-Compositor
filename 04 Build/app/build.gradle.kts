@@ -23,6 +23,13 @@ android {
         }
     }
 
+    testOptions {
+        unitTests {
+            // The settings tests run the real Android settings code on the computer that builds the app.
+            isIncludeAndroidResources = true
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -46,4 +53,5 @@ dependencies {
     implementation("androidx.camera:camera-video:$cameraX")
     implementation("androidx.camera:camera-view:$cameraX")
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.17")
 }

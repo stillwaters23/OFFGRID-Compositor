@@ -98,7 +98,7 @@
     <string name="terminal_menu_view">VIEW</string>
     <string name="terminal_menu_sort">SORT</string>
     <string name="terminal_menu_move">Move folders</string>
-    <string name="terminal_menu_move_help">On: press and drag a folder to move it. This turns on Custom. Off: folders stay put.</string>
+    <string name="terminal_menu_move_help">On: press and hold a folder, or drag its grip, to move it. Swipes still scroll. This turns on Custom.</string>
     <string name="terminal_menu_size">FOLDER SIZE</string>
     <string name="terminal_menu_size_label">Folder size</string>
     <string name="terminal_menu_size_help">0 is small. 50 is normal. 100 is big.</string>
@@ -107,9 +107,9 @@
     <string name="terminal_view_chosen">Folders now show as %1$s.</string>
     <string name="terminal_sort_chosen">Folders are now sorted %1$s.</string>
     <string name="terminal_sort_custom">Folders are in your own order. Turn on Move folders to drag them.</string>
-    <string name="terminal_folders_unlocked">Move folders is on. Press and drag a folder to move it.</string>
+    <string name="terminal_folders_unlocked">Move folders is on. Press and hold a folder, or drag its grip, to move it.</string>
     <string name="terminal_folders_locked">Move folders is off. Folders stay put.</string>
-    <string name="terminal_folders_moved">New folder order saved.</string>
+    <string name="terminal_folders_moved">New folder order saved. To put it back, open ⋮ and tap Undo last move.</string>
     <string name="terminal_side_show">The side list now always shows.</string>
     <string name="terminal_side_swipe">The side list is tucked away. Swipe right from the left edge to open it.</string>
     <string name="terminal_side_hidden">The side list is hidden.</string>
@@ -121,6 +121,14 @@
     <string name="terminal_text_saved">%1$s is now: %2$s</string>
     <string name="terminal_text_empty">Type something first. Nothing changed.</string>
     <string name="terminal_text_description">%1$s. Type a short text, then tap Done.</string>
+    <string name="terminal_stepped_aside">The camera needs you. The panel moved aside so you can tap the button below.</string>
+    <string name="terminal_menu_undo">Undo last move</string>
+    <string name="terminal_menu_replace_question">You already have your own folder order. Use the order on screen instead?</string>
+    <string name="terminal_menu_replace_yes">Use the order on screen</string>
+    <string name="terminal_menu_replace_no">Keep my saved order</string>
+    <string name="terminal_order_replaced">Your order is now the order on screen. Press and hold a folder to move it.</string>
+    <string name="terminal_order_kept">Your saved order is back. Press and hold a folder to move it.</string>
+    <string name="terminal_move_undone">The last move is undone.</string>
     <plurals name="terminal_items">
         <item quantity="one">%d item</item>
         <item quantity="other">%d items</item>

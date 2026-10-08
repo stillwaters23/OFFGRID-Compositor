@@ -94,6 +94,9 @@ class TerminalPanel @JvmOverloads constructor(
 
     private val listRows = HashMap<String, SideRow>()
 
+    /** The folder and its order from before the last drag, for Undo last move. */
+    private var lastMove: Pair<PanelFolder, List<PanelFolder>>? = null
+
     /** Step 2.4: the ⋮ menu's choices, the folder views, the side list drawer, and the menu. */
     private val folderSettings = FolderSettings(prefs)
     private val mainFolders = FolderLayout(context, sub = false)
@@ -168,6 +171,12 @@ class TerminalPanel @JvmOverloads constructor(
     /** The bars the open panel covers now. They fade away, so their words never show through the glass. */
     private val coveredBars = HashSet<View>()
     private val barMoved = OnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> refreshCoveredBars() }
+
+    /** True while the record bar shows a button Royalty must tap, like Try again or Open settings. */
+    private var barNeedsTap = false
+
+    /** True when the panel shrank by itself to show that button. It comes back when the camera is live. */
+    private var steppedAside = false
     private val barTexts = ArrayList<TextView>()
     private val barButtons = ArrayList<TextView>()
 
@@ -350,6 +359,25 @@ class TerminalPanel @JvmOverloads constructor(
     fun onKeyboardInset(bottomInset: Int) {
         keyboardHeight = bottomInset
         fitAboveKeyboard()
+    }
+
+    /**
+     * The record bar shows a button to tap, like Try again or Open settings, when the camera
+     * can't start (final build, Rex's review). The bar never fades then, and the panel shrinks
+     * to its tag so the button can be tapped. When the camera is live, the panel comes back.
+     */
+    fun setBarNeedsTap(needed: Boolean) {
+        if (needed == barNeedsTap) return
+        barNeedsTap = needed
+        if (needed && !minimized && visibility == VISIBLE) {
+            steppedAside = true
+            showMinimized(true, animate = false, save = false)
+            say(context.getString(R.string.terminal_stepped_aside))
+        } else if (!needed && steppedAside) {
+            steppedAside = false
+            if (minimized) showMinimized(false, animate = true, save = false)
+        }
+        refreshCoveredBars()
     }
 
     /** Hides the panel while the saved video plays, so the whole video can be checked. */
@@ -777,7 +805,7 @@ class TerminalPanel @JvmOverloads constructor(
         val area = FrameLayout(context)
         mainFolders.setPadding(dpi(4f), dpi(6f), dpi(4f), dpi(GRIP_DP))
         mainFolders.onOpen = { folder, from -> openFromTop(folder, from) }
-        mainFolders.onMoved = { order -> foldersMoved(home, order) }
+        mainFolders.onMoved = { order, before -> foldersMoved(home, order, before) }
         mainFolders.styler = { restyle(it, look) }
         gridScroll.isVerticalScrollBarEnabled = false
         gridScroll.overScrollMode = OVER_SCROLL_NEVER
@@ -1142,7 +1170,7 @@ class TerminalPanel @JvmOverloads constructor(
      */
     private fun refreshCoveredBars() {
         if (barViews.isEmpty()) return
-        val open = isAttachedToWindow && visibility == VISIBLE && !minimized
+        val open = isAttachedToWindow && visibility == VISIBLE && !minimized && !barNeedsTap
         val here = IntArray(2)
         val there = IntArray(2)
         if (open) getLocationInWindow(here)
@@ -1223,9 +1251,11 @@ class TerminalPanel @JvmOverloads constructor(
         }
     }
 
-    private fun showMinimized(value: Boolean, animate: Boolean) {
+    private fun showMinimized(value: Boolean, animate: Boolean, save: Boolean = true) {
         minimized = value
-        prefs.minimized = value
+        if (save) prefs.minimized = value
+        // Royalty's own tap decides from now on.
+        if (save) steppedAside = false
         if (value) {
             hideKeyboard()
             menu.close(animate = false)
@@ -1378,14 +1408,39 @@ class TerminalPanel @JvmOverloads constructor(
 
         override fun onUnlockChanged(unlocked: Boolean) {
             if (unlocked && folderSettings.sort != FolderSort.CUSTOM) {
-                // Moving starts from the order on screen now, so nothing jumps.
-                keepOrderAsCustom()
+                if (folderSettings.hasSavedOrder(home)) {
+                    // Your own saved order is never replaced without asking.
+                    menu.askReplaceOrder()
+                    say(context.getString(R.string.terminal_menu_replace_question))
+                    return
+                }
+                // Moving starts from the order on screen now, in every folder, so nothing jumps.
+                folderSettings.keepEveryOrder(home)
                 folderSettings.sort = FolderSort.CUSTOM
             }
             folderSettings.unlocked = unlocked
             menu.refresh()
             applyFolderLayout()
             say(context.getString(if (unlocked) R.string.terminal_folders_unlocked else R.string.terminal_folders_locked))
+        }
+
+        override fun onReplaceOrder(replace: Boolean) {
+            if (replace) folderSettings.keepEveryOrder(home)
+            folderSettings.sort = FolderSort.CUSTOM
+            folderSettings.unlocked = true
+            menu.refresh()
+            applyFolderLayout()
+            say(context.getString(if (replace) R.string.terminal_order_replaced else R.string.terminal_order_kept))
+        }
+
+        override fun onUndoMove() {
+            val last = lastMove ?: return
+            lastMove = null
+            menu.setUndoAvailable(false)
+            folderSettings.saveOrder(last.first, last.second)
+            applyFolderLayout()
+            savedTick()
+            say(context.getString(R.string.terminal_move_undone))
         }
 
         override fun onFolderSize(value: Int, announce: Boolean) {
@@ -1427,12 +1482,6 @@ class TerminalPanel @JvmOverloads constructor(
     /** Folders can be dragged only while Move folders is on, in your own order. */
     private fun canMoveFolders(): Boolean = folderSettings.unlocked && folderSettings.sort == FolderSort.CUSTOM
 
-    /** Saves the order on screen now as your own order, for the top folders and the open folder. */
-    private fun keepOrderAsCustom() {
-        folderSettings.saveOrder(home, folderSettings.arrange(home))
-        val open = openFolder
-        if (open != null && open.folders.isNotEmpty()) folderSettings.saveOrder(open, folderSettings.arrange(open))
-    }
 
     /** Shows the folders in the chosen view, sort, and size, in the main area, the open folder, and the side list. */
     private fun applyFolderLayout() {
@@ -1462,9 +1511,11 @@ class TerminalPanel @JvmOverloads constructor(
         restyle(sideRows, look)
     }
 
-    /** A folder was dragged to a new spot. The new order is saved at once. */
-    private fun foldersMoved(parent: PanelFolder, order: List<PanelFolder>) {
+    /** A folder was dragged to a new spot. The new order is saved at once, and Undo can put it back. */
+    private fun foldersMoved(parent: PanelFolder, order: List<PanelFolder>, before: List<PanelFolder>) {
         folderSettings.saveOrder(parent, order)
+        lastMove = parent to before
+        menu.setUndoAvailable(true)
         if (parent === home) arrangeSideRows()
         say(context.getString(R.string.terminal_folders_moved))
     }
@@ -1692,7 +1743,7 @@ class TerminalPanel @JvmOverloads constructor(
             // Folders inside folders follow the ⋮ menu too: the same view, sort, and size.
             val folders = FolderLayout(context, sub = true)
             folders.onOpen = { child, from -> showFolder(child, from) }
-            folders.onMoved = { order -> foldersMoved(folder, order) }
+            folders.onMoved = { order, before -> foldersMoved(folder, order, before) }
             folders.styler = { restyle(it, look) }
             folders.tick = look.tick
             folders.dragOn = canMoveFolders()
@@ -1850,6 +1901,8 @@ class TerminalPanel @JvmOverloads constructor(
         showSizeNumbers(store.number(LookKeys.WIDTH), store.number(LookKeys.HEIGHT))
         onTestDiamond?.invoke(testDiamondOn)
         // The ⋮ menu's choices are back to the start too: List, Important first, side list shown.
+        lastMove = null
+        menu.setUndoAvailable(false)
         menu.refresh()
         applySideMode(announce = false)
         applyFolderLayout()
