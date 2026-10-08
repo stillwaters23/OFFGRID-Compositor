@@ -134,3 +134,11 @@ States: passed, waiting for review, blocked, or waiting for Royalty's phone test
 - **PR / commit:** Branch `final-build`, not merged. The pull request opens when the build is done.
 - **State:** waiting for review
 - **Next:** Milestone 2, true full size at Width 100 and Height 100.
+
+## 2026-10-08 3:55 PM CT — Agent 05, Claude Code
+
+- **Bootloader step:** FINAL full build. Milestone 2 of 5: true full size at 100.
+- **What was done:** Width 100 and Height 100 now fill the screen edge to edge, under the status bar, the camera hole, and the gesture bar. Only the words and buttons move in, so the title bar sits below the status bar, the − and ⋮ buttons stay clear of the round screen corners, and the resize corner stays out of the Back swipe and gesture areas. The bars are measured as if they always show, so pulling down the status bar never moves the panel. The keyboard never shrinks Height 100. A test measured the panel against the display at 100 and 100: both are 1152 by 2496 pixels on an S25 Ultra-sized screen.
+- **PR / commit:** Branch `final-build`, not merged.
+- **State:** waiting for review
+- **Next:** Milestone 3, the fixes from Rex's pull request #7 review.

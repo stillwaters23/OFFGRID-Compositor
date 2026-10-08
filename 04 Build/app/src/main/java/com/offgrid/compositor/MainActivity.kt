@@ -23,6 +23,7 @@ import android.view.TextureView
 import android.view.View
 import android.widget.Button
 import android.widget.FrameLayout
+import android.view.RoundedCorner
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -50,6 +51,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import com.offgrid.compositor.terminal.ScreenEdges
 import com.offgrid.compositor.terminal.TerminalPanel
 import java.io.File
 
@@ -135,9 +137,7 @@ class MainActivity : AppCompatActivity() {
         describeCamera(terminalPanel.testDiamondOn)
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.root)) { _, insets ->
             terminalPanel.onKeyboardInset(insets.getInsets(WindowInsetsCompat.Type.ime()).bottom)
-            // Full screen for the panel stays clear of the bars and the camera hole.
-            val safe = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
-            terminalPanel.onSystemInsets(safe.left, safe.top, safe.right, safe.bottom)
+            terminalPanel.onScreenEdges(screenEdges(insets))
             insets
         }
         recordButton.setOnClickListener { startFiveSecondRecording() }
@@ -635,6 +635,38 @@ class MainActivity : AppCompatActivity() {
             data = Uri.fromParts("package", packageName, null)
         }
         startActivity(intent)
+    }
+
+    /**
+     * The bars, camera hole, gesture areas, and round corners, for the panel (final build, M2).
+     * Bars are measured as if they show, so pulling the status bar down never moves the panel.
+     */
+    private fun screenEdges(insets: WindowInsetsCompat): ScreenEdges {
+        val bars = insets.getInsetsIgnoringVisibility(WindowInsetsCompat.Type.systemBars())
+        val cutout = insets.getInsets(WindowInsetsCompat.Type.displayCutout())
+        val gestures = insets.getInsetsIgnoringVisibility(WindowInsetsCompat.Type.systemGestures())
+        val mandatory = insets.getInsetsIgnoringVisibility(WindowInsetsCompat.Type.mandatorySystemGestures())
+        val platform = insets.toWindowInsets()
+        val corner = if (platform != null) {
+            listOf(
+                RoundedCorner.POSITION_TOP_LEFT,
+                RoundedCorner.POSITION_TOP_RIGHT,
+                RoundedCorner.POSITION_BOTTOM_LEFT,
+                RoundedCorner.POSITION_BOTTOM_RIGHT,
+            ).maxOf { platform.getRoundedCorner(it)?.radius ?: 0 }
+        } else {
+            0
+        }
+        return ScreenEdges(
+            top = maxOf(bars.top, cutout.top),
+            bottom = maxOf(bars.bottom, cutout.bottom),
+            left = maxOf(bars.left, cutout.left),
+            right = maxOf(bars.right, cutout.right),
+            gestureLeft = gestures.left,
+            gestureRight = gestures.right,
+            gestureBottom = maxOf(gestures.bottom, mandatory.bottom),
+            cornerRadius = corner,
+        )
     }
 
     private fun hideSystemBars() {

@@ -105,8 +105,18 @@ class TerminalPanel @JvmOverloads constructor(
     private val menu: PanelMenu
     private var sideMode = folderSettings.side
 
-    /** The phone's status bar, navigation bar, and camera cutout. Full screen stays inside them. */
-    private val safe = Rect()
+    /**
+     * Final build, milestone 2: the bars, camera hole, gesture areas, and round screen corners.
+     * The glass fills the screen edge to edge. Only its words and buttons move in from these.
+     */
+    private var edges = ScreenEdges()
+
+    /** Extra room inside the glass where it reaches an edge of [edges], in pixels. */
+    private val edgeRoom = Rect()
+
+    /** The screen size while the keyboard is closed, so the keyboard never shrinks Height 100. */
+    private var stableWidth = 0
+    private var stableHeight = 0
     private val themeRows = ArrayList<ThemeRow>()
 
     /** Width and Height boxes inside the open Size folder, kept in step with the top boxes. */
@@ -321,13 +331,19 @@ class TerminalPanel @JvmOverloads constructor(
     }
 
     /**
-     * The phone's status bar, navigation bar, and camera cutout. Width 100 and Height 100
-     * fill the screen inside them, like a terminal window, so nothing hides behind the bars.
+     * The phone's bars, camera hole, gesture areas, and round corners. Width 100 and Height 100
+     * fill the whole screen, edge to edge. The words and buttons stay out of these parts.
      */
-    fun onSystemInsets(left: Int, top: Int, right: Int, bottom: Int) {
-        if (safe.left == left && safe.top == top && safe.right == right && safe.bottom == bottom) return
-        safe.set(left, top, right, bottom)
+    fun onScreenEdges(next: ScreenEdges) {
+        if (next == edges) return
+        edges = next
+        refreshEdgeRoom()
         requestLayout()
+    }
+
+    /** The same as [onScreenEdges] with only the bars and the camera hole. */
+    fun onSystemInsets(left: Int, top: Int, right: Int, bottom: Int) {
+        onScreenEdges(edges.copy(left = left, top = top, right = right, bottom = bottom))
     }
 
     /** Lifts the panel above the keyboard while a number or color code is typed. */
@@ -356,23 +372,21 @@ class TerminalPanel @JvmOverloads constructor(
             (menu.isOpen || drawer.isOpen || openFolder != null)
     }
 
-    /** The widths the glass may take on this screen, in pixels: smallest readable, then the full screen. */
+    /** The widths the glass may take on this screen, in pixels: smallest readable, then the whole screen. */
     private fun widthRange(areaWidth: Int): Pair<Int, Int> {
-        val most = (areaWidth - safe.left - safe.right).coerceAtLeast(0)
+        val most = areaWidth.coerceAtLeast(0)
         return minOf(dpi(MIN_WIDTH_DP), most) to most
     }
 
-    /** The heights the glass may take: smallest readable, then the full screen between the bars. */
+    /** The heights the glass may take: smallest readable, then the whole screen, edge to edge. */
     private fun heightRange(areaHeight: Int): Pair<Int, Int> {
-        val most = (areaHeight - safe.top - safe.bottom).coerceAtLeast(0)
+        val most = areaHeight.coerceAtLeast(0)
         return minOf(dpi(MIN_HEIGHT_DP), most) to most
     }
 
-    /** Where the glass's top left corner goes to sit in the middle of the screen, between the bars. */
+    /** Where the glass's top left corner goes to sit in the exact middle of the screen. */
     private fun middleFor(glassWidth: Int, glassHeight: Int): Pair<Float, Float> {
-        val usableWidth = areaWidth() - safe.left - safe.right
-        val usableHeight = areaHeight() - safe.top - safe.bottom
-        return (safe.left + (usableWidth - glassWidth) / 2f) to (safe.top + (usableHeight - glassHeight) / 2f)
+        return (areaWidth() - glassWidth) / 2f to (areaHeight() - glassHeight) / 2f
     }
 
     private fun sizeFor(percent: Int, range: Pair<Int, Int>): Int =
@@ -383,17 +397,33 @@ class TerminalPanel @JvmOverloads constructor(
         return ((size - range.first) / (range.second - range.first) * 100f).roundToInt().coerceIn(0, 100)
     }
 
-    private fun areaWidth(): Int = (parent as? View)?.width ?: 0
+    /** The screen width. While the keyboard is open, the size from before it opened. */
+    private fun areaWidth(): Int {
+        val now = (parent as? View)?.width ?: 0
+        return if (keyboardHeight > 0 && stableWidth > 0) stableWidth else now
+    }
 
-    private fun areaHeight(): Int = (parent as? View)?.height ?: 0
+    /** The screen height. While the keyboard is open, the size from before it opened, so nothing jumps. */
+    private fun areaHeight(): Int {
+        val now = (parent as? View)?.height ?: 0
+        return if (keyboardHeight > 0 && stableHeight > 0) maxOf(stableHeight, now) else now
+    }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         if (minimized) {
             super.onMeasure(widthMeasureSpec, heightMeasureSpec)
             return
         }
-        val areaWidth = MeasureSpec.getSize(widthMeasureSpec)
-        val areaHeight = MeasureSpec.getSize(heightMeasureSpec)
+        var areaWidth = MeasureSpec.getSize(widthMeasureSpec)
+        var areaHeight = MeasureSpec.getSize(heightMeasureSpec)
+        // On older phones the keyboard can shrink the window. Height 100 keeps the size from before.
+        if (keyboardHeight == 0) {
+            stableWidth = areaWidth
+            stableHeight = areaHeight
+        } else if (stableHeight > areaHeight) {
+            areaWidth = stableWidth
+            areaHeight = stableHeight
+        }
         val widths = widthRange(areaWidth)
         val heights = heightRange(areaHeight)
         val live = liveSize
@@ -443,7 +473,8 @@ class TerminalPanel @JvmOverloads constructor(
 
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         super.onLayout(changed, left, top, right, bottom)
-        glass.headerHeight = if (minimized) 0f else header.height.toFloat()
+        // The title bar's band reaches up under the status bar when the glass does.
+        glass.headerHeight = if (minimized) 0f else (header.height + edgeRoom.top).toFloat()
         val area = parent as? View ?: return
         if (area.width == 0 || area.height == 0) return
         val glassWidth = width - margin * 2
@@ -453,7 +484,7 @@ class TerminalPanel @JvmOverloads constructor(
             placed = true
             val saved = prefs.position()
             if (saved != null) {
-                moveGlassTo(saved.first * area.width, saved.second * area.height)
+                moveGlassTo(saved.first * areaWidth(), saved.second * areaHeight())
             } else {
                 // The first time, the panel opens in the exact middle of the screen.
                 val (middleX, middleY) = middleFor(glassWidth, glassHeight)
@@ -612,7 +643,7 @@ class TerminalPanel @JvmOverloads constructor(
         val band = dp(EDGE_TOUCH_DP)
         val nearEdge = x - glassBox.left < band || glassBox.right - x < band ||
             y - glassBox.top < band || glassBox.bottom - y < band
-        val onTitleBar = !minimized && y < glassBox.top + glass.frameInset + header.height
+        val onTitleBar = !minimized && y < glassBox.top + glass.frameInset + edgeRoom.top + header.height
         if (!nearEdge && !onTitleBar && !minimized) return
         val ripple = Ripple(x, y)
         ripples += ripple
@@ -840,9 +871,7 @@ class TerminalPanel @JvmOverloads constructor(
                         view.isPressed = false
                         parent?.requestDisallowInterceptTouchEvent(true)
                         if (look.centerGuide) {
-                            val usableWidth = areaWidth() - safe.left - safe.right
-                            val usableHeight = areaHeight() - safe.top - safe.bottom
-                            guides?.setMiddle(safe.left + usableWidth / 2f, safe.top + usableHeight / 2f)
+                            guides?.setMiddle(areaWidth() / 2f, areaHeight() / 2f)
                             guides?.showGuides()
                         }
                     }
@@ -935,11 +964,11 @@ class TerminalPanel @JvmOverloads constructor(
 
     /** Sets a new glass size in pixels. It never goes past the screen, or below the smallest size. */
     private fun resizeGlassTo(newWidth: Float, newHeight: Float) {
-        val area = parent as? View ?: return
-        val widths = widthRange(area.width)
-        val heights = heightRange(area.height)
-        val roomWidth = (area.width - safe.right - (translationX + margin)).coerceIn(widths.first.toFloat(), widths.second.toFloat())
-        val roomHeight = (area.height - safe.bottom - (userY + margin)).coerceIn(heights.first.toFloat(), heights.second.toFloat())
+        if (parent !is View) return
+        val widths = widthRange(areaWidth())
+        val heights = heightRange(areaHeight())
+        val roomWidth = (areaWidth() - (translationX + margin)).coerceIn(widths.first.toFloat(), widths.second.toFloat())
+        val roomHeight = (areaHeight() - (userY + margin)).coerceIn(heights.first.toFloat(), heights.second.toFloat())
         val glassWidth = newWidth.coerceIn(widths.first.toFloat(), roomWidth)
         val glassHeight = newHeight.coerceIn(heights.first.toFloat(), roomHeight)
         liveSize = glassWidth to glassHeight
@@ -1037,15 +1066,74 @@ class TerminalPanel @JvmOverloads constructor(
 
     /** Moves the glass so its top left corner is at x, y. The glass always stays on the screen. */
     private fun moveGlassTo(x: Float, y: Float) {
-        val area = parent as? View ?: return
+        if (parent !is View) return
         val glassWidth = (width - margin * 2).toFloat()
         val glassHeight = (height - margin * 2).toFloat()
-        val glassX = x.coerceIn(safe.left.toFloat(), (area.width - safe.right - glassWidth).coerceAtLeast(safe.left.toFloat()))
-        val glassY = y.coerceIn(safe.top.toFloat(), (area.height - safe.bottom - glassHeight).coerceAtLeast(safe.top.toFloat()))
+        val glassX = x.coerceIn(0f, (areaWidth() - glassWidth).coerceAtLeast(0f))
+        val glassY = y.coerceIn(0f, (areaHeight() - glassHeight).coerceAtLeast(0f))
         translationX = glassX - margin
         userY = glassY - margin
         translationY = userY - keyboardLift
+        refreshEdgeRoom()
         refreshCoveredBars()
+    }
+
+    /**
+     * Where the glass reaches an edge of the screen, its words and buttons move in, out of
+     * the bars, the camera hole, and the round corners. The resize corner also stays out of
+     * the Back swipe area. The glass itself still fills the screen.
+     */
+    private fun refreshEdgeRoom() {
+        if (parent !is View || minimized) {
+            if (edgeRoom.left != 0 || edgeRoom.top != 0 || edgeRoom.right != 0 || edgeRoom.bottom != 0) {
+                edgeRoom.set(0, 0, 0, 0)
+                applyContentPadding()
+            }
+            return
+        }
+        val areaWidth = areaWidth()
+        val areaHeight = areaHeight()
+        if (areaWidth == 0 || areaHeight == 0) return
+        val glassLeft = (translationX + margin).roundToInt()
+        val glassTop = (userY + margin).roundToInt()
+        val glassRight = glassLeft + width - margin * 2
+        val glassBottom = glassTop + height - margin * 2
+        // A round screen corner cuts in about this far. The buttons stay clear of it.
+        val corner = (edges.cornerRadius * CORNER_SHARE).roundToInt()
+        val top = (edges.top - glassTop).coerceAtLeast(0)
+        val bottom = (glassBottom - (areaHeight - maxOf(edges.bottom, edges.gestureBottom))).coerceAtLeast(0)
+        val left = (maxOf(edges.left, corner) - glassLeft).coerceAtLeast(0)
+        val right = (glassRight - (areaWidth - maxOf(edges.right, corner))).coerceAtLeast(0)
+        if (edgeRoom.left == left && edgeRoom.top == top && edgeRoom.right == right && edgeRoom.bottom == bottom) {
+            placeResizeGrip(glassRight, areaWidth, right)
+            return
+        }
+        edgeRoom.set(left, top, right, bottom)
+        applyContentPadding()
+        placeResizeGrip(glassRight, areaWidth, right)
+    }
+
+    /** The resize corner stays out of the Back swipe area on the right edge. */
+    private fun placeResizeGrip(glassRight: Int, areaWidth: Int, roomRight: Int) {
+        val params = resizeGrip.layoutParams as? LayoutParams ?: return
+        val gesture = (glassRight - (areaWidth - edges.gestureRight)).coerceAtLeast(0)
+        val extra = (gesture - roomRight).coerceAtLeast(0)
+        if (params.rightMargin != extra) {
+            params.rightMargin = extra
+            resizeGrip.layoutParams = params
+        }
+    }
+
+    /** The glow margin, the titanium frame, and any room for the screen's edges. */
+    private fun applyContentPadding() {
+        val base = margin + glass.frameInset.roundToInt()
+        val left = base + edgeRoom.left
+        val top = base + edgeRoom.top
+        val right = base + edgeRoom.right
+        val bottom = base + edgeRoom.bottom
+        if (paddingLeft != left || paddingTop != top || paddingRight != right || paddingBottom != bottom) {
+            setPadding(left, top, right, bottom)
+        }
     }
 
     /**
@@ -1088,9 +1176,10 @@ class TerminalPanel @JvmOverloads constructor(
     }
 
     private fun savePosition() {
-        val area = parent as? View ?: return
-        if (area.width > 0 && area.height > 0) {
-            prefs.setPosition((translationX + margin) / area.width, (userY + margin) / area.height)
+        val areaWidth = areaWidth()
+        val areaHeight = areaHeight()
+        if (areaWidth > 0 && areaHeight > 0) {
+            prefs.setPosition((translationX + margin) / areaWidth, (userY + margin) / areaHeight)
         }
     }
 
@@ -1104,7 +1193,7 @@ class TerminalPanel @JvmOverloads constructor(
         val glassTop = userY + margin
         val glassBottom = userY + height - margin
         keyboardLift = if (keyboardHeight > 0 && glassBottom > visibleBottom) {
-            (glassBottom - visibleBottom).coerceAtMost((glassTop - safe.top).coerceAtLeast(0f))
+            (glassBottom - visibleBottom).coerceAtMost((glassTop - edges.top).coerceAtLeast(0f))
         } else {
             0f
         }
@@ -1144,6 +1233,7 @@ class TerminalPanel @JvmOverloads constructor(
         }
         expanded.isVisible = !value
         pill.isVisible = value
+        refreshEdgeRoom()
         resizeGrip.isVisible = !value
         scanLine.isVisible = !value && look.scanLine
         pillRing.isVisible = look.ring
@@ -1168,8 +1258,7 @@ class TerminalPanel @JvmOverloads constructor(
         glass.look = current
         paneGlass.look = current
         // The titanium frame is drawn inside the glass edge, so the content starts inside it.
-        val pad = margin + glass.frameInset.roundToInt()
-        if (paddingLeft != pad) setPadding(pad, pad, pad, pad)
+        applyContentPadding()
         restyle(this, current)
         // The words dim a little with the glass, but never fade away.
         val contentAlpha = 0.7f + 0.3f * current.opacity
@@ -1921,6 +2010,9 @@ class TerminalPanel @JvmOverloads constructor(
         const val CENTER_MS = 420L
         const val STEP_DP = 40f
         const val GRIP_DP = 30f
+
+        /** How far in a round screen corner cuts, as a share of its radius (1 minus the sine of 45 degrees). */
+        const val CORNER_SHARE = 0.3f
 
         /** The smallest comfortable touch target, for the ⋮ and − buttons. */
         const val TARGET_DP = 48f
