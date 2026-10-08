@@ -161,6 +161,9 @@ class TerminalPanel @JvmOverloads constructor(
     private val barTexts = ArrayList<TextView>()
     private val barButtons = ArrayList<TextView>()
 
+    /** Called with a setting's key whenever any setting is saved, so the camera screen can follow it. */
+    var onSettingChanged: ((String) -> Unit)? = null
+
     /** Called when the Test diamond toggle changes. The camera screen passes it to the video painter. */
     var onTestDiamond: ((Boolean) -> Unit)? = null
 
@@ -1656,6 +1659,34 @@ class TerminalPanel @JvmOverloads constructor(
             row.setOnClickListener { applyTheme(item.theme) }
         }
         is ColorItem -> ColorEditorView(context, item.part, store, onLookChanged = ::refreshLook, say = ::say)
+        is ChoiceItem -> ChoiceGroup(context, item, store.choice(item.key)) { choice -> saveChoice(item, choice) }
+        is TextItem -> TextRow(
+            context,
+            item,
+            store.text(item.key),
+            onSave = { value -> saveText(item, value) },
+            onProblem = { say(it) },
+        )
+    }
+
+    /** A pick-one setting changed. It is saved and used at once. */
+    private fun saveChoice(item: ChoiceItem, choice: Choice) {
+        store.setChoice(item.key, choice.value)
+        refreshLook()
+        settingChanged(item.key)
+        say(context.getString(R.string.terminal_choice_saved, item.label, choice.label))
+    }
+
+    /** A typed text setting changed. It is saved and used at once. */
+    private fun saveText(item: TextItem, value: String) {
+        store.setText(item.key, value)
+        settingChanged(item.key)
+        say(context.getString(R.string.terminal_text_saved, item.label, value))
+    }
+
+    /** Tells the camera screen a setting changed, so effects follow at once. */
+    private fun settingChanged(key: String) {
+        onSettingChanged?.invoke(key)
     }
 
     /** A button with a short note. Center panel works at once. Reset all asks first, in plain words. */
@@ -1822,6 +1853,7 @@ class TerminalPanel @JvmOverloads constructor(
     private fun saveNumber(item: NumberItem, value: Int, announce: Boolean) {
         store.setNumber(item.key, value)
         refreshLook()
+        settingChanged(item.key)
         if (announce) {
             say(context.getString(R.string.terminal_number_saved, item.label, value))
         }
@@ -1836,6 +1868,7 @@ class TerminalPanel @JvmOverloads constructor(
         }
         store.setToggle(item.key, on)
         refreshLook()
+        settingChanged(item.key)
         if (item.key == LookKeys.TEST_DIAMOND) {
             onTestDiamond?.invoke(on)
             say(context.getString(if (on) R.string.terminal_diamond_on else R.string.terminal_diamond_off))

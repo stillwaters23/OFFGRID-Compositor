@@ -101,6 +101,10 @@ internal object LookKeys {
     const val TYPING_GLOW = "typing_glow"
     const val TICK = "tick"
     const val CENTER_GUIDE = "center_guide"
+
+    /** Final build: the toggle style (Pure White or Pure Black) and the optional toggle glow. */
+    const val TOGGLE_STYLE = "toggle_style"
+    const val TOGGLE_GLOW = "toggle_glow"
 }
 
 /** Everything a theme sets. Typing speed, font size, laser typing, and the test diamond are not theme settings. */
@@ -314,6 +318,10 @@ internal data class PanelLook(
     val typingGlow: Boolean,
     val tick: Boolean,
     val centerGuide: Boolean,
+    /** Pure White (the start) or Pure Black power toggles. */
+    val toggleStyle: ToggleStyle = ToggleStyle.WHITE,
+    /** A soft halo around toggles that are on. It starts off. */
+    val toggleGlow: Boolean = false,
 ) {
     /** Holo Classic keeps the Step 2 cut corners, gold brackets, and tinted glass. */
     val holo: Boolean get() = base == Theme.HOLO
@@ -335,18 +343,28 @@ internal class ThemeStore(private val context: Context, private val prefs: Panel
     private fun spec(): ThemeSpec = Themes.spec(base())
 
     fun number(key: String): Int {
-        val default = spec().numbers[key] ?: Themes.PERSONAL_NUMBERS[key] ?: 50
+        val default = spec().numbers[key] ?: Themes.PERSONAL_NUMBERS[key] ?: PanelTree.defaults.numbers[key] ?: 50
         return prefs.number(key, default)
     }
 
     fun toggle(key: String): Boolean {
-        val default = spec().toggles[key] ?: Themes.PERSONAL_TOGGLES[key] ?: false
+        val default = spec().toggles[key] ?: Themes.PERSONAL_TOGGLES[key] ?: PanelTree.defaults.toggles[key] ?: false
         return prefs.toggle(key, default)
     }
 
     fun setNumber(key: String, value: Int) = prefs.setNumber(key, value)
 
     fun setToggle(key: String, value: Boolean) = prefs.setToggle(key, value)
+
+    /** The saved choice for a pick-one setting, or its start value. */
+    fun choice(key: String): String = prefs.text(key) ?: PanelTree.defaults.choices[key].orEmpty()
+
+    fun setChoice(key: String, value: String) = prefs.write { text(key, value) }
+
+    /** The saved text for a typed text setting, or its start value. */
+    fun text(key: String): String = prefs.text(key) ?: PanelTree.defaults.texts[key].orEmpty()
+
+    fun setText(key: String, value: String) = prefs.write { text(key, value) }
 
     fun part(part: ColorPart): PartState {
         val spec = spec().parts.getValue(part)
@@ -472,6 +490,8 @@ internal class ThemeStore(private val context: Context, private val prefs: Panel
             typingGlow = toggle(LookKeys.TYPING_GLOW),
             tick = toggle(LookKeys.TICK),
             centerGuide = toggle(LookKeys.CENTER_GUIDE),
+            toggleStyle = ToggleStyle.from(choice(LookKeys.TOGGLE_STYLE)),
+            toggleGlow = toggle(LookKeys.TOGGLE_GLOW),
         )
         PanelLook.current = look
         return look

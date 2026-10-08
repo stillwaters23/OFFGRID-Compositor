@@ -116,6 +116,11 @@
     <string name="terminal_side_open">Open the side list</string>
     <string name="terminal_side_opened">Side list open. Swipe left or tap outside to close it.</string>
     <string name="terminal_folder_empty_short">Empty for now</string>
+    <!-- Final build: pick-one lists and typed text. -->
+    <string name="terminal_choice_saved">%1$s is now %2$s.</string>
+    <string name="terminal_text_saved">%1$s is now: %2$s</string>
+    <string name="terminal_text_empty">Type something first. Nothing changed.</string>
+    <string name="terminal_text_description">%1$s. Type a short text, then tap Done.</string>
     <plurals name="terminal_items">
         <item quantity="one">%d item</item>
         <item quantity="other">%d items</item>

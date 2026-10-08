@@ -126,3 +126,11 @@ States: passed, waiting for review, blocked, or waiting for Royalty's phone test
 - **Next:** Rex (Agent 04) reviews pull request #7 and does not merge it. Then Royalty installs step-2-preview on the Galaxy S25 Ultra and runs the test steps in pull request #7. Do not start Step 3 or Step 7.
 - **Asked for next (not built):** Royalty asked for a camera button and a mic button next to −, each a white symbol in a glowing white ring on black, with 📁 Camera and 📁 Sound folders. Camera off would really stop the camera. A call can't send a see-through picture, so viewers would see black, a background picture, or effects only. The mic needs the mic permission, which stays off until Royalty says go. Proposed as Step 2.5, waiting for her two answers.
 - **Later:** a new toggle design Royalty will share. App icons in her new `OFFGRID_App_Icons` repo, tested on black and white backgrounds first. Nobody touches that repo yet.
+
+## 2026-10-08 3:51 PM CT — Agent 05, Claude Code
+
+- **Bootloader step:** FINAL full build (everything except voice). Milestone 1 of 5: new coded toggles.
+- **What was done:** Started the final build on a new branch, `final-build`, made from pull request #7's head, so it holds Steps 2.1 to 2.4. The red and green picture toggles and both picture files are gone. Every toggle is now drawn in code: a circle with the power symbol inside. There are two styles, Pure White (the start) and Pure Black. On is lit or filled. Off is dim or outlined. They are sharp at every size, fade between on and off in a short moment (none with Remove animations), and are 52 dp wide, above the 48 dp touch target. A new 📁 Toggle style folder inside 📁 Themes picks the style and has an optional Toggle glow, off at the start. The choice is kept after a restart. The test build now publishes only from `final-build`. The pictures in `03 Design/References` were kept as design history.
+- **PR / commit:** Branch `final-build`, not merged. The pull request opens when the build is done.
+- **State:** waiting for review
+- **Next:** Milestone 2, true full size at Width 100 and Height 100.

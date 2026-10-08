@@ -17,16 +17,44 @@ internal sealed class PanelItem {
     open val count: Int get() = 1
 }
 
-/** A typed whole number from 0 to 100. Never a slider. */
-internal class NumberItem(val key: String, val label: String, val help: String) : PanelItem()
+/**
+ * A typed whole number from 0 to 100. Never a slider.
+ * [default] is the start value for settings no theme sets, like effects. Theme settings
+ * take their start value from the theme.
+ */
+internal class NumberItem(val key: String, val label: String, val help: String, val default: Int? = null) : PanelItem()
 
-/** An on and off toggle. Every toggle uses the same art from 03 Design/References. */
+/** An on and off toggle. Every toggle is the same coded power toggle (PowerToggleView). */
 internal class ToggleItem(
     val key: String,
     val label: String,
     val help: String,
     val default: Boolean,
     val isTest: Boolean,
+) : PanelItem()
+
+/** One choice in a pick-one list. */
+internal class Choice(val value: String, val label: String, val help: String)
+
+/** What shows at the front of each choice: nothing, or a live toggle in that style. */
+internal enum class ChoicePreview { NONE, TOGGLE }
+
+/** Pick one of a few choices, like the toggle style or the camera mode. The choice is saved. */
+internal class ChoiceItem(
+    val key: String,
+    val label: String,
+    val choices: List<Choice>,
+    val default: String,
+    val preview: ChoicePreview = ChoicePreview.NONE,
+) : PanelItem()
+
+/** A short typed text, like a status word or a message. Letters, numbers, and emoji. Never a slider. */
+internal class TextItem(
+    val key: String,
+    val label: String,
+    val help: String,
+    val default: String,
+    val maxLength: Int,
 ) : PanelItem()
 
 /** A button that does one thing, like Reset all. */
@@ -113,12 +141,41 @@ internal class PanelFolder(
     }
 }
 
+/** Start values for settings no theme sets, read from the items that declare them. */
+internal class SettingDefaults(
+    val numbers: Map<String, Int>,
+    val toggles: Map<String, Boolean>,
+    val choices: Map<String, String>,
+    val texts: Map<String, String>,
+)
+
 /**
  * Every folder in the terminal panel.
  * The 18 platform folders follow 01 Brainstorm/Feature Scope.md, feature 13.
- * Platform folders hold no effects yet. Effects come in later steps.
  */
 internal object PanelTree {
+    /** The start value of every setting in the tree, by key. Themes still win for their own settings. */
+    val defaults: SettingDefaults by lazy {
+        val numbers = HashMap<String, Int>()
+        val toggles = HashMap<String, Boolean>()
+        val choices = HashMap<String, String>()
+        val texts = HashMap<String, String>()
+        fun walk(folder: PanelFolder) {
+            for (item in folder.items) {
+                when (item) {
+                    is NumberItem -> item.default?.let { numbers[item.key] = it }
+                    is ToggleItem -> if (!item.isTest) toggles[item.key] = item.default
+                    is ChoiceItem -> choices[item.key] = item.default
+                    is TextItem -> texts[item.key] = item.default
+                    else -> Unit
+                }
+            }
+            folder.folders.forEach { walk(it) }
+        }
+        walk(build())
+        SettingDefaults(numbers, toggles, choices, texts)
+    }
+
     fun build(): PanelFolder {
         val top = listOf(settingsFolder(), offgridFolder()) +
             PLATFORMS.mapIndexed { index, platform -> platformFolder(index + 1, platform) }
@@ -145,7 +202,7 @@ internal object PanelTree {
         notes = listOf(
             "Every setting is in a folder. Tap a folder to open it.",
             "Type a number from 0 to 100. Then tap Done.",
-            "Green toggle means on. Red toggle means off.",
+            "A lit toggle means on. A dim toggle means off.",
             "No sliders here. Only typed numbers and toggles.",
         ),
     )
@@ -241,11 +298,40 @@ internal object PanelTree {
         title = "📁 Themes",
         tag = null,
         kind = FolderKind.OFFICE,
+        folders = listOf(toggleStyleFolder()),
         items = Theme.entries.map { ThemeItem(it) },
         notes = listOf(
             "Tap a theme to use it.",
             "You can still change every setting after.",
             "OLED means the screen's black parts turn fully off.",
+        ),
+    )
+
+    /** Final build, milestone 1: the coded power toggles, in Pure White or Pure Black. */
+    private fun toggleStyleFolder() = PanelFolder(
+        id = "toggle_style",
+        title = "📁 Toggle style",
+        tag = null,
+        kind = FolderKind.OFFICE,
+        items = listOf(
+            ChoiceItem(
+                LookKeys.TOGGLE_STYLE,
+                "Toggle style",
+                ToggleStyle.entries.map { Choice(it.key, it.title, it.help) },
+                default = ToggleStyle.WHITE.key,
+                preview = ChoicePreview.TOGGLE,
+            ),
+            ToggleItem(
+                LookKeys.TOGGLE_GLOW,
+                "Toggle glow",
+                "A soft halo in your glow color around toggles that are on. It starts off.",
+                false,
+                isTest = false,
+            ),
+        ),
+        notes = listOf(
+            "Every toggle is a circle with a power symbol.",
+            "A lit toggle means on. A dim toggle means off.",
         ),
     )
 
@@ -357,7 +443,7 @@ internal object PanelTree {
                     items = TEST_TOGGLES,
                     notes = listOf(
                         "Private test toggles. Viewers never see them.",
-                        "Green means on. Red means off.",
+                        "A lit toggle means on. A dim toggle means off.",
                         TEST_MARKERS_LINE,
                     ),
                 ),

@@ -114,18 +114,18 @@ internal fun pressGlow(context: Context, color: Int, radius: Float = Hud.dp(cont
     return RippleDrawable(ColorStateList.valueOf(Hud.withAlpha(color, 0.28f)), null, mask)
 }
 
-private fun rowTitle(context: Context, text: String) = FitTextView(context).apply {
+internal fun rowTitle(context: Context, text: String) = FitTextView(context).apply {
     this.text = text
     typeface = Hud.condensedBold
 }
 
-private fun rowNote(context: Context, text: String) = FitTextView(context).apply {
+internal fun rowNote(context: Context, text: String) = FitTextView(context).apply {
     this.text = text
     typeface = Hud.mono(context)
     visibility = if (text.isEmpty()) View.GONE else View.VISIBLE
 }
 
-private fun styleRowWords(title: TextView, note: TextView, look: PanelLook) {
+internal fun styleRowWords(title: TextView, note: TextView, look: PanelLook) {
     title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12.5f * look.fontScale)
     title.setTextColor(look.sideText)
     note.setTextSize(TypedValue.COMPLEX_UNIT_SP, 9.5f * look.fontScale)
@@ -307,7 +307,7 @@ internal class ToggleRow(
 ) : LinearLayout(context), Styled {
     private val title = rowTitle(context, item.label)
     private val words = rowNote(context, note)
-    val toggle = GlowToggleView(context)
+    val toggle = PowerToggleView(context)
 
     init {
         orientation = HORIZONTAL

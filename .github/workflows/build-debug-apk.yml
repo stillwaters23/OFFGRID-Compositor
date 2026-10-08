@@ -6,11 +6,13 @@ on:
       - ccr-c441a76e-hgt5wa
       - step-2-2-premium-panel
       - step-2-4-presets-layouts
+      - final-build
   pull_request:
     branches:
       - main
       - ccr-c441a76e-hgt5wa
       - step-2-2-premium-panel
+      - step-2-4-presets-layouts
 
 permissions:
   contents: write
@@ -136,9 +138,7 @@ jobs:
       - name: Attach the app file to the preview release
         if: >-
           github.event_name == 'push' &&
-          (github.ref == 'refs/heads/ccr-c441a76e-hgt5wa' ||
-           github.ref == 'refs/heads/step-2-2-premium-panel' ||
-           github.ref == 'refs/heads/step-2-4-presets-layouts')
+          github.ref == 'refs/heads/final-build'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |

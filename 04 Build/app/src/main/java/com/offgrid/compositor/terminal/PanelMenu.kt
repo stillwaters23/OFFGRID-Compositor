@@ -161,10 +161,9 @@ private class ChoiceMark(context: Context) : View(context) {
     }
 }
 
-/** One choice in the ⋮ menu: a small picture, a name, a short note, and a round mark. */
-internal class ChoiceRow(context: Context, label: String, help: String, kind: ChoiceGlyph.Kind) :
+/** One choice: an optional small picture, a name, a short note, and a round mark. */
+internal class ChoiceRow(context: Context, label: String, help: String, private val glyph: View?) :
     LinearLayout(context), Styled {
-    private val glyph = ChoiceGlyph(context, kind)
     private val title = FitTextView(context)
     private val note = FitTextView(context)
     private val mark = ChoiceMark(context)
@@ -183,7 +182,10 @@ internal class ChoiceRow(context: Context, label: String, help: String, kind: Ch
         val pad = Hud.dpi(context, 6f)
         setPadding(pad, Hud.dpi(context, 5f), pad, Hud.dpi(context, 5f))
         minimumHeight = Hud.dpi(context, 48f)
-        addView(glyph, LayoutParams(Hud.dpi(context, 26f), Hud.dpi(context, 26f)))
+        if (glyph != null) {
+            val size = if (glyph is PowerToggleView) Hud.dpi(context, 44f) else Hud.dpi(context, 26f)
+            addView(glyph, LayoutParams(size, size))
+        }
         val column = LinearLayout(context).apply { orientation = VERTICAL }
         title.text = label
         title.typeface = Hud.condensedBold
@@ -192,7 +194,7 @@ internal class ChoiceRow(context: Context, label: String, help: String, kind: Ch
         column.addView(title)
         column.addView(note)
         addView(column, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f).apply {
-            marginStart = Hud.dpi(context, 10f)
+            marginStart = Hud.dpi(context, if (glyph == null) 4f else 10f)
             marginEnd = Hud.dpi(context, 6f)
         })
         addView(mark, LayoutParams(Hud.dpi(context, 22f), Hud.dpi(context, 22f)))
@@ -203,7 +205,7 @@ internal class ChoiceRow(context: Context, label: String, help: String, kind: Ch
 
     override fun applyLook(look: PanelLook) {
         this.look = look
-        glyph.applyLook(look)
+        (glyph as? Styled)?.applyLook(look)
         title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f * look.fontScale)
         title.setTextColor(if (chosen) look.decor else look.sideText)
         note.setTextSize(TypedValue.COMPLEX_UNIT_SP, 9.5f * look.fontScale)
@@ -280,7 +282,7 @@ internal class PanelMenu(
             FolderView.GRID_3 to ChoiceGlyph.Kind.GRID_3,
         )
         for (view in FolderView.entries) {
-            val row = ChoiceRow(context, view.title, view.help, viewKinds.getValue(view))
+            val row = ChoiceRow(context, view.title, view.help, ChoiceGlyph(context, viewKinds.getValue(view)))
             row.setOnClickListener { listener.onViewChosen(view) }
             viewRows[view] = row
             content.addView(row, LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
@@ -293,7 +295,7 @@ internal class PanelMenu(
             FolderSort.CUSTOM to ChoiceGlyph.Kind.CUSTOM,
         )
         for (sort in FolderSort.entries) {
-            val row = ChoiceRow(context, sort.title, sort.help, sortKinds.getValue(sort))
+            val row = ChoiceRow(context, sort.title, sort.help, ChoiceGlyph(context, sortKinds.getValue(sort)))
             row.setOnClickListener { listener.onSortChosen(sort) }
             sortRows[sort] = row
             content.addView(row, LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
@@ -331,7 +333,7 @@ internal class PanelMenu(
             SideMode.HIDDEN to ChoiceGlyph.Kind.SIDE_HIDDEN,
         )
         for (mode in SideMode.entries) {
-            val row = ChoiceRow(context, mode.title, mode.help, sideKinds.getValue(mode))
+            val row = ChoiceRow(context, mode.title, mode.help, ChoiceGlyph(context, sideKinds.getValue(mode)))
             row.setOnClickListener { listener.onSideChosen(mode) }
             sideRows[mode] = row
             content.addView(row, LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
