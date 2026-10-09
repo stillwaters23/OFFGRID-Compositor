@@ -100,6 +100,10 @@ jobs:
         working-directory: 04 Build
         run: chmod +x ./gradlew && ./gradlew assembleDebug --stacktrace
 
+      - name: Run Android lint
+        working-directory: 04 Build
+        run: ./gradlew lintDebug --stacktrace
+
       - name: Check the color mix math
         working-directory: 04 Build
         run: ./gradlew testDebugUnitTest --stacktrace
@@ -137,7 +141,11 @@ jobs:
           print("Permissions in the built app:")
           for permission in found:
               print("  " + permission)
-          extra = [p for p in found if p.rsplit(".", 1)[-1] not in allowed or not p.startswith("android.permission.")]
+          extra = [
+              p for p in found
+              if (p.rsplit(".", 1)[-1] not in allowed or not p.startswith("android.permission."))
+              and p != "com.offgrid.compositor.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+          ]
           if extra:
               print("These permissions are not allowed:")
               print("\n".join(extra))

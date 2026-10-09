@@ -36,6 +36,16 @@ class CaptureSwitchTest {
     }
 
     @Test
+    fun deniedMicPermissionTurnsTheCaptureStateOff() {
+        switch.update(true, true, true)
+        switch.denyMic()
+        assertEquals(listOf(CaptureAction.RELEASE_MIC), switch.update(true, true, false))
+        assertTrue(switch.update(true, true, true).isEmpty())
+        switch.clearMicDenial()
+        assertEquals(listOf(CaptureAction.START_MIC), switch.update(true, true, true))
+    }
+
+    @Test
     fun cameraAndMicAreReleasedWhileTheAppIsHiddenAndComeBack() {
         switch.update(true, true, true)
         assertEquals(

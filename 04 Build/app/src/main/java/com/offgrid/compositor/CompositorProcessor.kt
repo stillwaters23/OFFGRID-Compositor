@@ -66,6 +66,24 @@ class CompositorProcessor(
             effects?.reducedMotion = value
         }
 
+        /** Draws each finished picture to an additional encoder surface. Pass null to remove [id]. Any thread. */
+        fun setExtraOutput(id: String, surface: Surface?, width: Int, height: Int) {
+            executor.execute {
+                if (surface == null) {
+                    destroyExtraOutput(extraOutputs.remove(id))
+                    return@execute
+                }
+                if (released || width <= 0 || height <= 0) return@execute
+                val eglSurface = EGL14.eglCreateWindowSurface(display, config, surface, intArrayOf(EGL14.EGL_NONE), 0)
+                if (eglSurface == null || eglSurface == EGL14.EGL_NO_SURFACE) {
+                    Log.e(TAG, "Extra output $id could not draw")
+                    return@execute
+                }
+                destroyExtraOutput(extraOutputs.remove(id))
+                extraOutputs.set(id, ExtraOutputSlot(eglSurface, width, height))
+            }
+        }
+
     private val thread = HandlerThread("OffgridCompositor")
     private val handler: Handler
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -86,6 +104,7 @@ class CompositorProcessor(
     private var replaySurface = EGL14.EGL_NO_SURFACE
     private var replayWanted = false
     private var replaySeconds = 30
+    private val extraOutputs = ExtraOutputRegistry<ExtraOutputSlot>()
 
     /** The video recorder and its drawing target, while a recording runs. */
     @Volatile
@@ -258,6 +277,9 @@ class CompositorProcessor(
         if (recorder != null && recorderSurface != EGL14.EGL_NO_SURFACE) {
             recorder.frameDrawn(stamp)
             drawFinal(recorderSurface, recorder.width, recorder.height, stamp, painted, camera)
+        }
+        for (slot in extraOutputs.values()) {
+            drawFinal(slot.eglSurface, slot.width, slot.height, stamp, painted, camera)
         }
     }
 
@@ -633,6 +655,7 @@ class CompositorProcessor(
                 EGL14.eglDestroySurface(display, slot.eglSurface)
                 slot.surfaceOutput.close()
             }
+            extraOutputs.clear().forEach(::destroyExtraOutput)
             drawer?.release()
             drawer = null
             stage?.release()
@@ -701,6 +724,12 @@ class CompositorProcessor(
         GLES20.glDeleteTextures(1, intArrayOf(name), 0)
     }
 
+    private fun destroyExtraOutput(slot: ExtraOutputSlot?) {
+        if (slot == null) return
+        if (dummy != EGL14.EGL_NO_SURFACE) EGL14.eglMakeCurrent(display, dummy, dummy, context)
+        EGL14.eglDestroySurface(display, slot.eglSurface)
+    }
+
     private fun fail(message: String) {
         Log.e(TAG, "$message (gl ${Integer.toHexString(EGL14.eglGetError())})")
         if (failed.compareAndSet(false, true)) {
@@ -710,6 +739,12 @@ class CompositorProcessor(
 
     private class OutputSlot(
         val surfaceOutput: SurfaceOutput,
+        val eglSurface: android.opengl.EGLSurface,
+        val width: Int,
+        val height: Int,
+    )
+
+    private class ExtraOutputSlot(
         val eglSurface: android.opengl.EGLSurface,
         val width: Int,
         val height: Int,
