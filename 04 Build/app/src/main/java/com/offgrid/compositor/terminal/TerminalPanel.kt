@@ -233,7 +233,6 @@ class TerminalPanel @JvmOverloads constructor(
         if (bottomInset < 0) return
         translationY = if (fullBleed) 0f else userY
     }
-
     /** Hides the panel while the saved video plays, so the whole video can be checked. */
     fun setHiddenForPlayback(hidden: Boolean) {
         if (hidden) {
@@ -901,6 +900,7 @@ class TerminalPanel @JvmOverloads constructor(
     private fun saveToggle(folder: PanelFolder, item: ToggleItem, on: Boolean) {
         prefs.setToggle(toggleKey(folder, item), on)
         onSettingChanged?.invoke(item.key, on)
+        topBar?.setQuickToggle(item.key, on)
         if (item.isTest) {
             val message = if (on) R.string.terminal_test_on else R.string.terminal_test_off
             say(context.getString(message, item.label))
@@ -915,7 +915,7 @@ class TerminalPanel @JvmOverloads constructor(
         }
         applyLook()
         val message = if (on) R.string.terminal_toggle_on else R.string.terminal_toggle_off
-        say(context.getString(message, item.label))
+        say(if (item.key == FxKeys.MIC_ON && on) "Mic is on. Your voice goes into the video." else context.getString(message, item.label))
     }
 
     private fun saveChoice(item: ChoiceItem, value: String) {

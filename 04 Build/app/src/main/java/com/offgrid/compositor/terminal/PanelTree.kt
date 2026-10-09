@@ -397,7 +397,7 @@ internal object PanelTree {
         id = "reset",
         title = "Reset",
         tag = null,
-        kind = kind,
+        kind = FolderKind.SETTINGS,
         actions = listOf(PanelActionItem(PanelAction.RESET_ALL, "Reset all", "Restore the start settings.")),
     )
 
