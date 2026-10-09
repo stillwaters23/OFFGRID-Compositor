@@ -115,7 +115,7 @@ class CloudsLayer : OverlayLayer {
                 spot.set(x - size / 2f, y - tall * 0.75f, x + size / 2f, y + tall * 0.25f)
                 if (spot.right < 0f || spot.left > w || spot.top > h) continue
                 art.alpha = (255 * fade * (0.55f + 0.4f * thick) * thin).toInt()
-                drawSprite(canvas, sprite(seed), spot, EffectMath.hash(seed, SALT_FLIP) < 0.5f)
+                drawSprite(canvas, floorSprite(seed), spot, EffectMath.hash(seed, SALT_FLIP) < 0.5f)
             }
         }
 
@@ -203,10 +203,10 @@ class CloudsLayer : OverlayLayer {
             val size = w * (0.55f + 0.25f * EffectMath.hash(seed, SALT_SIZE))
             val run = w + size
             val x = (EffectMath.hash(seed, SALT_PHASE) * run + drift * (0.5f + 0.3f * i)) % run - size / 2f
-            val tall = size * SPRITE_H / SPRITE_W * 0.55f
-            val y = h * (0.015f + 0.03f * EffectMath.hash(seed, SALT_OFF))
+            val tall = size * SPRITE_H / SPRITE_W
+            val y = h * (0.01f + 0.025f * EffectMath.hash(seed, SALT_OFF))
             spot.set(x - size / 2f, y - tall / 2f, x + size / 2f, y + tall / 2f)
-            art.alpha = (255 * (0.35f + 0.3f * thick) * thin).toInt()
+            art.alpha = (255 * (0.5f + 0.3f * thick) * thin).toInt()
             drawSprite(canvas, sprites[STRATUS], spot, i % 2 == 1)
         }
 
@@ -232,6 +232,9 @@ class CloudsLayer : OverlayLayer {
         }
         art.colorFilter = null
     }
+
+    private fun floorSprite(seed: Int): Bitmap? =
+        sprites[FLOOR_FIRST + (EffectMath.hash(seed, SALT_KIND) * FLOOR_KINDS).toInt().coerceIn(0, FLOOR_KINDS - 1)]
 
     private fun sprite(seed: Int): Bitmap? = sprites[(EffectMath.hash(seed, SALT_KIND) * CUMULUS).toInt().coerceIn(0, CUMULUS - 1)]
 
@@ -267,7 +270,7 @@ class CloudsLayer : OverlayLayer {
         sunShader = RadialGradient(
             w * 0.84f, h * 0.05f, w * 0.8f,
             intArrayOf(SUN, EffectMath.withAlpha(SUN, 0.75f), EffectMath.withAlpha(SUN, 0.22f), EffectMath.withAlpha(SUN, 0.06f), 0),
-            floatArrayOf(0f, 0.06f, 0.2f, 0.5f, 1f), Shader.TileMode.CLAMP,
+            floatArrayOf(0f, 0.045f, 0.16f, 0.45f, 1f), Shader.TileMode.CLAMP,
         )
         floorShader = LinearGradient(
             0f, horizon, 0f, h,
@@ -310,7 +313,7 @@ class CloudsLayer : OverlayLayer {
         const val FLOOR_NEAR = 0.7f
         const val FLOOR_PUFF = 2.6f
         const val FLOOR_LANE = 1.9f
-        const val FLOOR_FLAT = 0.38f
+        const val FLOOR_FLAT = 0.36f
         const val LOW_FLOOR = 1.7f
         const val HIGH_FLOOR = 1.25f
 
@@ -355,16 +358,18 @@ class CloudsLayer : OverlayLayer {
         const val MIST = 0xFFF2F6FB.toInt()
         const val SHADE_TINT = 0xD9E2EE
 
-        /** The cloud pictures: three heaped clouds and one long flat one. */
-        const val SPRITES = 4
+        /** The cloud pictures: three heaped clouds, one long flat one, and two tops for the floor. */
+        const val SPRITES = 6
         const val CUMULUS = 3
         const val STRATUS = 3
+        const val FLOOR_FIRST = 4
+        const val FLOOR_KINDS = 2
         const val SPRITE_W = 448
         const val SPRITE_H = 280
 
         const val LIT = 0xFFFFFDF8.toInt()
-        const val SHADOW = 0xFFB3C1D6.toInt()
-        const val BASE = 0xFF8394B2.toInt()
+        const val SHADOW = 0xFFBDCADD.toInt()
+        const val BASE = 0xFF8C9CBA.toInt()
 
         fun mix(from: Int, to: Int, t: Float): Int {
             val k = EffectMath.clamp01(t)
@@ -385,6 +390,8 @@ class CloudsLayer : OverlayLayer {
             val bh = SPRITE_H
             val thick = FloatArray(bw * bh)
             val flat = kind == STRATUS
+            // Floor clouds are seen from above: mostly sunlit tops, with a long soft fade below.
+            val above = kind >= FLOOR_FIRST
             val salt = SALT_LOBE + kind * 10
             val baseY = bh * if (flat) 0.62f else 0.72f
             fun puff(x: Float, y: Float, r: Float, squash: Float) {
@@ -439,7 +446,11 @@ class CloudsLayer : OverlayLayer {
             // How solid each spot is, with uneven, wispy edges.
             val solid = FloatArray(bw * bh)
             for (py in 0 until bh) {
-                val base = 1f - EffectMath.smooth((py - (baseY - bh * 0.03f)) / (bh * 0.16f))
+                val base = if (above) {
+                    1f - EffectMath.smooth((py - (baseY - bh * 0.3f)) / (bh * 0.42f))
+                } else {
+                    1f - EffectMath.smooth((py - (baseY - bh * 0.03f)) / (bh * 0.16f))
+                }
                 for (px in 0 until bw) {
                     val i = py * bw + px
                     val grain = fbm(px / NOISE_SCALE, py / NOISE_SCALE, kind)
@@ -451,20 +462,20 @@ class CloudsLayer : OverlayLayer {
             // It is added up down each column, so the shading is smooth.
             val pixels = IntArray(bw * bh)
             for (px in 0 until bw) {
-                var above = 0f
+                var shadow = 0f
                 for (py in 0 until bh) {
                     val i = py * bw + px
                     val a = solid[i]
-                    above = above * LIGHT_KEEP + a
+                    shadow = shadow * LIGHT_KEEP + a
                     if (a <= 0.004f) continue
-                    val light = 1f / (1f + above * LIGHT_DIM)
+                    val light = 1f / (1f + shadow * if (above) LIGHT_DIM * 0.45f else LIGHT_DIM)
                     val low = EffectMath.smooth((py - (baseY - bh * 0.2f)) / (bh * 0.24f))
                     val grain = 0.94f + 0.12f * fbm(px / 18f + 40f, py / 18f, kind + 7)
                     val k = EffectMath.clamp01(light * grain)
                     var r = Color.red(SHADOW) + (Color.red(LIT) - Color.red(SHADOW)) * k
                     var g = Color.green(SHADOW) + (Color.green(LIT) - Color.green(SHADOW)) * k
                     var b = Color.blue(SHADOW) + (Color.blue(LIT) - Color.blue(SHADOW)) * k
-                    val under = low * (1f - k) * 0.8f
+                    val under = low * (1f - k) * if (above) 0.3f else 0.8f
                     r += (Color.red(BASE) - r) * under
                     g += (Color.green(BASE) - g) * under
                     b += (Color.blue(BASE) - b) * under
@@ -505,6 +516,6 @@ class CloudsLayer : OverlayLayer {
 
         const val NOISE_SCALE = 34f
         const val LIGHT_KEEP = 0.975f
-        const val LIGHT_DIM = 0.045f
-    }
+        const val LIGHT_DIM = 0.038f
+            }
 }

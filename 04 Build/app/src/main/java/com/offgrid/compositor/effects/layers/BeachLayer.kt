@@ -294,10 +294,11 @@ class BeachLayer : OverlayLayer {
             val restY = rest + lap
             val shape = scallop(x, w, c) * curl * sin(PI.toFloat() * EffectMath.clamp01((p - 0.22f) / 0.75f))
             val far = reach * (0.7f + 0.3f * EffectMath.hash(c, SALT_REACH))
-            edge[i] = when {
+            // The wavy outline grows and shrinks smoothly with the wash, so the edge never jumps.
+            edge[i] = shape + when {
                 p < UP_START -> restY
-                p < UP_END -> EffectMath.lerp(restY, shore + far, EffectMath.easeOut((p - UP_START) / (UP_END - UP_START))) + shape
-                else -> EffectMath.lerp(shore + far, restY, EffectMath.smooth((p - UP_END) / (BACK_END - UP_END))) + shape
+                p < UP_END -> EffectMath.lerp(restY, shore + far, EffectMath.easeOut((p - UP_START) / (UP_END - UP_START)))
+                else -> EffectMath.lerp(shore + far, restY, EffectMath.smooth((p - UP_END) / (BACK_END - UP_END)))
             }
             val last = if (p >= UP_END) c else c - 1
             val lastFar = reach * (0.7f + 0.3f * EffectMath.hash(last, SALT_REACH))
@@ -313,6 +314,12 @@ class BeachLayer : OverlayLayer {
             for (i in 0..SEGMENTS) path.lineTo(i * step, wet[i])
             path.lineTo(w, rest)
             path.close()
+            // A soft outer edge first, then the wet mark itself.
+            canvas.save()
+            canvas.translate(0f, h * WET_FEATHER)
+            fill.color = EffectMath.withAlpha(wetColor, damp * 0.35f)
+            canvas.drawPath(path, fill)
+            canvas.restore()
             fill.color = EffectMath.withAlpha(wetColor, damp)
             canvas.drawPath(path, fill)
             // A thin line of old foam left at the top of the wash.
@@ -338,7 +345,10 @@ class BeachLayer : OverlayLayer {
 
     private fun drawFoam(canvas: Canvas, w: Float, h: Float, t: Float, waves: Float, p: Float, cycle: Int, step: Float) {
         val surf = 0.55f + 0.45f * waves
-        // Foam lace on the water between the break line and the edge.
+        // The break line's shape changes smoothly with the time, not with each wave.
+        val roll = cycle + p
+        // Foam lace on the water between the break line and the edge. Its shape only drifts
+        // slowly with the time, so it never jumps from one wave to the next.
         val lace = 0.35f + 0.65f * EffectMath.smooth(p / 0.1f) * (1f - EffectMath.smooth((p - 0.35f) / 0.6f))
         line.strokeWidth = h * 0.0014f
         for (k in 1..LACE_LINES) {
@@ -347,7 +357,7 @@ class BeachLayer : OverlayLayer {
             var drawing = false
             for (i in 0..SEGMENTS) {
                 val x = i * step
-                val gap = EffectMath.hash(i / 3 + k * 17 + cycle * 7, SALT_LACE) < 0.3f
+                val gap = EffectMath.hash(i / 3 + k * 17, SALT_LACE) < 0.3f
                 if (gap) {
                     drawing = false
                     continue
@@ -366,12 +376,12 @@ class BeachLayer : OverlayLayer {
         path.reset()
         for (i in 0..SEGMENTS) {
             val x = i * step
-            val y = breakLine - h * 0.005f * surf * (1f + sin(x * 0.017f + cycle * 2.1f + t * 0.3f) * 0.6f + sin(x * 0.051f + cycle) * 0.4f)
+            val y = breakLine - h * 0.005f * surf * (1f + sin(x * 0.017f + roll * 2.1f + t * 0.3f) * 0.6f + sin(x * 0.051f + roll) * 0.4f)
             if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
         }
         for (i in SEGMENTS downTo 0) {
             val x = i * step
-            val y = breakLine + h * (0.004f + 0.014f * burst) * surf * (1f + 0.5f * sin(x * 0.029f + cycle * 1.7f))
+            val y = breakLine + h * (0.004f + 0.014f * burst) * surf * (1f + 0.5f * sin(x * 0.029f + roll * 1.7f))
             path.lineTo(x, y)
         }
         path.close()
@@ -380,7 +390,7 @@ class BeachLayer : OverlayLayer {
         path.reset()
         for (i in 0..SEGMENTS) {
             val x = i * step
-            val y = breakLine - h * 0.005f * surf * (1f + sin(x * 0.017f + cycle * 2.1f + t * 0.3f) * 0.6f + sin(x * 0.051f + cycle) * 0.4f)
+            val y = breakLine - h * 0.005f * surf * (1f + sin(x * 0.017f + roll * 2.1f + t * 0.3f) * 0.6f + sin(x * 0.051f + roll) * 0.4f)
             if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
         }
         line.color = EffectMath.withAlpha(foamColor, 0.2f * burst)
@@ -403,8 +413,8 @@ class BeachLayer : OverlayLayer {
             }
             canvas.save()
             canvas.translate(0f, h * 0.006f * surf)
-            line.color = EffectMath.withAlpha(faceColor, 0.5f * rise * surf)
-            line.strokeWidth = h * 0.01f * surf
+            line.color = EffectMath.withAlpha(faceColor, 0.32f * rise * surf)
+            line.strokeWidth = h * 0.016f * surf
             canvas.drawPath(path, line)
             canvas.restore()
             line.color = EffectMath.withAlpha(foamColor, 0.75f * rise * surf)
@@ -641,12 +651,13 @@ class BeachLayer : OverlayLayer {
         const val BACK_END = 0.97f
         const val BORE_END = 0.3f
         const val WET_SHAPE = 0.95f
-        const val WET_ALPHA = 0.4f
+        const val WET_ALPHA = 0.32f
+        const val WET_FEATHER = 0.005f
         const val DRY_CYCLES = 1.1f
         const val SEGMENTS = 64
         const val LACE_LINES = 4
 
-        const val GLINTS = 70
+        const val GLINTS = 54
         const val SHINE_WIDE = 0.2f
         const val STARS = 46
         const val STAR_REACH = 0.85f
@@ -746,7 +757,7 @@ class BeachLayer : OverlayLayer {
 
         const val GRAIN_TILE = 96
         const val RIPPLES = 9
-        const val BUBBLES = 46
+        const val BUBBLES = 34
         const val SALT_BUBBLE = 181
         const val RIPPLE_ALPHA = 0.1f
         const val SALT_RIPPLE = 171

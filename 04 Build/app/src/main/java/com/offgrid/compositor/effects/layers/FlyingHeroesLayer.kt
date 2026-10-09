@@ -85,6 +85,7 @@ class FlyingHeroesLayer : OverlayLayer {
     private val heroSize = FloatArray(MAX_HEROES)
     private val heroLane = FloatArray(MAX_HEROES)
     private val heroIndex = IntArray(MAX_HEROES)
+    private val heroLaneShare = FloatArray(MAX_HEROES)
 
     // The trail, in hero units, nearest point first.
     private val trailX = FloatArray(TRAIL_POINTS + 1)
@@ -96,6 +97,7 @@ class FlyingHeroesLayer : OverlayLayer {
     private var atVX = 0f
     private var atVY = 0f
     private var atDir = 1f
+    private var laneShare = 0.5f
     private var startRoom = 0f
     private var endRoom = 0f
 
@@ -128,6 +130,7 @@ class FlyingHeroesLayer : OverlayLayer {
             if (u > 1f + LINGER) continue
             val seed = (i + 1) * SEED_STEP + trip.toInt()
             val depth = 0.5f * EffectMath.hash(i, 24) + 0.5f * EffectMath.hash(seed, 7)
+            heroLaneShare[shown] = (i + LANE_EDGE + (1f - 2f * LANE_EDGE) * EffectMath.hash(seed, 2)) / count
             heroSeed[shown] = seed
             heroU[shown] = u
             heroLane[shown] = lane
@@ -155,8 +158,9 @@ class FlyingHeroesLayer : OverlayLayer {
         val px = heroSize[slot]
         val unit = px / HERO_LENGTH
         // Room off each edge: enough for the whole hero, and at the far edge for its trail too.
+        laneShare = heroLaneShare[slot]
         startRoom = px * START_ROOM
-        endRoom = px * (START_ROOM + look.trailLength)
+        endRoom = px * (START_ROOM + look.trailLength * TRAIL_SEEN)
         val span = w + startRoom + endRoom
         val calm = if (frame.reducedMotion) CALM_FLUTTER else 1f
         val wiggle = EffectMath.hash(heroIndex[slot], 25) * TWO_PI
@@ -213,7 +217,7 @@ class FlyingHeroesLayer : OverlayLayer {
     /** Fills where the hero is at [u] (0 is off one edge, 1 is off the other) and which way it flies. */
     private fun place(seed: Int, u: Float, w: Float, h: Float) {
         val dir = if (EffectMath.hash(seed, 1) < 0.5f) 1f else -1f
-        val y0 = EffectMath.lerp(LANE_TOP, LANE_BOTTOM, EffectMath.hash(seed, 2))
+        val y0 = EffectMath.lerp(LANE_TOP, LANE_BOTTOM, laneShare)
         val y1 = (y0 + (EffectMath.hash(seed, 3) - 0.5f) * LANE_DRIFT).coerceIn(LANE_TOP, LANE_BOTTOM)
         val bulge = (EffectMath.hash(seed, 4) - 0.5f) * BULGE
         val bobTurns = BOB_TURNS_MIN + BOB_TURNS_EXTRA * EffectMath.hash(seed, 5)
@@ -653,23 +657,23 @@ class FlyingHeroesLayer : OverlayLayer {
         limb(torso, 0.31f, -0.045f, 0.044f, 0.37f, -0.055f, 0.04f)
 
         // The far arm reaches forward past the head. The far leg bends a little at the knee.
-        limb(farSide, 0.28f, -0.06f, 0.047f, 0.44f, -0.1f, 0.037f)
-        limb(farSide, 0.44f, -0.1f, 0.037f, 0.56f, -0.118f, 0.032f)
-        limb(farSide, 0f, -0.016f, 0.06f, -0.24f, 0.028f, 0.046f)
-        limb(farSide, -0.24f, 0.028f, 0.046f, -0.4f, -0.016f, 0.035f)
-        limb(farTrim, 0.545f, -0.115f, 0.037f, 0.6f, -0.124f, 0.041f)
-        farTrim.addCircle(0.632f, -0.128f, 0.047f, Path.Direction.CW)
-        limb(farTrim, -0.36f, -0.006f, 0.041f, -0.44f, -0.03f, 0.037f)
-        limb(farTrim, -0.44f, -0.03f, 0.035f, -0.53f, -0.058f, 0.02f)
+        limb(farSide, 0.28f, -0.06f, 0.053f, 0.44f, -0.1f, 0.041f)
+        limb(farSide, 0.44f, -0.1f, 0.041f, 0.56f, -0.118f, 0.036f)
+        limb(farSide, 0f, -0.016f, 0.067f, -0.24f, 0.028f, 0.052f)
+        limb(farSide, -0.24f, 0.028f, 0.052f, -0.4f, -0.016f, 0.039f)
+        limb(farTrim, 0.545f, -0.115f, 0.041f, 0.6f, -0.124f, 0.046f)
+        ball(farTrim, 0.632f, -0.128f, 0.048f)
+        limb(farTrim, -0.36f, -0.006f, 0.046f, -0.44f, -0.03f, 0.041f)
+        limb(farTrim, -0.44f, -0.03f, 0.039f, -0.53f, -0.058f, 0.022f)
 
         // The near arm rests along the body. The near leg is straight.
-        limb(nearSide, 0.27f, -0.016f, 0.049f, 0.15f, 0.066f, 0.037f)
-        limb(nearSide, 0.15f, 0.066f, 0.037f, 0.04f, 0.074f, 0.032f)
-        limb(nearSide, 0f, 0.012f, 0.067f, -0.25f, 0.03f, 0.051f)
-        limb(nearSide, -0.25f, 0.03f, 0.051f, -0.42f, 0.028f, 0.039f)
-        limb(nearTrim, 0.06f, 0.074f, 0.035f, -0.015f, 0.076f, 0.039f)
-        limb(nearTrim, -0.37f, 0.029f, 0.045f, -0.5f, 0.031f, 0.041f)
-        limb(nearTrim, -0.5f, 0.031f, 0.038f, -0.61f, 0.044f, 0.022f)
+        limb(nearSide, 0.27f, -0.016f, 0.055f, 0.15f, 0.066f, 0.041f)
+        limb(nearSide, 0.15f, 0.066f, 0.041f, 0.04f, 0.074f, 0.036f)
+        limb(nearSide, 0f, 0.012f, 0.075f, -0.25f, 0.03f, 0.057f)
+        limb(nearSide, -0.25f, 0.03f, 0.057f, -0.42f, 0.028f, 0.044f)
+        limb(nearTrim, 0.06f, 0.074f, 0.039f, -0.015f, 0.076f, 0.044f)
+        limb(nearTrim, -0.37f, 0.029f, 0.05f, -0.5f, 0.031f, 0.046f)
+        limb(nearTrim, -0.5f, 0.031f, 0.043f, -0.61f, 0.044f, 0.025f)
 
         silhouette.set(torso)
         silhouette.op(farSide, Path.Op.UNION)
@@ -716,9 +720,6 @@ class FlyingHeroesLayer : OverlayLayer {
         face.cubicTo(HEAD_X + 0.06f, HEAD_Y + 0.045f, HEAD_X + 0.02f, HEAD_Y + 0.06f, HEAD_X - 0.02f, HEAD_Y + 0.06f)
         face.cubicTo(HEAD_X - 0.07f, HEAD_Y + 0.05f, HEAD_X - 0.08f, HEAD_Y - 0.04f, HEAD_X - 0.045f, HEAD_Y - 0.06f)
         face.close()
-        val grow = android.graphics.Matrix()
-        grow.setScale(FACE_GROW, FACE_GROW, HEAD_X, HEAD_Y)
-        face.transform(grow)
 
         // A four-point sparkle, one unit across.
         spark.moveTo(0f, -1f)
@@ -785,18 +786,22 @@ class FlyingHeroesLayer : OverlayLayer {
         const val START_ROOM = 0.7f
 
         /** A hero stays a moment after its trip, off screen, so its last sparkles fade out. */
-        const val LINGER = 0.15f
+        const val LINGER = 0.1f
+
+        /** The far end of a trail is faint, so a trip can end when most of the trail is off screen. */
+        const val TRAIL_SEEN = 0.75f
         const val LANE_BASE = 0.85f
         const val LANE_SPREAD = 0.35f
-        const val GAP_MIN = 0.25f
-        const val GAP_EXTRA = 0.3f
+        const val GAP_MIN = 0.12f
+        const val GAP_EXTRA = 0.2f
         const val STAGGER_JITTER = 0.18f
         const val SEED_STEP = 7919
         const val DEPTH_MIN = 0.7f
-        const val LANE_TOP = 0.1f
-        const val LANE_BOTTOM = 0.84f
-        const val LANE_DRIFT = 0.42f
-        const val BULGE = 0.24f
+        const val LANE_EDGE = 0.1f
+        const val LANE_TOP = 0.08f
+        const val LANE_BOTTOM = 0.86f
+        const val LANE_DRIFT = 0.3f
+        const val BULGE = 0.16f
         const val BOB = 0.012f
         const val BOB_TURNS_MIN = 1f
         const val BOB_TURNS_EXTRA = 1.5f
@@ -884,7 +889,6 @@ class FlyingHeroesLayer : OverlayLayer {
         const val STAR_R = 0.05f
         const val STAR_GLOW = 0.12f
         const val HALO_X = 0.05f
-        const val FACE_GROW = 1.18f
         const val HALO_R = 0.75f
 
         // Nova's cape.
@@ -949,7 +953,7 @@ class FlyingHeroesLayer : OverlayLayer {
         const val NOVA_DEEP = 0xFF06505A.toInt()
         const val VOLT_YELLOW = 0xFFFFE01A.toInt()
         const val COMET_GOLD = 0xFFFFD36B.toInt()
-        const val COMET_FACE = 0x993A1206.toInt()
+        const val COMET_FACE = 0x4D5A1A06
         const val COMET_RIM = 0xFFFFE2A0.toInt()
         const val EMBER_HOT = 0xFFFFF0B0.toInt()
         const val EMBER_COOL = 0xFFFF6A1A.toInt()
@@ -980,6 +984,13 @@ class FlyingHeroesLayer : OverlayLayer {
             end.reset()
             end.addCircle(x1, y1, r1, Path.Direction.CW)
             piece.op(end, Path.Op.UNION)
+            into.op(piece, Path.Op.UNION)
+        }
+
+        /** Adds a round ball, like a fist, joined cleanly to what is already in [into]. */
+        fun ball(into: Path, x: Float, y: Float, r: Float) {
+            val piece = Path()
+            piece.addCircle(x, y, r, Path.Direction.CW)
             into.op(piece, Path.Op.UNION)
         }
 

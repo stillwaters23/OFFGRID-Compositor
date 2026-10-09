@@ -64,6 +64,8 @@ class PortalLayer : OverlayLayer {
     private val depth = RadialGradient(0f, 0f, 1f, intArrayOf(0, 0, 0x55000000, 0xCC000000.toInt()), floatArrayOf(0f, 0.6f, 0.85f, 1f), Shader.TileMode.CLAMP)
     private val starsSmall = FloatArray(STARS_SMALL * 2)
     private val starsBig = FloatArray(STARS_BIG * 2)
+    private val glints = FloatArray(STARS_BIG * 8)
+    private val streak = FloatArray(STREAK_STEPS * 4)
 
     // Wormhole: the tunnel.
     private val tunnel = RadialGradient(0f, 0f, 1f, TUNNEL_COLORS, TUNNEL_STOPS, Shader.TileMode.CLAMP)
@@ -87,7 +89,20 @@ class PortalLayer : OverlayLayer {
 
     init {
         for (i in 0 until STARS_SMALL) starAt(starsSmall, i, i)
-        for (i in 0 until STARS_BIG) starAt(starsBig, i, i + 500)
+        for (i in 0 until STARS_BIG) {
+            starAt(starsBig, i, i + 500)
+            val x = starsBig[i * 2]
+            val y = starsBig[i * 2 + 1]
+            val g = GLINT * (0.6f + 0.8f * EffectMath.hash(i, 43))
+            glints[i * 8] = x - g
+            glints[i * 8 + 1] = y
+            glints[i * 8 + 2] = x + g
+            glints[i * 8 + 3] = y
+            glints[i * 8 + 4] = x
+            glints[i * 8 + 5] = y - g
+            glints[i * 8 + 6] = x
+            glints[i * 8 + 7] = y + g
+        }
         for (a in 0 until SPIRAL_ARMS) {
             val turn = a * TWO_PI / SPIRAL_ARMS
             for (k in 0..SPIRAL_POINTS) {
@@ -182,9 +197,12 @@ class PortalLayer : OverlayLayer {
         canvas.drawPoints(starsSmall, dots)
         // Big stars breathe softly, less than once a second.
         val breathe = 0.8f + 0.2f * sin(t * TWINKLE)
-        dots.color = EffectMath.withAlpha(STAR_GLOW, 0.35f * breathe)
-        dots.strokeWidth = STAR_BIG_SIZE * 3f
+        dots.color = EffectMath.withAlpha(STAR_GLOW, 0.22f * breathe)
+        dots.strokeWidth = STAR_BIG_SIZE * 2.2f
         canvas.drawPoints(starsBig, dots)
+        dots.color = EffectMath.withAlpha(STAR_GLOW, 0.75f * breathe)
+        dots.strokeWidth = STAR_SMALL_SIZE * 0.6f
+        canvas.drawLines(glints, dots)
         dots.color = EffectMath.withAlpha(Color.WHITE, breathe)
         dots.strokeWidth = STAR_BIG_SIZE
         canvas.drawPoints(starsBig, dots)
@@ -258,6 +276,9 @@ class PortalLayer : OverlayLayer {
             oval.set(ox - r, oy - r, ox + r, oy + r)
             val turn = spin * 360f + z * RING_TWIST
             val color = mix(RING_FAR, RING_NEAR, z)
+            pen.color = EffectMath.withAlpha(color, alpha * 0.28f)
+            pen.strokeWidth = 0.003f + 0.01f * z
+            canvas.drawOval(oval, pen)
             pen.color = EffectMath.withAlpha(color, alpha * 0.3f)
             pen.strokeWidth = 0.012f + 0.06f * z
             for (a in 0 until 3) canvas.drawArc(oval, turn + a * 120f, RING_ARC, false, pen)
@@ -310,15 +331,29 @@ class PortalLayer : OverlayLayer {
             if (p < 0f) p += 1f
             val r0 = SPECK_FAR_MIN + SPECK_FAR_EXTRA * EffectMath.hash(i, 103)
             val a0 = EffectMath.hash(i, 104) * TWO_PI
-            val r1 = speckRadius(r0, p)
-            val r2 = speckRadius(r0, (p - SPECK_STREAK).coerceAtLeast(0f))
-            val a1 = a0 + SWIRL * (1f / r1 - 1f / r0)
-            val a2 = a0 + SWIRL * (1f / r2 - 1f / r0)
-            val alpha = EffectMath.smooth(p / 0.15f) * (1f - EffectMath.smooth((p - 0.85f) / 0.15f))
+            val alpha = EffectMath.smooth(p / 0.15f) * (1f - EffectMath.smooth((p - 0.88f) / 0.12f))
             if (alpha <= 0.01f) continue
+            // A short curved streak along its spiral, longer as it speeds up.
+            var lastX = 0f
+            var lastY = 0f
+            for (k in 0..STREAK_STEPS) {
+                val q = (p - SPECK_STREAK * (0.4f + p) * k / STREAK_STEPS).coerceAtLeast(0f)
+                val r = speckRadius(r0, q)
+                val a = a0 + SWIRL * (1f / r - 1f / r0)
+                val x = cos(a) * r
+                val y = sin(a) * r
+                if (k > 0) {
+                    streak[(k - 1) * 4] = lastX
+                    streak[(k - 1) * 4 + 1] = lastY
+                    streak[(k - 1) * 4 + 2] = x
+                    streak[(k - 1) * 4 + 3] = y
+                }
+                lastX = x
+                lastY = y
+            }
             pen.color = EffectMath.withAlpha(mix(SPECK_COOL, SPECK_HOT, p), alpha)
-            pen.strokeWidth = 0.012f + 0.012f * EffectMath.hash(i, 105)
-            canvas.drawLine(cos(a2) * r2, sin(a2) * r2, cos(a1) * r1, sin(a1) * r1, pen)
+            pen.strokeWidth = 0.008f + 0.01f * EffectMath.hash(i, 105)
+            canvas.drawLines(streak, pen)
         }
 
         // The hole itself: no light at all.
@@ -403,14 +438,14 @@ class PortalLayer : OverlayLayer {
                 if (k == 0) bolt.moveTo(x, y) else bolt.lineTo(x, y)
             }
             val color = palette[(b + 1) % palette.size]
-            pen.color = EffectMath.withAlpha(color, 0.3f)
-            pen.strokeWidth = 0.05f
+            pen.color = EffectMath.withAlpha(color, 0.25f)
+            pen.strokeWidth = 0.04f
             canvas.drawPath(bolt, pen)
-            pen.color = EffectMath.withAlpha(color, 0.9f)
-            pen.strokeWidth = 0.014f
+            pen.color = EffectMath.withAlpha(color, 0.85f)
+            pen.strokeWidth = 0.01f
             canvas.drawPath(bolt, pen)
             pen.color = Color.WHITE
-            pen.strokeWidth = 0.005f
+            pen.strokeWidth = 0.0035f
             canvas.drawPath(bolt, pen)
         }
 
@@ -471,9 +506,9 @@ class PortalLayer : OverlayLayer {
         const val SWIRL_IN = 0.94f
         const val SWIRL_SPREAD = 0.14f
         const val BOLTS = 3
-        const val BOLT_POINTS = 14
+        const val BOLT_POINTS = 22
         const val BOLT_SPAN = 0.9f
-        const val BOLT_JAG = 0.16f
+        const val BOLT_JAG = 0.1f
         const val BOLT_PACE = 1.4f
         const val CRACKLE_RATE = 12f
         const val CRACKLE_CALM = 4f
@@ -483,7 +518,8 @@ class PortalLayer : OverlayLayer {
         const val STARS_SMALL = 90
         const val STARS_BIG = 14
         const val STAR_SMALL_SIZE = 0.012f
-        const val STAR_BIG_SIZE = 0.024f
+        const val STAR_BIG_SIZE = 0.02f
+        const val GLINT = 0.05f
         const val STAR_TURN = 0.12f
         const val NEBULA_TURN = 0.2f
         const val TWINKLE = 3.1f
@@ -512,15 +548,15 @@ class PortalLayer : OverlayLayer {
         const val RING_FLOW = 0.6f
         const val RING_DEPTH = 1.9f
         const val RING_TWIST = 260f
-        const val RING_ARC = 92f
+        const val RING_ARC = 70f
         const val TUNNEL_BEND = 0.12f
         const val FAR_LIGHT = 0.42f
         const val SPIRAL_ARMS = 5
         const val SPIRAL_POINTS = 48
         const val SPIRAL_IN = 0.03f
         const val SPIRAL_TURNS = 0.9f
-        val SPIRAL_GLOW = 0x2E7FB8FF
-        val SPIRAL_LINE = 0x8CB8E4FF.toInt()
+        val SPIRAL_GLOW = 0x263D8BFF
+        val SPIRAL_LINE = 0x6E8FC8FF
         val RING_FAR = 0xFF8FF3FF.toInt()
         val RING_NEAR = 0xFF9B5BFF.toInt()
         val TUNNEL_COLORS = intArrayOf(0xFF2A6CFF.toInt(), 0xFF1A2A8C.toInt(), 0xFF120A4A.toInt(), 0xFF07041C.toInt(), 0xFF030210.toInt())
@@ -533,10 +569,11 @@ class PortalLayer : OverlayLayer {
         const val SPECKS = 46
         const val SPECK_LIFE_MIN = 2.2f
         const val SPECK_LIFE_EXTRA = 2.4f
-        const val SPECK_FAR_MIN = 1.3f
-        const val SPECK_FAR_EXTRA = 1.5f
-        const val SPECK_STREAK = 0.06f
-        const val SWIRL = 1.6f
+        const val SPECK_FAR_MIN = 1.15f
+        const val SPECK_FAR_EXTRA = 1.1f
+        const val SPECK_STREAK = 0.12f
+        const val STREAK_STEPS = 5
+        const val SWIRL = 2.4f
         const val SHIMMER = 0.018f
         const val SHIMMER_POINTS = 96
         val DISK_STREAK = 0xFFFFC870.toInt()

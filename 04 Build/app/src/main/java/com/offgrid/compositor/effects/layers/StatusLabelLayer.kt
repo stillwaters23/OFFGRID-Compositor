@@ -7,6 +7,7 @@ import android.graphics.Color
 import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.RadialGradient
+import android.graphics.Rect
 import android.graphics.Shader
 import android.graphics.Typeface
 import com.offgrid.compositor.effects.EffectFrame
@@ -39,25 +40,29 @@ class StatusLabelLayer(face: Typeface? = null) : OverlayLayer {
     private val rule = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     private val glow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = letters
-        textAlign = Paint.Align.CENTER
+        textAlign = Paint.Align.LEFT
         letterSpacing = SPACING
     }
     private val edge = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = letters
-        textAlign = Paint.Align.CENTER
+        textAlign = Paint.Align.LEFT
         letterSpacing = SPACING
         style = Paint.Style.STROKE
         strokeJoin = Paint.Join.ROUND
     }
     private val core = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = letters
-        textAlign = Paint.Align.CENTER
+        textAlign = Paint.Align.LEFT
         letterSpacing = SPACING
     }
-    private val metrics = Paint.FontMetrics()
+    private val ink = Rect()
 
     // The word, split into lines, and its size. Only worked out again when something changes.
     private val lines = arrayOfNulls<String>(MAX_LINES)
+
+    /** Where each line's letters really start and how wide they are, at size [PROBE]. */
+    private val inkLeft = FloatArray(MAX_LINES)
+    private val inkWide = FloatArray(MAX_LINES)
     private var lineCount = 0
     private var textSize = 0f
     private var widest = 0f
@@ -130,7 +135,6 @@ class StatusLabelLayer(face: Typeface? = null) : OverlayLayer {
         core.textSize = size
         glow.textSize = size
         edge.textSize = size
-        core.getFontMetrics(metrics)
         val step = size * LINE_GAP
         val cx = w / 2f
         // Capital letters sit from the baseline up to about this share of the size.
@@ -143,7 +147,7 @@ class StatusLabelLayer(face: Typeface? = null) : OverlayLayer {
         spill.alpha = (255 * fade * breath).toInt()
         canvas.save()
         canvas.translate(cx, h / 2f)
-        canvas.scale(widest * 0.75f + size, block * 0.5f + size * 1.1f)
+        canvas.scale(min(widest * 0.6f + size * 0.6f, w * 0.55f), min(block * 0.5f + size * 0.8f, h * 0.3f))
         canvas.drawCircle(0f, 0f, 1f, spill)
         canvas.restore()
 
@@ -163,16 +167,19 @@ class StatusLabelLayer(face: Typeface? = null) : OverlayLayer {
         val hot = mix(color, Color.WHITE, HOT)
         glow.color = EffectMath.withAlpha(color, 0.5f * fade)
         glow.setShadowLayer(size * WIDE_GLOW, 0f, 0f, EffectMath.withAlpha(color, 0.85f * fade * breath))
-        edge.color = EffectMath.withAlpha(color, 0.75f * fade)
+        edge.color = EffectMath.withAlpha(mix(color, Color.WHITE, EDGE_WHITE), 0.9f * fade)
         edge.strokeWidth = size * EDGE_WIDTH
         edge.setShadowLayer(size * NEAR_GLOW, 0f, 0f, EffectMath.withAlpha(color, fade * breath))
         core.color = EffectMath.withAlpha(hot, fade)
+        val scale = size / PROBE
         for (i in 0 until lineCount) {
             val text = lines[i] ?: continue
             val y = firstBase + step * i
-            canvas.drawText(text, cx, y, glow)
-            canvas.drawText(text, cx, y, edge)
-            canvas.drawText(text, cx, y, core)
+            // Centered on the letters themselves, not on their spacing.
+            val x = cx - (inkLeft[i] + inkWide[i] / 2f) * scale
+            canvas.drawText(text, x, y, glow)
+            canvas.drawText(text, x, y, edge)
+            canvas.drawText(text, x, y, core)
         }
     }
 
@@ -193,7 +200,7 @@ class StatusLabelLayer(face: Typeface? = null) : OverlayLayer {
         for (count in 1..min(MAX_LINES, words.size)) {
             val split = splitInto(words, count)
             var wide = 0f
-            for (line in split) wide = maxOf(wide, core.measureText(line))
+            for (line in split) wide = maxOf(wide, inkWidth(line))
             val fit = min(PROBE * room / wide, height * TALLEST / ((count - 1) * LINE_GAP + 1f))
             // Another line only wins when it makes the words clearly bigger.
             if (fit > best * WRAP_GAIN) {
@@ -203,12 +210,25 @@ class StatusLabelLayer(face: Typeface? = null) : OverlayLayer {
         }
         val split = splitInto(words, bestLines)
         lineCount = split.size
-        for (i in 0 until MAX_LINES) lines[i] = split.getOrNull(i)
+        var wide = 0f
+        for (i in 0 until MAX_LINES) {
+            val line = split.getOrNull(i)
+            lines[i] = line
+            if (line == null) continue
+            inkWide[i] = inkWidth(line)
+            inkLeft[i] = ink.left.toFloat()
+            wide = maxOf(wide, inkWide[i])
+        }
         val small = min(width * SMALLEST, best)
         textSize = EffectMath.lerp(small, best, sizeSetting / 100f)
-        core.textSize = textSize
-        widest = 0f
-        for (line in split) widest = maxOf(widest, core.measureText(line))
+        widest = wide * textSize / PROBE
+    }
+
+    /** How wide [line]'s letters really are at size [PROBE]. Leaves their edges in [ink]. */
+    private fun inkWidth(line: String): Float {
+        core.textSize = PROBE
+        core.getTextBounds(line, 0, line.length, ink)
+        return maxOf(1f, ink.width().toFloat())
     }
 
     /** The words in [count] lines of about the same length, keeping each word whole. */
@@ -289,10 +309,11 @@ class StatusLabelLayer(face: Typeface? = null) : OverlayLayer {
         const val TALLEST = 0.55f
         const val WRAP_GAIN = 1.3f
 
-        const val HOT = 0.62f
+        const val HOT = 0.7f
         const val WIDE_GLOW = 0.3f
         const val NEAR_GLOW = 0.07f
-        const val EDGE_WIDTH = 0.035f
+        const val EDGE_WIDTH = 0.022f
+        const val EDGE_WHITE = 0.3f
         const val SPILL = 0.13f
 
         /** The glow breathes from full to this much less and back, once every few seconds. */
@@ -304,7 +325,7 @@ class StatusLabelLayer(face: Typeface? = null) : OverlayLayer {
         const val RULE_REACH = 0.45f
 
         const val LINE_COUNT = 600f
-        const val LINE_ALPHA = 14
+        const val LINE_ALPHA = 9
         const val ROLL_SECONDS = 7f
         const val BAND_TALL = 0.3f
         const val BAND_ALPHA = 0.035f
@@ -325,7 +346,7 @@ class StatusLabelLayer(face: Typeface? = null) : OverlayLayer {
             val pixels = IntArray(size * size)
             for (i in pixels.indices) {
                 val n = EffectMath.hash(i, SALT_GRAIN)
-                pixels[i] = if (n > 0.82f) Color.argb((6 + 16 * (n - 0.82f) / 0.18f).toInt(), 210, 235, 240) else 0
+                pixels[i] = if (n > 0.82f) Color.argb((4 + 12 * (n - 0.82f) / 0.18f).toInt(), 210, 235, 240) else 0
             }
             val tile = Bitmap.createBitmap(pixels, size, size, Bitmap.Config.ARGB_8888)
             return BitmapShader(tile, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT)

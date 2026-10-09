@@ -93,6 +93,7 @@ class RollerCoasterLayer : OverlayLayer {
     private var sky: Shader? = null
     private var ground: Shader? = null
     private var noseShade: Shader? = null
+    private var noseShine: Shader? = null
     private val sun = RadialGradient(0f, 0f, 1f, intArrayOf(0xFFFFFBEA.toInt(), 0xEEFFE2A8.toInt(), 0x55FFB070, 0), floatArrayOf(0f, 0.12f, 0.35f, 1f), Shader.TileMode.CLAMP)
     private val puff = RadialGradient(0f, 0f, 1f, intArrayOf(0xEEFFF4EC.toInt(), 0x99FFE2D2.toInt(), 0), floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
     private val hills = Path()
@@ -177,11 +178,15 @@ class RollerCoasterLayer : OverlayLayer {
         bulbs.strokeWidth = unit * BULB_SIZE
         canvas.drawPath(spine, bulbs)
 
-        pen.color = EffectMath.withAlpha(glowColor, RAIL_GLOW_ALPHA)
+        // A soft neon glow around the rail, in the panel's color.
+        pen.color = EffectMath.withAlpha(glowColor, RAIL_GLOW_ALPHA * 0.45f)
         pen.strokeWidth = unit * RAIL_GLOW
         canvas.drawPath(rail, pen)
+        pen.color = EffectMath.withAlpha(glowColor, RAIL_GLOW_ALPHA)
+        pen.strokeWidth = unit * RAIL_GLOW * 0.4f
+        canvas.drawPath(rail, pen)
         pen.color = STEEL_SHADOW
-        pen.strokeWidth = unit * RAIL_WIDTH * 2f
+        pen.strokeWidth = unit * RAIL_WIDTH * 1.6f
         canvas.drawPath(rail, pen)
         pen.color = towardWhite(glowColor, RAIL_WHITE)
         pen.strokeWidth = unit * RAIL_WIDTH
@@ -322,9 +327,10 @@ class RollerCoasterLayer : OverlayLayer {
         samples = 0
 
         // Lead-in, flat.
-        val start = -u * LEAD_IN
+        // The train starts just off the left edge and leaves just off the right edge.
+        val start = -u * LEAD_IN - carLength
         var x = 0f
-        addLine(start, base, x, base, 30)
+        addLine(start, base, x, base, 20)
         // The lift hill: a long climb, a steep drop.
         val hillWidth = u * HILL_WIDTH
         for (i in 1..HILL_STEPS) {
@@ -354,7 +360,7 @@ class RollerCoasterLayer : OverlayLayer {
             }
             x += bw
         }
-        addLine(x, base, max(x, w) + u * LEAD_IN, base, 30)
+        addLine(x, base, max(x, w) + u * LEAD_IN + carLength, base, 20)
 
         // Length and timing. Higher up is slower, lower down is faster.
         var top = Float.MAX_VALUE
@@ -610,6 +616,29 @@ class RollerCoasterLayer : OverlayLayer {
             fill.color = HILL_COLOR
             canvas.drawPath(hills, fill)
         }
+        // Nearer, greener hills in front of the far ones.
+        hills.reset()
+        started = false
+        for (i in 0..HILL_POINTS) {
+            val az = yaw - HILL_REACH + 2f * HILL_REACH * i / HILL_POINTS
+            val el = HILL_BASE * 0.5f + HILL_B * sin(az * 5f + 0.4f) + HILL_B * 0.6f * sin(az * 11f + 3f)
+            if (!projectDirection(az, el)) continue
+            if (!started) {
+                hills.moveTo(outX, outY)
+                started = true
+            } else {
+                hills.lineTo(outX, outY)
+            }
+        }
+        if (started) {
+            projectDirection(yaw + HILL_REACH, -0.02f)
+            hills.lineTo(outX, outY)
+            projectDirection(yaw - HILL_REACH, -0.02f)
+            hills.lineTo(outX, outY)
+            hills.close()
+            fill.color = HILL_NEAR
+            canvas.drawPath(hills, fill)
+        }
 
         // Fields on the ground, rushing past.
         stripes.reset()
@@ -655,7 +684,9 @@ class RollerCoasterLayer : OverlayLayer {
         ribbon(glowRail, -GAUGE, RAIL_GLOW_HALF, 0f, swoop)
         ribbon(glowRail, GAUGE, RAIL_GLOW_HALF, 0f, swoop)
         ribbon(leftRail, -GAUGE, RAIL_HALF, 0f, swoop)
-        ribbon(rightRail, GAUGE, RAIL_HALF, 0f, swoop)
+        ribbon(leftRail, GAUGE, RAIL_HALF, 0f, swoop)
+        ribbon(rightRail, -GAUGE, RAIL_HALF * RAIL_SHINE, RAIL_HALF * 0.5f, swoop)
+        ribbon(rightRail, GAUGE, RAIL_HALF * RAIL_SHINE, RAIL_HALF * 0.5f, swoop)
         sleepers.reset()
         val firstTie = ceil((camZ + NEAR_TIE) / TIE_STEP) * TIE_STEP
         for (n in 0 until TIES_AHEAD) {
@@ -670,8 +701,10 @@ class RollerCoasterLayer : OverlayLayer {
         canvas.drawPath(sleepers, fill)
         fill.color = EffectMath.withAlpha(frame.panelColor or OPAQUE, RIDE_GLOW_ALPHA)
         canvas.drawPath(glowRail, fill)
-        fill.color = RIDE_RAIL
+        // Steel rails with a bright line of light along their tops.
+        fill.color = RIDE_STEEL
         canvas.drawPath(leftRail, fill)
+        fill.color = RIDE_RAIL
         canvas.drawPath(rightRail, fill)
         canvas.restore()
 
@@ -762,24 +795,23 @@ class RollerCoasterLayer : OverlayLayer {
     private fun drawNose(canvas: Canvas, w: Float, h: Float) {
         shade(noseShade)
         canvas.drawPath(nose, fill)
+        shade(noseShine)
+        canvas.drawPath(nose, fill)
         fill.shader = null
+        pen.shader = null
         pen.color = NOSE_TRIM
         pen.strokeWidth = w * 0.008f
         canvas.drawPath(noseTrim, pen)
-        // Two small lamps on the nose.
-        for (side in 0..1) {
-            val x = w * (if (side == 0) 0.3f else 0.7f)
-            val y = h * 0.935f
-            shade(headlight)
-            canvas.save()
-            canvas.translate(x, y)
-            canvas.scale(w * 0.07f, w * 0.07f)
-            canvas.drawCircle(0f, 0f, 1f, fill)
-            canvas.restore()
-            fill.shader = null
-            fill.color = LAMP
-            canvas.drawCircle(x, y, w * 0.016f, fill)
-        }
+        // The padded lap bar, close to the rider, across the bottom.
+        pen.color = BAR_EDGE
+        pen.strokeWidth = h * BAR_THICK * 1.25f
+        canvas.drawLine(w * 0.16f, h * BAR_Y, w * 0.84f, h * BAR_Y, pen)
+        pen.color = BAR_COLOR
+        pen.strokeWidth = h * BAR_THICK
+        canvas.drawLine(w * 0.16f, h * BAR_Y, w * 0.84f, h * BAR_Y, pen)
+        pen.color = BAR_SHINE
+        pen.strokeWidth = h * BAR_THICK * 0.18f
+        canvas.drawLine(w * 0.18f, h * (BAR_Y - BAR_THICK * 0.22f), w * 0.82f, h * (BAR_Y - BAR_THICK * 0.22f), pen)
     }
 
     /** Makes the sky, ground and car-front shapes for this size. Only runs when the size changes. */
@@ -792,6 +824,7 @@ class RollerCoasterLayer : OverlayLayer {
         sky = LinearGradient(0f, -h * 0.75f, 0f, 0f, SKY_COLORS, SKY_STOPS, Shader.TileMode.CLAMP)
         ground = LinearGradient(0f, 0f, 0f, h * 0.6f, GROUND_COLORS, GROUND_STOPS, Shader.TileMode.CLAMP)
         noseShade = LinearGradient(0f, h * 0.84f, 0f, h, NOSE_COLORS, NOSE_STOPS, Shader.TileMode.CLAMP)
+        noseShine = LinearGradient(0f, 0f, w, 0f, SHINE_COLORS, SHINE_STOPS, Shader.TileMode.CLAMP)
         nose.reset()
         nose.moveTo(-w * 0.05f, h + 2f)
         nose.lineTo(-w * 0.05f, h * 0.9f)
@@ -818,10 +851,10 @@ class RollerCoasterLayer : OverlayLayer {
         const val SCALE_MIN = 0.65f
         const val SCALE_MAX = 1.35f
         const val BASE_LIFT = 0.07f
-        const val LEAD_IN = 0.35f
-        const val HILL_HEIGHT = 0.5f
-        const val HILL_WIDTH = 0.42f
-        const val HILL_SKEW = 1.45f
+        const val LEAD_IN = 0.06f
+        const val HILL_HEIGHT = 0.46f
+        const val HILL_WIDTH = 0.5f
+        const val HILL_SKEW = 1.3f
         const val HILL_STEPS = 140
         const val LOOP_RADIUS = 0.13f
         const val LOOP_DRIFT = 0.3f
@@ -833,9 +866,9 @@ class RollerCoasterLayer : OverlayLayer {
         const val CAMEL_TWO_WIDTH = 0.2f
         const val BUMP_STEPS = 70
         const val DROP_SPEEDUP = 7f
-        const val PACE_SLOW = 0.25f
-        const val PACE_FAST = 1.4f
-        const val EXIT_ROOM = 0.4f
+        const val PACE_SLOW = 0.35f
+        const val PACE_FAST = 1.6f
+        const val EXIT_ROOM = 0.1f
         const val MAX_CARS = 8
         const val CAR_LENGTH = 0.085f
         const val CAR_GAP = 1.08f
@@ -848,8 +881,8 @@ class RollerCoasterLayer : OverlayLayer {
         const val TIE_WIDTH = 0.004f
         const val SPINE_WIDTH = 0.009f
         const val RAIL_WIDTH = 0.0065f
-        const val RAIL_GLOW = 0.03f
-        const val RAIL_GLOW_ALPHA = 0.28f
+        const val RAIL_GLOW = 0.04f
+        const val RAIL_GLOW_ALPHA = 0.4f
         const val RAIL_WHITE = 0.75f
         const val BULB_EVERY = 0.045f
         const val BULB_SIZE = 0.006f
@@ -900,14 +933,15 @@ class RollerCoasterLayer : OverlayLayer {
         const val CLIP = 0.3f
         const val RAIL_POINTS = 48
         const val GAUGE = 0.62f
-        const val RAIL_HALF = 0.06f
-        const val RAIL_GLOW_HALF = 0.2f
-        const val BEAM_HALF = 0.32f
+        const val RAIL_HALF = 0.045f
+        const val RAIL_SHINE = 0.35f
+        const val RAIL_GLOW_HALF = 0.13f
+        const val BEAM_HALF = 0.2f
         const val BEAM_DROP = 0.55f
         const val TIE_STEP = 1.1f
         const val NEAR_TIE = 1.2f
-        const val TIE_HALF = 0.85f
-        const val TIE_DEPTH = 0.12f
+        const val TIE_HALF = 0.76f
+        const val TIE_DEPTH = 0.08f
         const val TIES_AHEAD = 54
         const val POST_STEP = 9f
         const val POSTS_AHEAD = 12
@@ -928,17 +962,26 @@ class RollerCoasterLayer : OverlayLayer {
         const val HILL_POINTS = 40
         const val HILL_REACH = 1.2f
         const val HILL_BASE = 0.02f
-        const val HILL_A = 0.012f
-        const val HILL_B = 0.006f
+        const val HILL_A = 0.022f
+        const val HILL_B = 0.011f
         const val RIDE_GLOW_ALPHA = 0.35f
-        val RIDE_RAIL = 0xFFF2F6FF.toInt()
-        val BEAM_COLOR = 0xFF2A3140.toInt()
-        val SLEEPER_COLOR = 0xFF4A5468.toInt()
+        val RIDE_RAIL = 0xFFFFFFFF.toInt()
+        val RIDE_STEEL = 0xFF9AA6B8.toInt()
+        val BEAM_COLOR = 0xFF20262F.toInt()
+        val SLEEPER_COLOR = 0xFF5C677C.toInt()
         val PILLAR_COLOR = 0xFFDCE3EE.toInt()
-        val HILL_COLOR = 0xFF4E6A73.toInt()
-        val STRIPE_COLOR = 0x2A000000
-        val ROW_COLOR = 0x22FFFFFF
+        val HILL_COLOR = 0xFF7891A6.toInt()
+        val HILL_NEAR = 0xFF46624F.toInt()
+        val STRIPE_COLOR = 0x1E000000
+        val ROW_COLOR = 0x12FFFFFF
         val NOSE_TRIM = 0xFFE9EEF5.toInt()
+        val BAR_COLOR = 0xFF15171D.toInt()
+        val BAR_EDGE = 0x66000000
+        val BAR_SHINE = 0x40FFFFFF
+        const val BAR_Y = 0.975f
+        const val BAR_THICK = 0.03f
+        val SHINE_COLORS = intArrayOf(0, 0x14FFFFFF, 0x47FFFFFF, 0x14FFFFFF, 0, 0)
+        val SHINE_STOPS = floatArrayOf(0f, 0.18f, 0.3f, 0.42f, 0.6f, 1f)
         val SKY_COLORS = intArrayOf(0xFF16306E.toInt(), 0xFF3F6CC4.toInt(), 0xFF8FB6EC.toInt(), 0xFFFFD7A8.toInt(), 0xFFFFC08A.toInt())
         val SKY_STOPS = floatArrayOf(0f, 0.35f, 0.7f, 0.93f, 1f)
         val GROUND_COLORS = intArrayOf(0xFF8FA58A.toInt(), 0xFF4F7A45.toInt(), 0xFF2C5228.toInt(), 0xFF173318.toInt())
