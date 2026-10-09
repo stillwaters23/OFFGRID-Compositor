@@ -260,3 +260,11 @@ States: passed, waiting for review, blocked, or waiting for Royalty's phone test
 - **PR / commit:** Pull request #13. Round two changes are staged for publication.
 - **State:** blocked
 - **Next:** Lane B's current PR branch does not yet expose `setExtraOutput`, so its final shared-surface integration and the under-40-line cap still require that API to land. PC transport/encoded audio and device checks also remain incomplete.
+
+## 2026-10-09 9:41 AM CT — Lane C review follow-up
+
+- **Bootloader step:** Lane C. Follow-up review
+- **What was done:** Fixed role changes from local panel settings, stop the camera role before switching to remote, sync camera/mic/mode state for the remote toggles, and time out incomplete pairing handshakes. Standalone encrypted loopback and timeout checks pass.
+- **PR / commit:** Pull request #13. Follow-up changes are pending publication.
+- **State:** blocked
+- **Next:** The public Lane B output-surface API and real PC transport are still unavailable; finish those after Lane B lands, then rerun Android tests and device checks.

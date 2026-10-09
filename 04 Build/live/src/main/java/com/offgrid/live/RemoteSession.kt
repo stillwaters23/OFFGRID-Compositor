@@ -72,7 +72,14 @@ class RemoteSession private constructor(
         private const val MAX_ENCRYPTED_SIZE = MAX_VIDEO_SIZE + 64
         private const val MIN_ENCRYPTED_SIZE = 24
 
-        fun establish(socket: Socket, pairingKey: String, isInitiator: Boolean): RemoteSession {
+        fun establish(
+            socket: Socket,
+            pairingKey: String,
+            isInitiator: Boolean,
+            handshakeTimeoutMs: Int = HANDSHAKE_TIMEOUT_MS,
+        ): RemoteSession {
+            require(handshakeTimeoutMs > 0)
+            socket.soTimeout = handshakeTimeoutMs
             try {
                 return establishConnected(socket, pairingKey, isInitiator)
             } catch (error: Exception) {
@@ -82,6 +89,8 @@ class RemoteSession private constructor(
                     error.addSuppressed(closeError)
                 }
                 throw error
+            } finally {
+                if (!socket.isClosed) socket.soTimeout = 0
             }
         }
 
@@ -141,6 +150,7 @@ class RemoteSession private constructor(
         private const val NONCE_SIZE = 32
         private const val PROOF_SIZE = 32
         private const val MAX_PUBLIC_KEY_SIZE = 128
+        private const val HANDSHAKE_TIMEOUT_MS = 5_000
     }
 }
 

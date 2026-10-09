@@ -11,6 +11,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import java.net.InetSocketAddress
+import java.util.concurrent.ConcurrentHashMap
 
 class RemotePreviewActivity : Activity(), SurfaceHolder.Callback {
     private lateinit var pairing: PairingWorkflow
@@ -22,6 +23,7 @@ class RemotePreviewActivity : Activity(), SurfaceHolder.Callback {
     private var link: RemoteLink? = null
     @Volatile
     private var decoder: RemotePreviewDecoder? = null
+    private val cameraSettings = ConcurrentHashMap<String, String>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -45,6 +47,11 @@ class RemotePreviewActivity : Activity(), SurfaceHolder.Callback {
         root.addView(button("Find camera phone") { findCamera() }, marginTop(8))
         root.addView(button("Camera on / off") { toggle("fx.cam.on", true) }, marginTop(8))
         root.addView(button("Mic on / off") { toggle("fx.mic.on", false) }, marginTop(8))
+        for (mode in CAMERA_MODES) {
+            root.addView(button("Camera mode: $mode") {
+                sendSetting("fx.camera.mode", mode)
+            }, marginTop(8))
+        }
         for (action in FIRE_ACTIONS) {
             root.addView(button("Fire $action") {
                 link?.sendControl(RemoteMessage("", "fire", action))
@@ -78,8 +85,11 @@ class RemotePreviewActivity : Activity(), SurfaceHolder.Callback {
             pairingKey = key,
             onState = { message -> runOnUiThread { status.text = message } },
             onPacket = { packet ->
-                if (packet is RemotePacket.Video) {
-                    decoder?.queue(packet)
+                when (packet) {
+                    is RemotePacket.Video -> decoder?.queue(packet)
+                    is RemotePacket.Control -> if (packet.message.type == "setting") {
+                        cameraSettings[packet.message.key] = packet.message.value
+                    }
                 }
             },
         )
@@ -97,10 +107,15 @@ class RemotePreviewActivity : Activity(), SurfaceHolder.Callback {
     }
 
     private fun toggle(key: String, default: Boolean) {
-        val current = LiveHostRegistry.host?.readSetting(key)?.toBooleanStrictOrNull() ?: default
+        val current = cameraSettings[key]?.toBooleanStrictOrNull() ?: default
         val next = (!current).toString()
-        link?.sendControl(RemoteMessage(key, "setting", next))
+        sendSetting(key, next)
         status.text = if (key == "fx.cam.on") "Camera request sent: $next" else "Mic request sent: $next"
+    }
+
+    private fun sendSetting(key: String, value: String) {
+        cameraSettings[key] = value
+        link?.sendControl(RemoteMessage(key, "setting", value))
     }
 
     override fun surfaceCreated(holder: SurfaceHolder) {
@@ -167,6 +182,7 @@ class RemotePreviewActivity : Activity(), SurfaceHolder.Callback {
     private companion object {
         const val WHITE = 0xfff4f4f4.toInt()
         const val UV = 0xff9b5cff.toInt()
+        val CAMERA_MODES = listOf("live", "blackout", "cloak", "status", "ghost")
         val FIRE_ACTIONS = listOf("shatter", "freeze", "quiet", "fireworks", "red_sweep", "laser_writing")
     }
 }

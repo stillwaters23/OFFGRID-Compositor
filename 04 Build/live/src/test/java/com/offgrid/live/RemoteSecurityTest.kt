@@ -4,6 +4,7 @@ import java.net.InetAddress
 import java.net.Socket
 import java.net.ServerSocket
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -75,6 +76,16 @@ class RemoteSecurityTest {
             val plain = byteArrayOf(index.toByte())
             assertArrayEquals(plain, receiver.decrypt(sender.encrypt(plain)))
         }
+    }
+
+    @Test
+    fun channelRekeysAfterItsLifetime() {
+        val key = ByteArray(32) { (it + 7).toByte() }
+        val prefix = byteArrayOf(2, 4, 6, 8)
+        val sender = EncryptedChannel(key, prefix, lifetimeNanos = 1)
+        val receiver = EncryptedChannel(key, prefix, lifetimeNanos = Long.MAX_VALUE)
+        val plain = byteArrayOf(7, 8, 9)
+        assertArrayEquals(plain, receiver.decrypt(sender.encrypt(plain)))
     }
 
     @Test
@@ -169,6 +180,30 @@ class RemoteSecurityTest {
                         false
                     } catch (error: IllegalArgumentException) {
                         error.message == "Keys don't match"
+                    }
+
+                    @Test
+                    fun incompleteHandshakeTimesOut() {
+                        val loopback = InetAddress.getLoopbackAddress()
+                        val pairingKey = PairingKey.generate()
+                        val executor = Executors.newSingleThreadExecutor()
+                        ServerSocket(0, 1, loopback).use { server ->
+                            try {
+                                val timedOut = executor.submit<Boolean> {
+                                    try {
+                                        RemoteSession.establish(server.accept(), pairingKey, false, handshakeTimeoutMs = 100)
+                                        false
+                                    } catch (_: java.net.SocketTimeoutException) {
+                                        true
+                                    }
+                                }
+                                Socket(loopback, server.localPort).use {
+                                    assertTrue(timedOut.get(2, TimeUnit.SECONDS))
+                                }
+                            } finally {
+                                executor.shutdownNow()
+                            }
+                        }
                     }
                 }
                 val failure = runCatching {

@@ -53,6 +53,8 @@ internal class EffectsController(
 
     // Lane C hook
     var onLiveAction: ((String) -> Unit)? = null
+    // Lane C hook
+    var onLiveSettings: (() -> Unit)? = null
 
     private var chained: Runnable? = null
     private val radarPing = object : Runnable {
@@ -108,6 +110,8 @@ internal class EffectsController(
         }
         if (now.on(FxKeys.EMOJI_ON) && !before.on(FxKeys.EMOJI_ON)) sounds.play(SOUND_EMOJI, now)
         onSettings?.invoke()
+        // Lane C hook
+        onLiveSettings?.invoke()
     }
 
     private fun pushReplay() {

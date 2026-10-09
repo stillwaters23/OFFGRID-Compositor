@@ -17,7 +17,6 @@ internal class LiveHost(
     private val main = Handler(Looper.getMainLooper())
     @Volatile private var effects: EffectsController? = null
     @Volatile private var processor: (() -> CompositorProcessor?)? = null
-    var onRoleChanged: ((String) -> Unit)? = null
     var onOverlayChanged: ((Boolean) -> Unit)? = null
 
     fun attach(effects: EffectsController, processor: () -> CompositorProcessor?) {
@@ -44,7 +43,6 @@ internal class LiveHost(
                 preferences.write { text(key, value) }
             }
             effects?.refresh()
-            if (key == REMOTE_ROLE) onRoleChanged?.invoke(value)
             if (key == LIVE_OVERLAY) onOverlayChanged?.invoke(value.toBoolean())
         }
     }

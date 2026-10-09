@@ -50,10 +50,13 @@ internal class LiveIntegration(
     private var streamServiceStarted = false
     private var cleanOutput = false
     private var activity: Activity? = activity
+    private var activeRole = "off"
 
     init {
         LiveHostRegistry.host = host
         effects.onLiveAction = ::onAction
+        effects.onLiveSettings = ::syncRole
+        syncRole()
         activity.lifecycle.addObserver(this)
     }
 
@@ -78,6 +81,7 @@ internal class LiveIntegration(
 
     fun close() {
         effects?.onLiveAction = null
+        effects?.onLiveSettings = null
         effects = null
         host.detach()
         activity = null
@@ -147,11 +151,20 @@ internal class LiveIntegration(
     }
 
     private fun changeRole(value: String) {
+        if (activeRole == value) return
+        activeRole = value
         when (value) {
             "camera" -> startCameraRole()
-            "remote" -> launch(RemotePreviewActivity::class.java)
+            "remote" -> {
+                stopCameraRole()
+                launch(RemotePreviewActivity::class.java)
+            }
             else -> stopCameraRole()
         }
+    }
+
+    private fun syncRole() {
+        changeRole(host.readSetting("fx.remote.role") ?: "off")
     }
 
     private fun startCameraRole() {
@@ -187,12 +200,19 @@ internal class LiveIntegration(
                                     if (started) showStatus("Camera phone is ready on local Wi-Fi.")
                                 }
                                 try {
+                                    for ((key, default) in CAMERA_SETTINGS) {
+                                        val value = host.readSetting(key) ?: default
+                                        session.sendControl(RemoteMessage(key, "setting", value))
+                                    }
                                     while (!Thread.currentThread().isInterrupted) {
                                         when (val packet = session.receive()) {
                                             is RemotePacket.Control -> {
                                                 val message = packet.message
                                                 if (message.type == "fire") host.fire(message.value)
-                                                else host.writeSetting(message.key, message.value)
+                                                else {
+                                                    host.writeSetting(message.key, message.value)
+                                                    session.sendControl(message)
+                                                }
                                             }
                                             is RemotePacket.Video -> Unit
                                         }
@@ -242,6 +262,11 @@ internal class LiveIntegration(
 
     private companion object {
         const val LIVE_OVERLAY_KEY = "fx.live.overlay"
+        val CAMERA_SETTINGS = mapOf(
+            "fx.cam.on" to "true",
+            "fx.mic.on" to "false",
+            "fx.camera.mode" to "live",
+        )
     }
 
     companion object {
