@@ -3,6 +3,7 @@ import { committedPalette, previewPalette } from "@/lib/appearance";
 import { hexToRgb, isValidHex, normalizeHex } from "@/lib/color";
 import { checkNumberColor, resolveReelNumberColor } from "@/lib/contrast-guard";
 import { useAuric } from "@/lib/store";
+import { OrbToggle } from "@/components/auric/switch";
 import "@/styles/reel-look.css";
 
 const LASER_PRESETS = [
@@ -73,15 +74,24 @@ export function ReelLookFolder() {
       </div>
 
       <section className="rounded-2xl p-4 panel-glass">
-        <h2 className="tx-title text-sm">Laser color</h2>
-        <p className="tx-muted mt-2 text-xs">Decorative light · no text-contrast rule</p>
+        <div className="flex min-h-12 items-center justify-between gap-4">
+          <div>
+            <h2 className="tx-title text-sm">Laser color</h2>
+            <p className="tx-muted mt-2 text-xs">Decorative light · no text-contrast rule</p>
+          </div>
+          <OrbToggle
+            on={draft.laserEnabled}
+            onChange={(enabled) => useAuric.getState().setDraftLaserEnabled(enabled)}
+            label="Laser on/off"
+          />
+        </div>
         <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
           {LASER_PRESETS.map((preset) => (
             <button
               key={preset.hex}
               type="button"
               aria-pressed={draft.laserColor === preset.hex}
-              className="min-h-12 rounded-2xl px-4 text-left text-sm panel-glass"
+              className="reel-look-preset min-h-12 rounded-2xl px-4 text-left text-sm panel-glass"
               onClick={() => {
                 useAuric.getState().setDraftLaserColor(preset.hex);
                 setHexText(preset.hex);
@@ -106,6 +116,19 @@ export function ReelLookFolder() {
           />
         </label>
         {hexError ? <p role="alert" className="mt-2 text-sm text-danger">{hexError}</p> : null}
+        <label className="mt-4 block text-sm">
+          Laser intensity · {draft.laserIntensity}%
+          <input
+            aria-label="Laser intensity"
+            type="range"
+            min={0}
+            max={100}
+            step={1}
+            value={draft.laserIntensity}
+            className="reel-look-slider mt-2 block min-h-12 w-full"
+            onChange={(event) => useAuric.getState().setDraftLaserIntensity(Number(event.target.value))}
+          />
+        </label>
       </section>
 
       <section className="rounded-2xl p-4 panel-glass">

@@ -100,6 +100,7 @@ function RestoreCard() {
 function StudioActions() {
   const dirty = useAuric(isAppearanceDirty);
   const draft = useAuric((s) => s.appearanceDraft);
+  const folder = useAuric((s) => s.customizationFolder);
   const now = useAuric((s) => s.now);
   const zone = useAuric((s) => (s.timeZoneLocked ? s.timeZoneId : null));
   const currentFont = useAuric((s) => s.digitFont);
@@ -139,7 +140,7 @@ function StudioActions() {
   return (
     <div className="mt-6 space-y-2">
       {issues[0] ? <p className="text-sm text-danger">{issues[0].message}</p> : null}
-      {numberIssue ? <p role="alert" className="text-sm text-danger">{numberIssue}</p> : null}
+      {numberIssue && folder !== "laser" ? <p role="alert" className="text-sm text-danger">{numberIssue}</p> : null}
       {!fontReady ? <p className="text-sm text-muted">The selected font is still loading.</p> : null}
       <div className="flex min-w-0 flex-wrap gap-2">
         <PitButton data-testid="apply-appearance" disabled={!dirty || !readable || !fontReady} className="min-h-11 min-w-0 flex-1" onClick={apply}>

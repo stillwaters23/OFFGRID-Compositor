@@ -46,3 +46,13 @@
 :root .reel-time-plaque .digit-cut {
   color: var(--reel-number, var(--digit));
 }
+
+.reel-look-slider {
+  accent-color: #C7D4E5;
+  touch-action: pan-y;
+}
+
+/* 1px is a neutral hairline to keep the selected aperture visible when the beam is off. */
+:root[data-laser-enabled="false"] .barrel .aperture {
+  border-top: 1px solid #8B929B;
+}
