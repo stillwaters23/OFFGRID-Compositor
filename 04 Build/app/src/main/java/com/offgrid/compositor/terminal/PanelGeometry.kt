@@ -1,28 +1,26 @@
 package com.offgrid.compositor.terminal
 
-internal data class GlowLayers(val core: Float, val mid: Float, val wide: Float) {
-    val totalAlpha: Float get() = core + mid + wide
-}
+import kotlin.math.roundToInt
 
 internal object PanelGeometry {
-    fun glowLayers(value: Int): GlowLayers {
-        val level = value.coerceIn(0, 100) / 100f
-        return GlowLayers(
-            core = level,
-            mid = level * level,
-            wide = level * level * level,
-        )
+    fun isFullBleed(width: Int, height: Int, fullScreen: Boolean): Boolean =
+        fullScreen || (width == 100 && height == 100)
+
+    fun sizeRange(available: Int, minimum: Int): Pair<Int, Int> {
+        val maximum = available.coerceAtLeast(0)
+        return minOf(minimum.coerceAtLeast(0), maximum) to maximum
     }
 
-    fun borderThickness(value: Int): Float {
-        val thickness = value.coerceIn(0, 100)
-        return if (thickness <= 50) 2f + thickness / 50f else 3f + 3f * (thickness - 50) / 50f
+    fun sizeFor(percent: Int, range: Pair<Int, Int>): Int {
+        val minimum = range.first.coerceAtLeast(0)
+        val maximum = maxOf(minimum, range.second)
+        return minimum + ((maximum - minimum) * percent.coerceIn(0, 100) / 100f).roundToInt()
     }
 
-    fun panelDimension(available: Int, percent: Int, maximum: Int): Int {
-        if (percent >= 100) return available.coerceAtLeast(0)
-        return (available.coerceAtLeast(0) * percent.coerceIn(0, 100) / 100f)
-            .toInt()
-            .coerceAtMost(maximum.coerceAtLeast(0))
+    fun percentFor(size: Float, range: Pair<Int, Int>): Int {
+        if (range.second <= range.first) return 100
+        return ((size - range.first) / (range.second - range.first) * 100f)
+            .roundToInt()
+            .coerceIn(0, 100)
     }
 }

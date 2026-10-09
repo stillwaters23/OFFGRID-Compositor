@@ -13,12 +13,13 @@ import android.view.animation.LinearInterpolator
 
 /**
  * A soft glowing line that slowly sweeps down the panel, then waits, then sweeps again.
- * It never takes taps.
+ * It takes the edge color. It never takes taps.
  */
-internal class ScanLineView(context: Context) : View(context) {
+internal class ScanLineView(context: Context) : View(context), Styled {
     private val band = Paint()
     private var sweep: ValueAnimator? = null
     private var shown = false
+    private var color = Hud.HOLO_CYAN
 
     init {
         isClickable = false
@@ -26,13 +27,25 @@ internal class ScanLineView(context: Context) : View(context) {
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
     }
 
+    override fun applyLook(look: PanelLook) {
+        if (look.edge != color) {
+            color = look.edge
+            buildShader(width, height)
+            invalidate()
+        }
+    }
+
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
+        buildShader(w, h)
+    }
+
+    private fun buildShader(w: Int, h: Int) {
         if (w == 0 || h == 0) return
-        val clear = Hud.withAlpha(Hud.CYAN, 0f)
+        val clear = Hud.withAlpha(color, 0f)
         val vertical = LinearGradient(
             0f, 0f, 0f, h.toFloat(),
-            intArrayOf(clear, Hud.withAlpha(Hud.CYAN, 0.10f), Hud.withAlpha(Hud.CYAN, 0.45f), Hud.withAlpha(Hud.CYAN, 0.10f), clear),
+            intArrayOf(clear, Hud.withAlpha(color, 0.10f), Hud.withAlpha(color, 0.45f), Hud.withAlpha(color, 0.10f), clear),
             floatArrayOf(0f, 0.38f, 0.5f, 0.62f, 1f),
             Shader.TileMode.CLAMP,
         )
