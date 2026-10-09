@@ -22,6 +22,15 @@ object LocalAddressPolicy {
     fun requireAllowed(address: InetAddress) {
         require(isAllowed(address)) { "Only local network addresses are allowed" }
     }
+
+    fun siteLocalAddress(): InetAddress =
+        (NetworkInterface.getNetworkInterfaces()
+            ?: throw IllegalStateException("No private Wi-Fi address is available"))
+            .toList()
+            .asSequence()
+            .flatMap { it.inetAddresses.toList().asSequence() }
+            .firstOrNull { it is Inet4Address && it.isSiteLocalAddress }
+            ?: throw IllegalStateException("No private Wi-Fi address is available")
 }
 
 class RemoteServiceDiscovery(
@@ -198,19 +207,12 @@ class LocalSocketServer(
     override fun close() = server.close()
 
     private companion object {
-        fun localAddress(): InetAddress =
-            (NetworkInterface.getNetworkInterfaces()
-                ?: throw IllegalStateException("No private Wi-Fi address is available"))
-                .toList()
-                .asSequence()
-                .flatMap { it.inetAddresses.toList().asSequence() }
-                .firstOrNull { it is Inet4Address && it.isSiteLocalAddress }
-                ?: throw IllegalStateException("No private Wi-Fi address is available")
-
         fun bind(port: Int, address: InetAddress): ServerSocket {
             LocalAddressPolicy.requireAllowed(address)
             return ServerSocket(port, 1, address)
         }
+
+        fun localAddress(): InetAddress = LocalAddressPolicy.siteLocalAddress()
     }
 }
 
@@ -236,7 +238,7 @@ class LocalMessageConnection(private val socket: Socket) : AutoCloseable {
     override fun close() = socket.close()
 
     companion object {
-        private const val MIN_FRAME_SIZE = 24
+        private const val MIN_FRAME_SIZE = 28
         private const val MAX_FRAME_SIZE = 16 * 1024 * 1024
     }
 }

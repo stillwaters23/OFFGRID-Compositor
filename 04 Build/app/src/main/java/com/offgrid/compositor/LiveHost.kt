@@ -12,11 +12,23 @@ import com.offgrid.live.OffgridHost
 
 internal class LiveHost(
     private val context: Context,
-    private val effects: EffectsController,
-    private val processor: () -> CompositorProcessor?,
 ) : OffgridHost {
     private val preferences = PanelPrefs(context)
     private val main = Handler(Looper.getMainLooper())
+    @Volatile private var effects: EffectsController? = null
+    @Volatile private var processor: (() -> CompositorProcessor?)? = null
+    var onRoleChanged: ((String) -> Unit)? = null
+    var onOverlayChanged: ((Boolean) -> Unit)? = null
+
+    fun attach(effects: EffectsController, processor: () -> CompositorProcessor?) {
+        this.effects = effects
+        this.processor = processor
+    }
+
+    fun detach() {
+        effects = null
+        processor = null
+    }
 
     override fun readSetting(key: String): String? = when {
         preferences.hasToggle(key) -> preferences.toggle(key, false).toString()
@@ -31,13 +43,15 @@ internal class LiveHost(
             } else {
                 preferences.write { text(key, value) }
             }
-            effects.refresh()
+            effects?.refresh()
+            if (key == REMOTE_ROLE) onRoleChanged?.invoke(value)
+            if (key == LIVE_OVERLAY) onOverlayChanged?.invoke(value.toBoolean())
         }
     }
 
     override fun fire(action: String) {
         val kind = FIRES[action] ?: return
-        main.post { effects.fire(kind) }
+        main.post { effects?.fire(kind) }
     }
 
     override fun openApp() {
@@ -49,16 +63,17 @@ internal class LiveHost(
 
     override fun frameSurfaceSink(): FrameSink = object : FrameSink {
         override fun attach(surface: Surface, width: Int, height: Int) {
-            processor()?.setLiveSurface(surface, width, height)
+            processor?.invoke()?.setLiveSurface(surface, width, height)
         }
 
         override fun detach(surface: Surface) {
-            processor()?.clearLiveSurface(surface)
+            processor?.invoke()?.clearLiveSurface(surface)
         }
     }
 
     private companion object {
         const val REMOTE_ROLE = "fx.remote.role"
+        const val LIVE_OVERLAY = "fx.live.overlay"
         val FIRES = mapOf(
             "shatter" to Fire.SHATTER,
             "freeze" to Fire.TIME_FREEZE,

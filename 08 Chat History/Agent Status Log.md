@@ -244,3 +244,19 @@ States: passed, waiting for review, blocked, or waiting for Royalty's phone test
 - **PR / commit:** Pull request #13. App integration changes are committed.
 - **State:** blocked
 - **Next:** Run automated code review and security validation, then report remaining Lane A/B work and device checks.
+
+## 2026-10-09 9:25 AM CT — Lane C round two
+
+- **Bootloader step:** Lane C. Live and Remote review follow-up
+- **What was done:** Corrected the Android library plugin declaration, added Live and Remote panel keys/rows/actions and local PC endpoint validation tests, removed duplicate audio permission and Bigo note, improved overlay resize input, and added derived transcript authentication plus channel key ratcheting.
+- **PR / commit:** Pull request #13. Round two changes are in progress.
+- **State:** blocked
+- **Next:** The Lane B PR branch does not yet contain the promised `setExtraOutput` API, so remove the duplicate compositor drawing hook only after that shared output path is present. Finish UI routing, PC streaming integration, validation, and PR details.
+
+## 2026-10-09 9:34 AM CT — Lane C round two validation
+
+- **Bootloader step:** Lane C. Live and Remote review follow-up
+- **What was done:** Added pairing and remote-preview screens, role-driven local discovery/server wiring, service stream-type entry points, SRT/RTMP endpoint validation and OBS setup steps. Standalone Kotlin checks pass for local output validation, HKDF, derived transcript confirmation, and channel rekey. XML and whitespace checks pass. Android Gradle remains blocked resolving AGP 8.13.2.
+- **PR / commit:** Pull request #13. Round two changes are staged for publication.
+- **State:** blocked
+- **Next:** Lane B's current PR branch does not yet expose `setExtraOutput`, so its final shared-surface integration and the under-40-line cap still require that API to land. PC transport/encoded audio and device checks also remain incomplete.

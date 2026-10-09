@@ -15,7 +15,7 @@ internal class OverlayPanelView(
 ) : View(context) {
     interface Listener {
         fun moveBy(dx: Int, dy: Int)
-        fun resizeBy(dx: Int, dy: Int)
+        fun resizeBy(dx: Int, dy: Int, fromLeftCorner: Boolean)
         fun action(name: String)
         fun openSizeEntry(axis: String)
         fun bubbleDrag(showTarget: Boolean)
@@ -30,6 +30,7 @@ internal class OverlayPanelView(
     private var lastX = 0f
     private var lastY = 0f
     private var resizing = false
+    private var resizeFromLeft = false
     private var dragging = false
     var cameraEnabled = true
         set(value) {
@@ -46,11 +47,11 @@ internal class OverlayPanelView(
                 field = value
                 fullScreenLabel = if (value) "FULL ON" else "FULL OFF"
             }
-        var widthLabel = "W [40]"
+        var widthLabel = "W"
             set(value) {
                 field = value
             }
-        var heightLabel = "H [35]"
+        var heightLabel = "H"
         private var cameraLabel = "CAM ON"
         private var microphoneLabel = "MIC OFF"
         private var fullScreenLabel = "FULL OFF"
@@ -148,12 +149,13 @@ internal class OverlayPanelView(
                 lastX = downX
                 lastY = downY
                 resizing = event.y / density > height / density - 24f
+                resizeFromLeft = event.x / density < 24f
                 return true
             }
             MotionEvent.ACTION_MOVE -> {
                 val dx = (event.rawX - lastX).toInt()
                 val dy = (event.rawY - lastY).toInt()
-                if (resizing) listener.resizeBy(dx, dy)
+                if (resizing) listener.resizeBy(dx, dy, resizeFromLeft)
                 else if (event.y / density < 32f) listener.moveBy(dx, dy)
                 lastX = event.rawX
                 lastY = event.rawY

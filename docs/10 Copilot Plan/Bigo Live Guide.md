@@ -63,10 +63,34 @@ Add these plain notes to the Bigo platform folder:
 ## Requests for other lanes
 
 - Lane A: Add the three notes above to the Bigo platform folder in 📁 Live and Remote.
-- Lane A: Add `LIVE_OPEN_OVERLAY_SETTINGS`, `LIVE_CLEAN_OUTPUT`, and `REMOTE_OPEN_PAIRING` to `PanelAction`, and add the Live and Remote rows/settings for `fx.live.overlay` and `fx.remote.role`. These actions and settings are not in the merged `final-build` base, so the app hooks cannot be reached until Lane A adds them.
-- Lane A: Add the three notes above to the Bigo platform folder in 📁 Live and Remote.
-- Lane B: When integrating, keep camera and microphone foreground-service types off for overlay-only use. Start them only while the OFFGRID activity is visible and OFFGRID itself is recording or streaming. The current app manifest removes `RECORD_AUDIO`; review that removal before wiring OFFGRID microphone recording.
-- Lane B: Wire `fx.cam.on` and `fx.mic.on` through the app's settings/effect snapshot path so overlay and remote controls can affect the camera phone.
+- Lane B: Add `setExtraOutput(id, surface, width, height)` using its shared `drawFinal` path so remote preview and PC encoder surfaces receive the same finished image without a duplicate compositor renderer. Its current PR branch does not yet expose this method, and it is not in `final-build`.
+- Lane B: Expose a read-only processed PCM tap for PC streaming when `fx.mic.on` is on. Until then the PC output remains video-only.
+- Lane B: Keep camera and microphone foreground-service types off for overlay-only use. Add them only for stream work started while OFFGRID is visible. `RECORD_AUDIO` is declared by Lane B in the app manifest.
+
+## Send to PC with OBS
+
+This route sends the finished OFFGRID picture over the local network. It does not send the panel or overlay. The Android implementation must use only a local PC address; never use a public streaming relay.
+
+### SRT listener
+
+1. On the PC, install OBS Studio and open it.
+2. In OBS, add a **Media Source** and name it `OFFGRID`.
+3. Clear **Local File**. Enter `srt://0.0.0.0:9000?mode=listener` as the input, then select **OK**.
+4. Allow OBS through the PC firewall on the private network only.
+5. On the phone, open 📁 Live and Remote. Set **PC protocol** to SRT, type the PC's local IP address, and keep port 9000 unless the PC listener uses another port.
+6. Turn on **Send to PC** and choose **Start PC output**. Check OBS for the finished picture.
+7. In OBS, choose **Start Streaming** and connect OBS to Bigo or TikTok Live Studio using the platform's current stream key and server details. Keep the stream key on the PC and never put it in OFFGRID.
+
+### RTMP server
+
+1. On the PC, install and start a local RTMP server, such as MediaMTX. Configure its private-network listener on port 1935.
+2. In OBS, add a **Media Source**, clear **Local File**, and enter the local server's stream path, such as `rtmp://127.0.0.1:1935/live/offgrid`.
+3. Allow the RTMP server through the PC firewall on the private network only.
+4. On the phone, choose RTMP, type the PC's local IP address, and set the port to 1935.
+5. Tap **Send to PC**, then **Start PC output**. Confirm the source appears in OBS.
+6. Start the Bigo or TikTok stream from OBS or the platform's current PC Live Studio. Follow the platform's current rules and account requirements.
+
+Test SRT and RTMP with a private or dummy stream first. Never share an OBS stream key, SRT passphrase, pairing key, or public IP in screenshots or logs.
 
 ## Test record
 

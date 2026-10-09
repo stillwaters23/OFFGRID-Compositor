@@ -39,7 +39,7 @@ class RemoteHandshake private constructor(
             responderKey = keyMaterial.copyOfRange(32, 64),
             initiatorNoncePrefix = keyMaterial.copyOfRange(64, 68),
             responderNoncePrefix = keyMaterial.copyOfRange(68, 72),
-            transcriptMac = Hkdf.hmac(pairingBytes, transcript),
+            transcriptMac = Hkdf.hmac(confirmationKey(pairingBytes), transcript),
         )
     }
 
@@ -56,11 +56,20 @@ class RemoteHandshake private constructor(
 
         fun confirm(pairingKey: String, transcript: ByteArray): ByteArray {
             require(PairingKey.isValid(pairingKey))
-            return Hkdf.hmac(pairingKey.toByteArray(Charsets.US_ASCII), transcript)
+            val pairingBytes = pairingKey.toByteArray(Charsets.US_ASCII)
+            return Hkdf.hmac(confirmationKey(pairingBytes), transcript)
         }
 
         fun verifyConfirmation(pairingKey: String, transcript: ByteArray, confirmation: ByteArray): Boolean =
             MessageDigest.isEqual(confirm(pairingKey, transcript), confirmation)
+
+        private fun confirmationKey(pairingKey: ByteArray): ByteArray =
+            Hkdf.sha256(
+                pairingKey,
+                ByteArray(32),
+                "OFFGRID transcript confirmation v1".toByteArray(Charsets.US_ASCII),
+                32,
+            )
     }
 }
 

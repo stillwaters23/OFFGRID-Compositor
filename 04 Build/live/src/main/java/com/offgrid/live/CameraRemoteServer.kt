@@ -7,12 +7,13 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 class CameraRemoteServer(
     bindAddress: InetAddress,
+    port: Int = DEFAULT_PORT,
     private val pairingKey: () -> String?,
     private val onSession: (RemoteSession) -> Unit,
     private val onFailure: (String) -> Unit,
 ) : AutoCloseable {
     private val running = AtomicBoolean(false)
-    private val server = LocalSocketServer(bindAddress = bindAddress)
+    private val server = LocalSocketServer(port = port, bindAddress = bindAddress)
     private var acceptThread: Thread? = null
 
     val port: Int
@@ -54,5 +55,9 @@ class CameraRemoteServer(
         acceptThread?.interrupt()
         acceptThread?.join(500)
         acceptThread = null
+    }
+
+    companion object {
+        const val DEFAULT_PORT = 9000
     }
 }

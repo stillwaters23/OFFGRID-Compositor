@@ -9,6 +9,19 @@ package com.offgrid.compositor.effects
  * PanelTree, next to the folder that shows it.
  */
 object FxKeys {
+    // Lane C hook: Live and Remote controls.
+    const val LIVE_OVERLAY = "fx.live.overlay"
+    const val REMOTE_ROLE = "fx.remote.role"
+    const val REMOTE_ROLE_OFF = "off"
+    const val REMOTE_ROLE_CAMERA = "camera"
+    const val REMOTE_ROLE_REMOTE = "remote"
+    const val LIVE_PC_ON = "fx.live.pc.on"
+    const val LIVE_PC_PROTOCOL = "fx.live.pc.protocol"
+    const val LIVE_PC_HOST = "fx.live.pc.host"
+    const val LIVE_PC_PORT = "fx.live.pc.port"
+    const val LIVE_PC_RES = "fx.live.pc.res"
+    const val LIVE_PC_BITRATE = "fx.live.pc.bitrate"
+
     // 📁 Camera: the no-face modes (features 9, 10, 11).
     const val CAMERA_MODE = "fx.camera.mode"
     const val MODE_LIVE = "live"

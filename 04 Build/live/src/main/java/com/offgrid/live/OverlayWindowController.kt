@@ -95,11 +95,13 @@ internal class OverlayWindowController(
         updatePosition()
     }
 
-    override fun resizeBy(dx: Int, dy: Int) {
+    override fun resizeBy(dx: Int, dy: Int, fromLeftCorner: Boolean) {
         val layout = params ?: return
         val limits = screenSize()
-        layout.width = (layout.width + dx).coerceIn(dp(160), limits.first)
+        val previousRight = layout.x + layout.width
+        layout.width = (layout.width + if (fromLeftCorner) -dx else dx).coerceIn(dp(160), limits.first)
         layout.height = (layout.height + dy).coerceIn(dp(224), limits.second - safeTop())
+        if (fromLeftCorner) layout.x = previousRight - layout.width
         layout.x = layout.x.coerceIn(dp(8), max(dp(8), limits.first - layout.width - dp(8)))
         layout.y = layout.y.coerceIn(safeTop(), max(safeTop(), limits.second - layout.height - dp(8)))
         preferences.widthPercent = (layout.width * 100 / limits.first).coerceIn(15, 100)
@@ -289,8 +291,8 @@ internal class OverlayWindowController(
         view.cameraEnabled = host?.readSetting("fx.cam.on")?.toBooleanStrictOrNull() ?: true
         view.microphoneEnabled = host?.readSetting("fx.mic.on")?.toBooleanStrictOrNull() ?: false
         view.fullScreenEnabled = preferences.fullScreen
-        view.widthLabel = "W [${preferences.widthPercent}]"
-        view.heightLabel = "H [${preferences.heightPercent}]"
+        view.widthLabel = "W"
+        view.heightLabel = "H"
     }
 
     private fun confirmFullScreen() {

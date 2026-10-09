@@ -12,6 +12,61 @@ import com.offgrid.compositor.effects.FxKeys
  */
 internal object EffectFolders {
 
+    // Lane C hook
+    fun liveRemote() = PanelFolder(
+        id = "live_remote",
+        title = "📁 Live and Remote",
+        tag = null,
+        kind = FolderKind.EFFECTS,
+        items = listOf(
+            ToggleItem(FxKeys.LIVE_OVERLAY, "Floating overlay", "Show the small OFFGRID controls above other apps.", false, isTest = false),
+            ActionItem(PanelAction.LIVE_OPEN_OVERLAY_SETTINGS, "Overlay settings", "Allow OFFGRID to draw its small controls over other apps."),
+            ActionItem(PanelAction.LIVE_CLEAN_OUTPUT, "Clean screen share", "Hide the record bar and shrink the panel to its bubble."),
+            ChoiceItem(
+                FxKeys.REMOTE_ROLE,
+                "Remote role",
+                listOf(
+                    Choice(FxKeys.REMOTE_ROLE_OFF, "Off", "Turn off the two-phone link."),
+                    Choice(FxKeys.REMOTE_ROLE_CAMERA, "Camera phone", "Send the finished picture to a paired phone."),
+                    Choice(FxKeys.REMOTE_ROLE_REMOTE, "Remote phone", "Show a paired camera phone's finished picture."),
+                ),
+                FxKeys.REMOTE_ROLE_OFF,
+            ),
+            ActionItem(PanelAction.REMOTE_OPEN_PAIRING, "Pairing", "Make, paste, forget, or replace a secure local key."),
+            ActionItem(PanelAction.REMOTE_OPEN_PREVIEW, "Remote preview", "Connect to the camera phone on this Wi-Fi network."),
+            ToggleItem(FxKeys.LIVE_PC_ON, "Send to PC", "Send the finished picture to OBS on your local network.", false, isTest = false),
+            ChoiceItem(
+                FxKeys.LIVE_PC_PROTOCOL,
+                "PC protocol",
+                listOf(
+                    Choice("srt", "SRT", "Send an encrypted SRT stream to a listener on your PC."),
+                    Choice("rtmp", "RTMP", "Push to an RTMP server running on your PC."),
+                ),
+                "srt",
+            ),
+            TextItem(FxKeys.LIVE_PC_HOST, "PC LAN address", "Type the PC's local IP address. Public addresses are refused.", "", 45),
+            TextItem(FxKeys.LIVE_PC_PORT, "PC port", "Type a port from 1 to 65535. SRT starts at 9000.", "9000", 5),
+            ChoiceItem(
+                FxKeys.LIVE_PC_RES,
+                "PC video size",
+                listOf(
+                    Choice("720p", "720p", "Send 1280 by 720 video."),
+                    Choice("1080p", "1080p", "Send 1920 by 1080 video."),
+                ),
+                "720p",
+            ),
+            TextItem(FxKeys.LIVE_PC_BITRATE, "PC video rate", "Type a video rate from 1,000,000 to 12,000,000 bits per second.", "6000000", 8),
+            ActionItem(PanelAction.LIVE_SEND_TO_PC, "Start PC output", "Send the finished picture to OBS on this local network."),
+        ),
+        notes = listOf(
+            "The controls and overlay never go into the finished picture.",
+            "Collapse the panel to its bubble before sharing your screen.",
+            "Normal Bigo camera live shows Bigo's camera, not OFFGRID's effects.",
+            "For the PC route, OBS receives the finished picture over SRT or RTMP.",
+            "Check Bigo and TikTok rules. Never fake viewers, gifts, or engagement.",
+        ),
+    )
+
     // ---- 📁 Camera: the no-face modes (features 9 to 12, 34) ----
 
     fun camera() = PanelFolder(

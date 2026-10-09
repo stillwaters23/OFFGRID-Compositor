@@ -66,6 +66,18 @@ class RemoteSecurityTest {
     }
 
     @Test
+    fun channelRekeysBeforeItsMessageLimitWithoutDroppingTheLink() {
+        val key = ByteArray(32) { (it + 3).toByte() }
+        val prefix = byteArrayOf(1, 3, 5, 7)
+        val sender = EncryptedChannel(key, prefix, rekeyLimit = 2)
+        val receiver = EncryptedChannel(key, prefix, rekeyLimit = 2)
+        repeat(6) { index ->
+            val plain = byteArrayOf(index.toByte())
+            assertArrayEquals(plain, receiver.decrypt(sender.encrypt(plain)))
+        }
+    }
+
+    @Test
     fun x25519HandshakeUsesKeyAndRejectsWrongKeyConfirmation() {
         val first = RemoteHandshake.create()
         val second = RemoteHandshake.create()
@@ -82,6 +94,7 @@ class RemoteSecurityTest {
         val confirmation = RemoteHandshake.confirm(key, transcript)
         assertTrue(RemoteHandshake.verifyConfirmation(key, transcript, confirmation))
         assertFalse(RemoteHandshake.verifyConfirmation(PairingKey.generate(), transcript, confirmation))
+        assertFalse(confirmation.contentEquals(Hkdf.hmac(key.toByteArray(Charsets.US_ASCII), transcript)))
         assertNotEquals(firstKeys.initiatorKey.toList(), firstKeys.responderKey.toList())
     }
 
