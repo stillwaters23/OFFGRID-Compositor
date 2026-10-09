@@ -235,5 +235,6 @@ States: passed, waiting for review, blocked, or waiting for Royalty's phone test
 - **Tests added:** Full-bleed measurement, panel geometry and resize zones, border inset, glow curve, scroll thumb geometry, responsive top-bar layout, microphone contract coverage, and toggle persistence/UI refresh.
 - **Validation:** `git diff --check` passes and no grip, slider, TODO, FIXME, or em-dash matches remain in owned panel sources. Local Gradle tests cannot configure because Android Gradle Plugin 8.13.2 is unavailable from the configured repositories. The latest successful PR build is from the earlier head, not these round 2 changes. The older failed `final-build` run stopped while downloading Android SDK command-line tools.
 - **Device evidence:** No screenshot or `dumpsys gfxinfo` result is available from this environment.
+- **Validation follow-up:** Commit `f88aed9` is published. Code review reported no findings; CodeQL had no analyzable code in scope. No build has run for this head.
 - **PR:** Pull request #15 remains draft, based on `final-build`, and unmerged.
-- **State:** round 2 validation and publication in progress
+- **State:** published for CI and Rex review
