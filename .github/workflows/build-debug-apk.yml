@@ -9,6 +9,7 @@ on:
       - final-build
   pull_request:
     branches:
+      - final-build
       - main
       - ccr-c441a76e-hgt5wa
       - step-2-2-premium-panel
@@ -105,7 +106,7 @@ jobs:
 
       - name: Build the debug app
         working-directory: 04 Build
-        run: chmod +x ./gradlew && ./gradlew assembleDebug --stacktrace
+        run: chmod +x ./gradlew && ./gradlew testDebugUnitTest assembleDebug --stacktrace
 
       - name: Check the color mix math
         working-directory: 04 Build
