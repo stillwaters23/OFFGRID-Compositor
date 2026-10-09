@@ -9,10 +9,12 @@ import {
   appearanceIssues,
   boundedPercent,
   canApplyAppearance,
+  committedPalette,
   paletteStyle,
   previewPalette,
   type AppearanceMode,
 } from "@/lib/appearance";
+import { checkNumberColor } from "@/lib/contrast-guard";
 import { hexToHsl, hexToRgb, hslToHex, isValidHex, normalizeHex, rgbToHex } from "@/lib/color";
 import { CURATED, ROYGBIV } from "@/lib/palettes";
 import { FLOORS, readFloorFile, floorSrc } from "@/lib/floors";
@@ -104,7 +106,28 @@ function StudioActions() {
   const draftFace = useFace(draft?.digitFont ?? currentFont);
   const look = draft ? previewPalette(draft, now, zone) : undefined;
   const issues = look ? appearanceIssues(look) : [];
-  const readable = look && draft ? canApplyAppearance(look) && canApplyAppearance(draft.palette) : true;
+  const numberIssue = draft
+    ? (["dark", "light"] as const).map((theme) => {
+        const color = draft.numberColor[theme];
+        if (!color) return null;
+        const palette = committedPalette({
+          paletteId: draft.palette.id,
+          customPalette: draft.palette.id === "custom" ? draft.palette : null,
+          mode: theme,
+          scheduleEnabled: false,
+          lightStart: draft.scheduleLight,
+          darkStart: draft.scheduleDark,
+          nowMs: 1,
+        });
+        return checkNumberColor(color, theme, {
+          palette,
+          laserColor: draft.laserColor,
+          laserIntensity: draft.laserIntensity,
+          laserEnabled: draft.laserEnabled,
+        });
+      }).find((check) => check && !check.ok)?.message
+    : undefined;
+  const readable = look && draft ? canApplyAppearance(look) && canApplyAppearance(draft.palette) && !numberIssue : true;
   const fontReady = !draft || draft.digitFont === currentFont || draftFace.status === "loaded";
 
   function apply() {
@@ -116,6 +139,7 @@ function StudioActions() {
   return (
     <div className="mt-6 space-y-2">
       {issues[0] ? <p className="text-sm text-danger">{issues[0].message}</p> : null}
+      {numberIssue ? <p role="alert" className="text-sm text-danger">{numberIssue}</p> : null}
       {!fontReady ? <p className="text-sm text-muted">The selected font is still loading.</p> : null}
       <div className="flex min-w-0 flex-wrap gap-2">
         <PitButton data-testid="apply-appearance" disabled={!dirty || !readable || !fontReady} className="min-h-11 min-w-0 flex-1" onClick={apply}>

@@ -41,3 +41,8 @@
   /* 1px is a permitted inset hairline for the editable hex field. */
   box-shadow: inset 0 0 0 1px var(--line);
 }
+
+:root .digit-cut,
+:root .reel-time-plaque .digit-cut {
+  color: var(--reel-number, var(--digit));
+}

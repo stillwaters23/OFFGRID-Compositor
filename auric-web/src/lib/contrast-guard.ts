@@ -123,15 +123,6 @@ export function checkNumberColor(
   if (!color) {
     return { ok: false, ratio: 0, worstAgainst: "color format", message: "Use a valid opaque #RGB or #RRGGBB color." };
   }
-  if (relativeLuminance(color) < 0.012) {
-    return {
-      ok: false,
-      ratio: 0,
-      worstAgainst: "near-black rule",
-      message: `${color} is too dark on the ${themeName} wheel: below the near-black limit, needs 4.5:1. Pick a lighter color.`,
-    };
-  }
-
   const backgrounds = wheelBackgroundSamples(ctx.palette);
   const samples = backgrounds.map((bg, index) => ({ bg, label: `wheel surface ${index + 1}` }));
   if (ctx.laserEnabled !== false && ctx.laserIntensity > 0) {
@@ -147,6 +138,16 @@ export function checkNumberColor(
     const ratio = contrastRatio(color, sample.bg);
     if (ratio < worst.ratio) worst = { ratio, label: sample.label };
   }
+  if (relativeLuminance(color) < 0.012) {
+    const ratio = worst.ratio;
+    return {
+      ok: false,
+      ratio,
+      worstAgainst: "near-black rule",
+      message: `${color} is too dark on the ${themeName} wheel: ${ratio.toFixed(2)}:1, needs 4.5:1. Pick a lighter color.`,
+    };
+  }
+
   const ratio = worst.ratio;
   const ok = ratio >= 4.5;
   const qualifier = worst.label.startsWith("laser") ? "against the laser bloom" : `on the ${themeName} wheel`;

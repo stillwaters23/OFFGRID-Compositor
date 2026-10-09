@@ -37,7 +37,10 @@ function channelDelta(first: string, second: string): number {
 
 test("number-color guard enforces the near-black rule and theme contrast", () => {
   for (const theme of ["dark", "light"] as const) {
-    assert.equal(checkNumberColor("#000000", theme, ctx(BLUE_DIAMOND)).ok, false);
+    const black = checkNumberColor("#000000", theme, ctx(BLUE_DIAMOND));
+    assert.equal(black.ok, false);
+    assert.match(black.message, new RegExp(`${theme}.*\\d+\\.\\d{2}:1.*4\\.5:1`, "i"));
+    assert.ok(black.ratio > 0);
   }
   assert.equal(checkNumberColor("#111111", "dark", ctx(BLUE_DIAMOND)).ok, false);
   assert.equal(checkNumberColor("#FFFFFF", "dark", ctx(BLUE_DIAMOND)).ok, true);
