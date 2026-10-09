@@ -1,5 +1,6 @@
 import { AlarmView } from "@/components/auric/alarm-view";
 import { AppearanceStudio } from "@/components/auric/appearance-studio";
+import { ClickerSoundsFolder } from "@/components/auric/clicker-sounds-folder";
 import { DeviceRoom } from "@/components/auric/device-room";
 import { LogsExports } from "@/components/auric/logs-exports";
 import { SpanReels } from "@/components/auric/span-reels";
@@ -56,6 +57,8 @@ function interior(id: ModuleId) {
       return <SoundList kind="alarm" />;
     case "timer-sounds":
       return <SoundList kind="timer" />;
+    case "clicker-sounds":
+      return <ClickerSoundsFolder />;
     case "haptics":
       return <HapticsList />;
     case "heartbeat":
