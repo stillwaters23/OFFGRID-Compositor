@@ -1,0 +1,38 @@
+{
+  "url": "http://127.0.0.1:8081/",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "Auric",
+      "hasCanvas": false,
+      "bodyTextLen": 159,
+      "bodyTextHash": "b3084749830d8f39a0acdd4bf8ab13fdad8d3dd7f8006f6cca972e48aab08e3b",
+      "bodyTextPrefix": "A PRIVATE TERMINAL FOR A CLEANER TOMORROW ONLINE STANDBY SYNCING",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-built.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "Auric",
+      "hasCanvas": false,
+      "bodyTextLen": 159,
+      "bodyTextHash": "b3084749830d8f39a0acdd4bf8ab13fdad8d3dd7f8006f6cca972e48aab08e3b",
+      "bodyTextPrefix": "A PRIVATE TERMINAL FOR A CLEANER TOMORROW ONLINE STANDBY SYNCING",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-built-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/app-builder-built.json",
+  "divergesFromBaseline": false,
+  "baselineReasons": []
+}
