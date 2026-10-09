@@ -7,6 +7,11 @@
     <uses-permission
         android:name="android.permission.RECORD_AUDIO"
         tools:node="remove" />
+    <!-- Final build: the camera is the only permission. A video library asks for this one,
+         but the app never goes online, so it is taken out. -->
+    <uses-permission
+        android:name="android.permission.ACCESS_NETWORK_STATE"
+        tools:node="remove" />
 
     <uses-feature
         android:name="android.hardware.camera"
@@ -17,6 +22,30 @@
     <uses-feature
         android:glEsVersion="0x00020000"
         android:required="true" />
+
+    <!-- Final build: lets "Open <app>" in each platform folder find that app on the phone.
+         This is not a permission. Nothing is ever opened without a tap. -->
+    <queries>
+        <package android:name="sg.bigo.live" />
+        <package android:name="com.taggedapp" />
+        <package android:name="com.myyearbook.m" />
+        <package android:name="com.zhiliaoapp.musically" />
+        <package android:name="tv.twitch.android.app" />
+        <package android:name="com.google.android.youtube" />
+        <package android:name="org.telegram.messenger" />
+        <package android:name="com.sgiggle.production" />
+        <package android:name="com.instagram.android" />
+        <package android:name="com.facebook.orca" />
+        <package android:name="com.whatsapp" />
+        <package android:name="us.zoom.videomeetings" />
+        <package android:name="com.google.android.apps.tachyon" />
+        <package android:name="com.discord" />
+        <package android:name="com.microsoft.teams" />
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="market" />
+        </intent>
+    </queries>
 
     <application
         android:allowBackup="false"

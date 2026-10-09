@@ -2,8 +2,9 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
-    <!-- Step 2 look: cyan and gold glow lines on dark glass. -->
-    <color name="hud_cyan">#FF46F0FF</color>
-    <color name="hud_gold">#FFFFC34D</color>
-    <color name="hud_text">#FFDDF8FF</color>
+    <!-- Step 2.1 look: plain black glass and soft white lines.
+         The panel repaints the record bar in the theme colors when the app starts. -->
+    <color name="hud_line">#B3FFFFFF</color>
+    <color name="hud_mark">#FFFFFFFF</color>
+    <color name="hud_text">#FFE6E6E6</color>
 </resources>
