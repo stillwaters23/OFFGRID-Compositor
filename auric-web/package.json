@@ -16,10 +16,12 @@
     "preview:stop": "node scripts/preview.mjs stop",
     "typecheck": "tsc --noEmit",
     "check:auth": "node scripts/check-auth-invariant.mjs",
-    "test": "node --test 'scripts/**/*.test.mjs' && node --experimental-strip-types --test src/lib/app-data/app-data.test.ts src/lib/app-data/readiness-schedule.test.ts src/lib/auth/gate-identity.test.ts src/lib/auth/sign-in-gate.test.ts && npm run test:auric",
+    "test": "node --test 'scripts/**/*.test.mjs' && node --experimental-strip-types --test src/lib/app-data/app-data.test.ts src/lib/app-data/readiness-schedule.test.ts src/lib/auth/gate-identity.test.ts src/lib/auth/sign-in-gate.test.ts && npm run test:auric && npm run test:l1",
     "lint": "eslint .",
     "format": "prettier --write .",
     "test:auric": "node --import ./scripts/test-aliases.mjs --experimental-strip-types --test tests/auric.test.ts tests/brainstorm.test.ts",
+    "test:l1": "node --import ./scripts/test-aliases.mjs --experimental-strip-types --test tests/l1-*.test.ts",
+    "test:l1:e2e": "node tests/e2e/l1-reels.e2e.mjs",
     "brand:export": "python3 scripts/export-brand.py",
     "brand:verify": "python3 scripts/verify-brand.py"
   },
