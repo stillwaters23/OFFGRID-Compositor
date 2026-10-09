@@ -25,6 +25,9 @@ internal class SoundBoard {
     private val handler = Handler(thread.looper)
     private val made = HashMap<String, ShortArray>()
 
+    /** Sounds still playing. All of them are let go when the soundboard closes. */
+    private val playing = HashSet<AudioTrack>()
+
     /** Plays [effect]'s chosen sound if the soundboard is on. [force] plays it even when off, for Try it. */
     fun play(effect: String, settings: EffectSnapshot, force: Boolean = false) {
         if (!force && !settings.on(FxKeys.SOUND_ON)) return
@@ -37,6 +40,8 @@ internal class SoundBoard {
 
     fun release() {
         handler.post {
+            playing.forEach { it.release() }
+            playing.clear()
             thread.quitSafely()
         }
     }
@@ -44,8 +49,9 @@ internal class SoundBoard {
     private fun playNow(sound: String, volume: Float) {
         val samples = made.getOrPut(sound) { SoundShapes.make(sound) }
         if (samples.isEmpty()) return
+        var track: AudioTrack? = null
         try {
-            val track = AudioTrack.Builder()
+            track = AudioTrack.Builder()
                 .setAudioAttributes(
                     AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_GAME)
@@ -62,12 +68,14 @@ internal class SoundBoard {
                 .setTransferMode(AudioTrack.MODE_STATIC)
                 .setBufferSizeInBytes(samples.size * 2)
                 .build()
+            playing += track
             track.write(samples, 0, samples.size)
             track.setVolume(volume)
             track.setNotificationMarkerPosition(samples.size)
             track.setPlaybackPositionUpdateListener(
                 object : AudioTrack.OnPlaybackPositionUpdateListener {
                     override fun onMarkerReached(done: AudioTrack) {
+                        playing -= done
                         done.release()
                     }
 
@@ -78,6 +86,10 @@ internal class SoundBoard {
             track.play()
         } catch (error: Exception) {
             Log.w(TAG, "A sound could not play", error)
+            track?.let {
+                playing -= it
+                it.release()
+            }
         }
     }
 

@@ -20,7 +20,6 @@ import com.offgrid.compositor.effects.StageMath
 import com.offgrid.compositor.terminal.PanelAction
 import com.offgrid.compositor.terminal.TerminalPanel
 import java.io.File
-import java.util.concurrent.Executors
 
 /**
  * Joins the terminal panel to the effects (final build, M4). Settings flow from the panel to
@@ -35,7 +34,7 @@ internal class EffectsController(
     val engine: EffectEngine,
 ) {
     private val main = Handler(Looper.getMainLooper())
-    private val worker = Executors.newSingleThreadExecutor()
+    private val worker = GallerySaver.background
     private val sounds = SoundBoard()
     private val handshake by lazy { Handshake(context) }
 
@@ -76,7 +75,19 @@ internal class EffectsController(
     fun release() {
         main.removeCallbacksAndMessages(null)
         sounds.release()
-        worker.shutdown()
+    }
+
+    /** The app went to the background: no sounds or chained effects until it comes back. */
+    fun pause() {
+        main.removeCallbacks(radarPing)
+        chained?.let { main.removeCallbacks(it) }
+        chained = null
+    }
+
+    fun resume() {
+        val s = engine.settings
+        main.removeCallbacks(radarPing)
+        if (s.on(FxKeys.RADAR_ON) || s.on(FxKeys.MIRROR_ON)) main.postDelayed(radarPing, radarTurnMs())
     }
 
     /** Reads every effect setting from the panel again and hands it to the effects. */
@@ -166,11 +177,12 @@ internal class EffectsController(
             PanelAction.OPEN_PLATFORM -> openPlatform(arg ?: return)
             PanelAction.SAVE_TO_GALLERY -> saveLastVideo()
             PanelAction.SAVE_REPLAY -> saveReplay()
-            PanelAction.HANDSHAKE_SHOW -> showMyCode(handshake.myCode())
-            PanelAction.HANDSHAKE_NEW -> showMyCode(handshake.newCode(), fresh = true)
-            PanelAction.HANDSHAKE_ADD -> withCopiedCode { code -> say(handshakeLine(handshake.trust(code))) }
-            PanelAction.HANDSHAKE_BLOCK -> withCopiedCode { code -> say(handshakeLine(handshake.block(code))) }
-            PanelAction.HANDSHAKE_CHECK -> withCopiedCode { code -> say(handshakeLine(handshake.check(code))) }
+            // The phone's locked storage is slow, so the code work runs off the screen's thread.
+            PanelAction.HANDSHAKE_SHOW -> inBackground({ handshake.myCode() }) { showMyCode(it) }
+            PanelAction.HANDSHAKE_NEW -> inBackground({ handshake.newCode() }) { showMyCode(it, fresh = true) }
+            PanelAction.HANDSHAKE_ADD -> withCopiedCode { code -> inBackground({ handshake.trust(code) }) { say(handshakeLine(it)) } }
+            PanelAction.HANDSHAKE_BLOCK -> withCopiedCode { code -> inBackground({ handshake.block(code) }) { say(handshakeLine(it)) } }
+            PanelAction.HANDSHAKE_CHECK -> withCopiedCode { code -> inBackground({ handshake.check(code) }) { say(handshakeLine(it)) } }
             else -> Unit
         }
     }
@@ -228,6 +240,13 @@ internal class EffectsController(
                     },
                 )
             }
+        }
+    }
+
+    private fun <T> inBackground(work: () -> T, then: (T) -> Unit) {
+        worker.execute {
+            val result = work()
+            main.post { then(result) }
         }
     }
 

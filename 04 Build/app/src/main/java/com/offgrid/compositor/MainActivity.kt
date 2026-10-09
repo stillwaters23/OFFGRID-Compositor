@@ -59,7 +59,6 @@ import com.offgrid.compositor.effects.FxKeys
 import com.offgrid.compositor.terminal.ScreenEdges
 import com.offgrid.compositor.terminal.TerminalPanel
 import java.io.File
-import java.util.concurrent.Executors
 
 /**
  * Step 1. Shows the painted camera picture, records a few seconds, and plays it back.
@@ -103,8 +102,10 @@ class MainActivity : AppCompatActivity() {
     private var shownMessage = 0
     private var diamondInVideo: Boolean? = null
     private lateinit var effects: EffectsController
+
+    /** True when the effects could not start on this phone. The camera screen says why it is black. */
+    private var effectsBroken = false
     private lateinit var faces: FaceTracker
-    private val saver = Executors.newSingleThreadExecutor()
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private var stopRecordingTask: Runnable? = null
@@ -168,6 +169,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        effects.resume()
         hideSystemBars()
         if (hasCameraPermission()) {
             startCamera()
@@ -181,6 +183,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onPause() {
+        effects.pause()
         hidePlayback()
         stopRecording()
         unbindCamera()
@@ -189,9 +192,9 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         effects.release()
-        saver.shutdown()
         processor?.onFirstFrame = null
         processor?.onFailed = null
+        processor?.onEffectsFailed = null
         processor?.release()
         processor = null
         super.onDestroy()
@@ -241,6 +244,10 @@ class MainActivity : AppCompatActivity() {
                 created.inputSize?.let { size ->
                     faces.streamAspect = maxOf(size.width, size.height).toFloat() / minOf(size.width, size.height)
                 }
+                showLivePicture()
+            }
+            created.onEffectsFailed = {
+                effectsBroken = true
                 showLivePicture()
             }
             created.onFailed = {
@@ -382,8 +389,11 @@ class MainActivity : AppCompatActivity() {
                 stopRecordingTask = null
                 activeRecording = null
                 recording = false
-                if (event.hasError()) {
-                    Log.e(TAG, "Recording failed with code ${event.error}")
+                // Some errors still leave a whole, playable video, like a full phone or the camera
+                // closing when the app goes to the background. Those videos are kept.
+                val kept = !event.hasError() || (event.error in KEPT_ERRORS && temp.exists() && temp.length() > 0L)
+                if (event.hasError()) Log.e(TAG, "Recording ended with code ${event.error}, kept: $kept")
+                if (!kept) {
                     if (temp.exists()) {
                         temp.delete()
                     }
@@ -398,11 +408,16 @@ class MainActivity : AppCompatActivity() {
                         temp.copyTo(saved, overwrite = true)
                         temp.delete()
                     }
+                    showMessage(R.string.record_saved, ButtonMode.LIVE)
                     if (effects.engine.settings.on(FxKeys.RECORD_GALLERY)) {
-                        showMessage(R.string.record_saved_gallery, ButtonMode.LIVE)
-                        saver.execute { GallerySaver.save(applicationContext, saved) }
-                    } else {
-                        showMessage(R.string.record_saved, ButtonMode.LIVE)
+                        GallerySaver.saveLater(this, saved) { name ->
+                            // Only change the words if they still say the video was saved.
+                            if (isDestroyed || shownMessage != R.string.record_saved) return@saveLater
+                            showMessage(
+                                if (name != null) R.string.record_saved_gallery else R.string.record_gallery_failed,
+                                ButtonMode.LIVE,
+                            )
+                        }
                     }
                 }
             }
@@ -612,8 +627,11 @@ class MainActivity : AppCompatActivity() {
         if (recording || playRequested) {
             return
         }
+        val settings = effects.engine.settings
+        val hidingFace = settings.on(FxKeys.DIAMOND_ON) || !settings.chose(FxKeys.CAMERA_MODE, FxKeys.MODE_LIVE)
         val message = when {
-            effects.engine.settings.chose(FxKeys.CAMERA_MODE, FxKeys.MODE_GHOST) -> R.string.ghost_on
+            effectsBroken && hidingFace -> R.string.effects_failed
+            settings.chose(FxKeys.CAMERA_MODE, FxKeys.MODE_GHOST) -> R.string.ghost_on
             terminalPanel.testDiamondOn -> R.string.shape_ready
             else -> R.string.camera_ready
         }
@@ -624,7 +642,7 @@ class MainActivity : AppCompatActivity() {
     private fun onTestDiamondChanged(on: Boolean) {
         processor?.testShapeOn = on
         describeCamera(on)
-        if (shownMessage == R.string.shape_ready || shownMessage == R.string.camera_ready || shownMessage == R.string.ghost_on) {
+        if (shownMessage in LIVE_MESSAGES) {
             showLivePicture()
         }
     }
@@ -633,7 +651,7 @@ class MainActivity : AppCompatActivity() {
     private fun onEffectSettings() {
         if (!::effects.isInitialized) return
         processor?.reducedMotion = reducedMotion()
-        if (shownMessage == R.string.shape_ready || shownMessage == R.string.camera_ready || shownMessage == R.string.ghost_on) {
+        if (shownMessage in LIVE_MESSAGES) {
             showLivePicture()
         } else if (!recording) {
             setRecordLabel()
@@ -772,5 +790,16 @@ class MainActivity : AppCompatActivity() {
         const val SAVED_NAME = "last-recording.mp4"
         const val TEMP_NAME = "recording-now.mp4"
         const val FALLBACK_EXTRA_MS = 3_000L
+
+        /** The words shown while the camera is live, which follow the settings. */
+        val LIVE_MESSAGES = setOf(R.string.shape_ready, R.string.camera_ready, R.string.ghost_on, R.string.effects_failed)
+
+        /** Recording errors that still leave a whole video behind. */
+        val KEPT_ERRORS = setOf(
+            VideoRecordEvent.Finalize.ERROR_FILE_SIZE_LIMIT_REACHED,
+            VideoRecordEvent.Finalize.ERROR_DURATION_LIMIT_REACHED,
+            VideoRecordEvent.Finalize.ERROR_INSUFFICIENT_STORAGE,
+            VideoRecordEvent.Finalize.ERROR_SOURCE_INACTIVE,
+        )
     }
 }

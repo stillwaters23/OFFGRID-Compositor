@@ -28,11 +28,13 @@ import javax.crypto.spec.GCMParameterSpec
 internal class Handshake(context: Context) {
     private val prefs = context.getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE)
 
-    /** Royalty's current code. A new one is made the first time. Null if the key store failed. */
+    /**
+     * Royalty's current code. A new one is made only the very first time. Null if the locked
+     * storage can't be opened, and then the saved code is left alone, never quietly replaced.
+     */
     fun myCode(): String? {
-        val sealed = prefs.getString(MY_CODE, null)
-        if (sealed != null) open(sealed)?.let { return it }
-        return newCode()
+        val sealed = prefs.getString(MY_CODE, null) ?: return newCode()
+        return open(sealed)
     }
 
     /** Makes a new code. The old one stops working. */
@@ -49,7 +51,8 @@ internal class Handshake(context: Context) {
     fun check(code: String): Status {
         val clean = code.trim()
         if (!looksLikeCode(clean)) return Status.NOT_A_CODE
-        if (clean == myCode()) return Status.MINE
+        val mine = prefs.getString(MY_CODE, null)?.let { open(it) }
+        if (mine != null && clean == mine) return Status.MINE
         val print = fingerprint(clean)
         return when {
             print in set(BLOCKED) -> Status.BLOCKED

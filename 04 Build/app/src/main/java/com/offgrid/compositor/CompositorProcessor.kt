@@ -15,6 +15,7 @@ import androidx.camera.core.SurfaceOutput
 import androidx.camera.core.SurfaceProcessor
 import androidx.camera.core.SurfaceRequest
 import com.offgrid.compositor.effects.EffectEngine
+import com.offgrid.compositor.effects.FxKeys
 import com.offgrid.compositor.effects.OverlayLayer
 import com.offgrid.compositor.effects.StagePlan
 import java.util.concurrent.Executor
@@ -39,6 +40,17 @@ class CompositorProcessor(
 
     @Volatile
     var onFailed: (() -> Unit)? = null
+
+    /** Called once if the effects can't run on this phone. The picture then stays black when the face must be hidden. */
+    @Volatile
+    var onEffectsFailed: (() -> Unit)? = null
+    private var toldEffectsFailed = false
+
+    /**
+     * True when this picture must not show the plain camera: a no-face mode or the face diamond
+     * is on, but the effects that hide the face are not drawn (yet). The picture stays black.
+     */
+    private var coverFace = false
 
     /** The Step 1 yellow test diamond. Off by default, so nothing extra is painted. */
     @Volatile
@@ -210,9 +222,11 @@ class CompositorProcessor(
         if (!EGL14.eglMakeCurrent(display, replaySurface, replaySurface, context)) return
         GLES20.glViewport(0, 0, buffer.width, buffer.height)
         val staged = stage
+        GLES20.glClearColor(0f, 0f, 0f, 1f)
+        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
         if (painted != null && staged != null) {
             staged.present(painted, buffer.width, buffer.height)
-        } else {
+        } else if (!coverFace) {
             val painter = drawer ?: return
             main.surfaceOutput.updateTransformMatrix(updatedTransform, textureTransform)
             painter.drawCamera(inputTextureId, updatedTransform)
@@ -257,6 +271,10 @@ class CompositorProcessor(
      * Returns the stage picture, or null when the camera goes out untouched.
      */
     private fun paintStage(slots: List<OutputSlot>): GlTarget? {
+        val settings = engine.settings
+        val diamondOn = settings.on(FxKeys.DIAMOND_ON)
+        val hideFace = diamondOn || settings.choice(FxKeys.CAMERA_MODE).ifEmpty { FxKeys.MODE_LIVE } != FxKeys.MODE_LIVE
+        coverFace = hideFace
         val painter = stage ?: return null
         val textureId = inputTextureId
         if (textureId == 0 || slots.isEmpty()) return null
@@ -278,9 +296,13 @@ class CompositorProcessor(
         overlay?.latch()
         overlay?.request(stageWidth, stageHeight)
         val drawn = overlay != null && overlay.hasPicture
-        if (plan.plain && !drawn) return null
+        // The face diamond is drawn with the other effects. Until that drawing arrives, the
+        // picture stays black, so the face never shows for even a moment.
+        coverFace = diamondOn && !drawn
+        if (coverFace || (plan.plain && !drawn)) return null
         if (!EGL14.eglMakeCurrent(display, main.eglSurface, main.eglSurface, context)) {
             fail("Could not draw a frame")
+            coverFace = hideFace
             return null
         }
         main.surfaceOutput.updateTransformMatrix(updatedTransform, textureTransform)
@@ -295,12 +317,20 @@ class CompositorProcessor(
                 overlayTexture = if (drawn) overlay?.texture ?: 0 else 0,
                 overlayMatrix = overlay?.matrix ?: updatedTransform,
             )
-        } catch (error: IllegalStateException) {
+        } catch (error: RuntimeException) {
             Log.e(TAG, "Effects stage failed", error)
             stage?.release()
             stage = null
+            effectsFailed()
+            coverFace = hideFace
             null
         }
+    }
+
+    private fun effectsFailed() {
+        if (toldEffectsFailed) return
+        toldEffectsFailed = true
+        mainHandler.post { onEffectsFailed?.invoke() }
     }
 
     fun release() {
@@ -327,7 +357,7 @@ class CompositorProcessor(
         val staged = stage
         if (painted != null && staged != null) {
             staged.present(painted, slot.width, slot.height)
-        } else {
+        } else if (!coverFace) {
             painter.drawCamera(textureId, updatedTransform)
         }
         GLES20.glEnable(GLES20.GL_BLEND)
@@ -418,6 +448,7 @@ class CompositorProcessor(
             Log.e(TAG, "Effects setup failed. The camera works without them.", error)
             stage?.release()
             stage = null
+            effectsFailed()
         }
         ready = true
     }

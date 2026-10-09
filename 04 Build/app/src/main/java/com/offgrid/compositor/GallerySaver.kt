@@ -3,18 +3,34 @@ package com.offgrid.compositor
 import android.content.ContentValues
 import android.content.Context
 import android.os.Environment
+import android.os.Handler
+import android.os.Looper
 import android.provider.MediaStore
 import android.util.Log
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.Executors
 
 /**
  * Puts a finished video in the phone's gallery, in Movies › OFFGRID (final build, M4).
  * Android lets an app add its own videos there without any permission. Nothing uploads.
  */
 internal object GallerySaver {
+    /** One helper thread for the whole app, so a save still finishes after the screen closes. */
+    val background = Executors.newSingleThreadExecutor()
+    private val main = Handler(Looper.getMainLooper())
+
+    /** Saves [file] on the helper thread, then tells [done] the saved name, or null, on the main thread. */
+    fun saveLater(context: Context, file: File, kind: String = "Video", done: (String?) -> Unit) {
+        val app = context.applicationContext
+        background.execute {
+            val name = save(app, file, kind)
+            main.post { done(name) }
+        }
+    }
+
     /** Copies [file] into the gallery. Returns the name it was saved under, or null if it failed. Call off the main thread. */
     fun save(context: Context, file: File, kind: String = "Video"): String? {
         if (!file.exists() || file.length() == 0L) return null
