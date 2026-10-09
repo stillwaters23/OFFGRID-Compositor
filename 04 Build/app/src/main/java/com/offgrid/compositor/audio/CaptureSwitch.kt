@@ -25,6 +25,8 @@ class CaptureSwitch {
         private set
     var micRunning = false
         private set
+    private var micDenied = false
+    private var micWasWanted = false
 
     /**
      * [micAllowed] is whether the phone gave the mic permission. [foreground] is false while the app is hidden:
@@ -32,12 +34,14 @@ class CaptureSwitch {
      */
     fun update(cameraWanted: Boolean, micWanted: Boolean, micAllowed: Boolean, foreground: Boolean = true): List<CaptureAction> {
         val actions = ArrayList<CaptureAction>(2)
+        if (micWanted && !micWasWanted) micDenied = false
+        micWasWanted = micWanted
         val cameraNeeded = cameraWanted && foreground
         if (cameraNeeded != cameraRunning) {
             cameraRunning = cameraNeeded
             actions += if (cameraNeeded) CaptureAction.BIND_CAMERA else CaptureAction.UNBIND_CAMERA
         }
-        val micNeeded = micWanted && micAllowed && foreground
+        val micNeeded = micWanted && micAllowed && !micDenied && foreground
         if (micNeeded != micRunning) {
             micRunning = micNeeded
             actions += if (micNeeded) CaptureAction.START_MIC else CaptureAction.RELEASE_MIC
@@ -48,5 +52,10 @@ class CaptureSwitch {
     /** The mic could not start, so it counts as released and the next update may try again. */
     fun micFailed() {
         micRunning = false
+    }
+
+    /** The permission request was denied. A fresh off-to-on toggle may ask again. */
+    fun micPermissionDenied() {
+        micDenied = true
     }
 }

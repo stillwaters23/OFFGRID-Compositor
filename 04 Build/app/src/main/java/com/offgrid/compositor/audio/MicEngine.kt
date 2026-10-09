@@ -16,7 +16,7 @@ import java.util.concurrent.CopyOnWriteArrayList
  */
 class MicEngine(private val voice: VoiceFx = VoiceFx()) {
     private val sinks = CopyOnWriteArrayList<PcmSink>()
-    private var record: AudioRecord? = null
+    private var recordRelease: MicRecordRelease? = null
     private var thread: Thread? = null
 
     @Volatile
@@ -74,25 +74,25 @@ class MicEngine(private val voice: VoiceFx = VoiceFx()) {
             created.release()
             return false
         }
-        record = created
+        val release = MicRecordRelease { created.release() }
+        recordRelease = release
         running = true
-        thread = Thread({ listen(created) }, "OffgridMic").also { it.start() }
+        thread = Thread({ listen(created, release) }, "OffgridMic").also { it.start() }
         Log.i(TAG, "Mic started")
         return true
     }
 
     /** Stops listening and releases the mic. */
     fun stop() {
-        if (!running) return
         running = false
+        recordRelease?.stop()
+        recordRelease = null
         thread?.join(JOIN_MS)
         thread = null
-        record?.release()
-        record = null
         Log.i(TAG, "Mic released")
     }
 
-    private fun listen(source: AudioRecord) {
+    private fun listen(source: AudioRecord, release: MicRecordRelease) {
         val raw = ShortArray(BLOCK_FRAMES)
         val work = FloatArray(BLOCK_FRAMES)
         while (running) {
@@ -100,6 +100,7 @@ class MicEngine(private val voice: VoiceFx = VoiceFx()) {
             if (read <= 0) {
                 Log.w(TAG, "The mic stopped giving sound ($read)")
                 running = false
+                release.readFailed()
                 return
             }
             for (i in 0 until read) work[i] = raw[i] / SCALE
@@ -115,5 +116,21 @@ class MicEngine(private val voice: VoiceFx = VoiceFx()) {
         const val BUFFER_BLOCKS = 8
         const val SCALE = 32768f
         const val JOIN_MS = 500L
+    }
+}
+
+internal class MicRecordRelease(private val releaseRecord: () -> Unit) {
+    private var released = false
+
+    @Synchronized
+    fun readFailed() = releaseOnce()
+
+    @Synchronized
+    fun stop() = releaseOnce()
+
+    private fun releaseOnce() {
+        if (released) return
+        released = true
+        releaseRecord()
     }
 }

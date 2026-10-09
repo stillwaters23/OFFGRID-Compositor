@@ -127,6 +127,9 @@ jobs:
               "NEARBY_WIFI_DEVICES",
               "CHANGE_WIFI_MULTICAST_STATE",
           }
+          allowed_exact = {
+              "com.offgrid.compositor.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",
+          }
           name = "{http://schemas.android.com/apk/res/android}name"
           root = ET.parse(sys.argv[1]).getroot()
           found = sorted(
@@ -137,7 +140,13 @@ jobs:
           print("Permissions in the built app:")
           for permission in found:
               print("  " + permission)
-          extra = [p for p in found if p.rsplit(".", 1)[-1] not in allowed or not p.startswith("android.permission.")]
+          extra = [
+              p for p in found
+              if p not in allowed_exact and (
+                  p.rsplit(".", 1)[-1] not in allowed
+                  or not p.startswith("android.permission.")
+              )
+          ]
           if extra:
               print("These permissions are not allowed:")
               print("\n".join(extra))

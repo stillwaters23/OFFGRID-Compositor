@@ -218,3 +218,11 @@ States: passed, waiting for review, blocked, or waiting for Royalty's phone test
 - **PR / commit:** Lane B pull request into `final-build`, not merged.
 - **State:** waiting for review
 - **Next:** read the CI log, fix anything it finds, then run the phone checks: a 20 second Robot plus Echo clip, camera off and mic off during a recording, and frame times.
+
+## 2026-10-09 9:22 AM CT — Lane B, Copilot, review round 2
+
+- **Bootloader step:** Lane B: Camera, Mic and Recording.
+- **What was done:** Restored the ACCESS_NETWORK_STATE manifest removal. The CI allowlist accepts Android permissions plus the exact AndroidX dynamic receiver permission. Mic read failures and repeated stop calls now release the recorder only once, with a unit test. Permission denial latches the capture mic off until the toggle is turned off and on again, with a state-machine test. CompositorProcessor now accepts keyed extra output surfaces and draws the finished frame into them; registry bookkeeping has a unit test.
+- **PR / commit:** Lane B pull request into `final-build`, not merged.
+- **State:** blocked on remaining review requests and validation.
+- **Next:** The local Gradle run could not resolve the Android Gradle plugin. The standalone CI trigger PR cannot be opened from this environment. The panel toggle API is not present in TerminalPanel and that file is outside the allowed edit scope. Audio in replay, radar ping mixing, splitting MainActivity below 400 lines, and device profiling and lip-sync evidence remain outstanding.
