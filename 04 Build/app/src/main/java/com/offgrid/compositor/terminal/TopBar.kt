@@ -39,19 +39,17 @@ internal class TopBar(
     private val shrinkButton: View
     private var currentWidth = width
     private var currentHeight = height
-    private var boxesVisible = false
     private var laidOutWidth = 0
     private val sideGap = Hud.dpi(context, 8f)
-    private val narrowIconWidth = Hud.dpi(context, 40f)
-    private val boxWidth = Hud.dpi(context, 48f)
+    private val controlWidth = Hud.dpi(context, 40f)
 
     init {
         orientation = HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
-        setPadding(Hud.dpi(context, 16f), 0, Hud.dpi(context, 16f), 0)
+        setPadding(Hud.dpi(context, 8f), 0, Hud.dpi(context, 8f), 0)
         contentDescription = context.getString(R.string.terminal_drag)
 
-        backOrb.layoutParams = LayoutParams(Hud.dpi(context, 48f), Hud.dpi(context, 48f))
+        backOrb.layoutParams = LayoutParams(controlWidth, Hud.dpi(context, CONTROL_HEIGHT_DP))
         addView(backOrb)
         titleView = TextView(context).apply {
             text = context.getString(R.string.terminal_title)
@@ -61,34 +59,36 @@ internal class TopBar(
             letterSpacing = 0.08f
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
-            setShadowLayer(Hud.dp(context, 6f), 0f, 0f, NeonPalette.ELECTRIC_PURPLE)
+            setShadowLayer(Hud.dp(context, 1.5f), 0f, 0f, Hud.withAlpha(NeonPalette.ELECTRIC_PURPLE, 0.2f))
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(Hud.dpi(context, 8f), 0, Hud.dpi(context, 8f), 0)
         }
-        addView(titleView, LayoutParams(0, Hud.dpi(context, CONTROL_HEIGHT_DP), 1f))
+        addView(titleView, LayoutParams(0, Hud.dpi(context, CONTROL_HEIGHT_DP), 1f).apply {
+            marginStart = sideGap
+            marginEnd = sideGap
+        })
 
         camera.onChanged = { onToggle(FxKeys.CAMERA_ON, it, "Camera") }
-        addControl(camera, narrowIconWidth, gap = false)
+        addControl(camera, controlWidth, gap = false)
         microphone.onChanged = { onToggle(FxKeys.MIC_ON, it, "Mic") }
-        addControl(microphone, narrowIconWidth)
+        addControl(microphone, controlWidth)
 
         widthInput = dimensionInput(context, "Width", width) { onDimensionChanged(LookKeys.WIDTH, it) }
         widthControl = dimensionControl(context, "W", widthInput)
-        addControl(widthControl, boxWidth)
+        addControl(widthControl, controlWidth)
         heightInput = dimensionInput(context, "Height", height) { onDimensionChanged(LookKeys.HEIGHT, it) }
         heightControl = dimensionControl(context, "H", heightInput)
-        addControl(heightControl, boxWidth)
+        addControl(heightControl, controlWidth)
 
         moreButton = MoreButton(context).apply {
             contentDescription = context.getString(R.string.terminal_view_options)
             setOnClickListener { showViewMenu(this, onViewModeChanged) }
         }
-        addControl(moreButton, narrowIconWidth)
+        addControl(moreButton, controlWidth)
         shrinkButton = ShrinkButton(context).apply {
             contentDescription = context.getString(R.string.terminal_shrink)
             setOnClickListener { onShrink() }
         }
-        addControl(shrinkButton, narrowIconWidth)
+        addControl(shrinkButton, controlWidth)
     }
 
     private fun addControl(view: View, width: Int, gap: Boolean = true) {
@@ -99,10 +99,8 @@ internal class TopBar(
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val available = MeasureSpec.getSize(widthMeasureSpec)
-        val needed = Hud.dpi(context, BOXES_MIN_WIDTH_DP)
-        boxesVisible = available >= needed
-        widthControl.visibility = if (boxesVisible) VISIBLE else GONE
-        heightControl.visibility = if (boxesVisible) VISIBLE else GONE
+        widthControl.visibility = VISIBLE
+        heightControl.visibility = VISIBLE
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
         laidOutWidth = available
     }
@@ -202,7 +200,6 @@ internal class TopBar(
         }
 
     private companion object {
-        const val CONTROL_HEIGHT_DP = 48f
-        const val BOXES_MIN_WIDTH_DP = 400f
+        const val CONTROL_HEIGHT_DP = 40f
     }
 }

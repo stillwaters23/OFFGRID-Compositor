@@ -1,5 +1,8 @@
 package com.offgrid.compositor.terminal
 
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.net.Uri
 import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
@@ -60,7 +63,27 @@ internal fun TerminalPanel.runAction(item: ActionItem) {
             say(context.getString(R.string.terminal_code_shown, code))
         }
         PanelAction.SAFE_START -> safeStart(item.arg ?: return)
+        PanelAction.OPEN_EFFECT_LINK -> openEffectLink(item.arg ?: return)
         else -> onAction?.invoke(item.action, item.arg)
+    }
+}
+
+internal fun TerminalPanel.openEffectLink(id: String) {
+    val parts = id.split(':')
+    val category = parts.getOrNull(0)?.toIntOrNull() ?: return
+    val index = parts.getOrNull(1)?.toIntOrNull() ?: return
+    val link = EffectLinks.categories.getOrNull(category)?.links?.getOrNull(index) ?: return
+    val uri = Uri.parse(link.url)
+    if (uri.scheme != "https" || uri.host.isNullOrBlank()) {
+        say("This link is not available.")
+        return
+    }
+    val intent = Intent(Intent.ACTION_VIEW, uri)
+    if (context !is android.app.Activity) intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    try {
+        context.startActivity(intent)
+    } catch (_: ActivityNotFoundException) {
+        say("No browser is available.")
     }
 }
 

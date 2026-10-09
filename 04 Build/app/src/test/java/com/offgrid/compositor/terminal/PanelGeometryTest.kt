@@ -110,6 +110,13 @@ class PanelGeometryTest {
     }
 
     @Test
+    fun breathingGlowVariesByFifteenPercent() {
+        assertEquals(0.85f, PanelGeometry.pulseScale(0f), 0f)
+        assertEquals(1f, PanelGeometry.pulseScale(0.5f), 0f)
+        assertEquals(1.15f, PanelGeometry.pulseScale(1f), 0f)
+    }
+
+    @Test
     fun scrollThumbTracksTheScrollableRangeAndHasAMinimumHeight() {
         val smallThumb = PanelGeometry.scrollThumbHeight(100, 1000, 32)
         assertEquals(32f, smallThumb, 0f)

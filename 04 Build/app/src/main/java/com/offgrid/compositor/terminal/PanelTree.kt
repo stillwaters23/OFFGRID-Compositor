@@ -91,6 +91,7 @@ internal enum class PanelAction {
     HANDSHAKE_ADD,
     HANDSHAKE_BLOCK,
     HANDSHAKE_CHECK,
+    OPEN_EFFECT_LINK,
 }
 
 /** Final build: the saved looks (theme, colors, glow, cursor, toggle style, size), with save, load, rename, delete. */
@@ -237,7 +238,7 @@ internal object PanelTree {
             glowFolder(),
             colorsFolder(),
             themesFolder(),
-            presetsFolder(),
+            effectLinksFolder(),
             resetFolder(),
         ),
         notes = listOf(
@@ -338,14 +339,14 @@ internal object PanelTree {
     /** Final build: save the look you have now and bring it back later. */
     private fun presetsFolder() = PanelFolder(
         id = "presets",
-        title = "📁 Presets",
+        title = "📁 Profiles",
         tag = null,
         kind = FolderKind.OFFICE,
         items = listOf(PresetsItem()),
         notes = listOf(
-            "A preset keeps your look: theme, colors, glow, cursor, toggle style, and size.",
-            "Type a name, then tap Save. Tap a preset to load, rename, or delete it.",
-            "Effects and the camera mode are not in presets.",
+            "Profiles save the look, position, camera mode, and effect settings.",
+            "Type a name, then tap Save. Existing names ask before overwrite.",
+            "Archive profiles to keep them without showing them in the active list.",
         ),
     )
 
@@ -368,12 +369,64 @@ internal object PanelTree {
         title = "📁 Themes",
         tag = null,
         kind = FolderKind.OFFICE,
-        folders = listOf(toggleStyleFolder()),
-        items = Theme.entries.map { ThemeItem(it) },
+        folders = listOf(themeModeFolder(), toggleStyleFolder(), presetsFolder()),
+        items = listOf(ThemeItem(Theme.SYSTEM)),
         notes = listOf(
-            "Tap a theme to use it.",
-            "You can still change every setting after.",
-            "OLED means the screen's black parts turn fully off.",
+            "System is the only built-in theme.",
+            "Its black and white colors follow Auto, Day, or Night.",
+        ),
+    )
+
+    private fun effectLinksFolder() = PanelFolder(
+        id = "effects_library",
+        title = "📁 Effects Library",
+        tag = null,
+        kind = FolderKind.OFFICE,
+        folders = EffectLinks.categories.mapIndexed { categoryIndex, category ->
+            PanelFolder(
+                id = "effect_links_$categoryIndex",
+                title = "📁 ${category.title}",
+                tag = null,
+                kind = FolderKind.OFFICE,
+                items = category.links.mapIndexed { linkIndex, link ->
+                    ActionItem(
+                        PanelAction.OPEN_EFFECT_LINK,
+                        link.title,
+                        link.note,
+                        "$categoryIndex:$linkIndex",
+                    )
+                },
+            )
+        },
+        notes = listOf(EffectLinks.LICENSE_NOTE),
+    )
+
+    private fun themeModeFolder() = PanelFolder(
+        id = "theme_mode",
+        title = "📁 Theme mode",
+        tag = null,
+        kind = FolderKind.OFFICE,
+        items = listOf(
+            ChoiceItem(
+                LookKeys.THEME_MODE,
+                "Theme mode",
+                ThemeMode.entries.map { mode ->
+                    Choice(
+                        mode.key,
+                        when (mode) {
+                            ThemeMode.AUTO -> "Auto"
+                            ThemeMode.DAY -> "Day"
+                            ThemeMode.NIGHT -> "Night"
+                        },
+                        when (mode) {
+                            ThemeMode.AUTO -> "Follow the phone's light setting."
+                            ThemeMode.DAY -> "Use a white panel and black text."
+                            ThemeMode.NIGHT -> "Use a black panel and white text."
+                        },
+                    )
+                },
+                ThemeMode.AUTO.key,
+            ),
         ),
     )
 

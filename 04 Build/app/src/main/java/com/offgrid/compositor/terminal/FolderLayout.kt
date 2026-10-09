@@ -32,7 +32,7 @@ internal enum class FolderView(val key: String, val title: String, val help: Str
     ;
 
     companion object {
-        fun from(key: String?): FolderView = entries.firstOrNull { it.key == key } ?: BIG_LIST
+        fun from(key: String?): FolderView = entries.firstOrNull { it.key == key } ?: GRID_2
     }
 }
 
@@ -249,7 +249,7 @@ internal class FolderLayout(context: Context, private val sub: Boolean) : ViewGr
 
     private val order = ArrayList<PanelFolder>()
     private val cells = HashMap<String, View>()
-    private var view = FolderView.BIG_LIST
+    private var view = FolderView.GRID_2
     private var size = FolderSettings.START_SIZE
     private var activeId: String? = null
     private var columns = 1

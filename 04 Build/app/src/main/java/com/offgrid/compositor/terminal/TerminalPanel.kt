@@ -3,6 +3,7 @@ package com.offgrid.compositor.terminal
 import android.animation.Animator
 import android.animation.ValueAnimator
 import android.content.Context
+import android.content.res.Configuration
 import android.graphics.BlendMode
 import android.graphics.Canvas
 import android.graphics.Matrix
@@ -185,7 +186,7 @@ class TerminalPanel @JvmOverloads constructor(
     /** Called when any of Royalty's own toggles flips (not test toggles), so fireworks can burst. */
     var onToggled: ((String, Boolean) -> Unit)? = null
 
-    /** Final build: the saved looks in 📁 Presets. */
+    /** Saved profiles include the look, position, camera mode, and effect settings. */
     internal val presets = LookPresets(context, prefs)
 
     /** Every effect setting right now, for the camera's effects. */
@@ -434,6 +435,7 @@ class TerminalPanel @JvmOverloads constructor(
             super.onMeasure(widthMeasureSpec, heightMeasureSpec)
             return
         }
+
         val nextFullBleed = PanelGeometry.isFullBleed(
             store.number(LookKeys.WIDTH),
             store.number(LookKeys.HEIGHT),
@@ -495,6 +497,11 @@ class TerminalPanel @JvmOverloads constructor(
             lastLoggedDisplayHeight = areaHeight
             Log.d("OFFGRID", "OFFGRID size: glass=${glassWidth}x$glassHeight display=${areaWidth}x$areaHeight")
         }
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        refreshLook()
     }
 
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
@@ -603,6 +610,7 @@ class TerminalPanel @JvmOverloads constructor(
         val current = look
         val live = ticking && GlowClock.motionAllowed
         glass.breath = if (live && current.pulse) breathAt(GlowClock.seconds, current.pulseSpeed) else STILL_BREATH
+        backOrb.breath = glass.breath
         super.draw(canvas)
     }
 

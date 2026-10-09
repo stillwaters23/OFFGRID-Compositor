@@ -51,22 +51,23 @@ internal fun applyTextStyle(view: TextView, style: StyleTag, look: PanelLook) {
         return
     }
     val glow = Hud.dp(view.context, 6f)
+    val systemText = look.base == Theme.SYSTEM
     when (style.role) {
         TextRole.TITLE -> {
-            view.setTextColor(look.edge)
-            view.setShadowLayer(glow, 0f, 0f, look.edge)
+            view.setTextColor(if (systemText) look.text else look.edge)
+            view.setShadowLayer(if (systemText) 0f else glow, 0f, 0f, look.edge)
         }
         TextRole.PILL -> {
-            view.setTextColor(look.decor)
-            view.setShadowLayer(glow, 0f, 0f, look.decor)
+            view.setTextColor(if (systemText) look.text else look.decor)
+            view.setShadowLayer(if (systemText) 0f else glow, 0f, 0f, look.decor)
         }
-        TextRole.SECTION, TextRole.BACK -> view.setTextColor(look.decor)
-        TextRole.PATH -> view.setTextColor(Hud.withAlpha(look.secondaryText, 0.6f))
+        TextRole.SECTION, TextRole.BACK -> view.setTextColor(if (systemText) look.text else look.decor)
+        TextRole.PATH -> view.setTextColor(if (systemText) look.text else Hud.withAlpha(look.secondaryText, 0.6f))
         TextRole.HEADING -> {
             view.setTextColor(look.secondaryText)
-            view.setShadowLayer(glow, 0f, 0f, look.folder)
+            view.setShadowLayer(if (systemText) 0f else glow, 0f, 0f, look.folder)
         }
-        TextRole.COUNT -> view.setTextColor(look.folder)
+        TextRole.COUNT -> view.setTextColor(if (systemText) look.text else look.folder)
         TextRole.MESSAGE -> view.setTextColor(look.text)
         TextRole.LABEL -> view.setTextColor(look.secondaryText)
     }
@@ -77,6 +78,10 @@ internal fun applyTextStyle(view: TextView, style: StyleTag, look: PanelLook) {
  * Holo Classic keeps its Step 2 colors.
  */
 private fun applyLaserTitle(view: LaserTitleView, role: TextRole, look: PanelLook) {
+    if (look.base == Theme.SYSTEM) {
+        view.setLaser(look.text, null, 0f)
+        return
+    }
     val strength = look.glowStrength
     val boost = look.glowBoost
     when (role) {
@@ -127,32 +132,57 @@ internal fun styleRowWords(title: TextView, note: TextView, look: PanelLook) {
     note.setTextColor(Hud.withAlpha(look.secondaryText, 0.62f))
 }
 
-/** A big glowing folder in a grid, with its name under it. */
+/** A glass folder tile for the two-column phone layout. */
 internal class FolderTile(context: Context, private val folder: PanelFolder, iconDp: Float) : LinearLayout(context), Styled {
     private val ring = HoloRingView(context, folder.special)
     private val name = FitTextView(context)
+    private val count = TextView(context)
+    private val accentBar = View(context)
+    private val icon = FolderIconView(
+        context,
+        folder.itemCount,
+        folder.tag,
+        compact = false,
+        special = folder.special,
+    )
+    private val iconSize = Hud.dpi(context, iconDp.coerceAtMost(48f))
     private var active = false
     private var look: PanelLook? = null
 
     init {
-        orientation = VERTICAL
-        gravity = Gravity.CENTER_HORIZONTAL
-        setPadding(0, 0, 0, Hud.dpi(context, 6f))
-        val ringSize = Hud.dpi(context, iconDp * 1.34f)
-        val frame = FrameLayout(context)
+        orientation = HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        minimumHeight = Hud.dpi(context, 96f)
+        setPadding(Hud.dpi(context, 8f), Hud.dpi(context, 8f), Hud.dpi(context, 8f), Hud.dpi(context, 8f))
+        val ringSize = Hud.dpi(context, 56f)
+        val frame = FrameLayout(context).apply { clipChildren = false }
         ring.visibility = INVISIBLE
         frame.addView(ring, FrameLayout.LayoutParams(ringSize, ringSize, Gravity.CENTER))
-        frame.addView(
-            FolderIconView(context, folder.itemCount, folder.tag, compact = false, special = folder.special),
-            FrameLayout.LayoutParams(Hud.dpi(context, iconDp), Hud.dpi(context, iconDp * 0.86f), Gravity.CENTER),
-        )
-        addView(frame, LayoutParams(ringSize, ringSize))
+        frame.addView(icon, FrameLayout.LayoutParams(iconSize, (iconSize * 0.86f).toInt(), Gravity.CENTER))
+        addView(accentBar, LayoutParams(Hud.dpi(context, 3f), LayoutParams.MATCH_PARENT))
+        addView(frame, LayoutParams(ringSize, ringSize).apply { marginStart = Hud.dpi(context, 4f) })
+        val labels = LinearLayout(context).apply {
+            orientation = VERTICAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(Hud.dpi(context, 8f), 0, 0, 0)
+        }
         name.apply {
             text = folder.title
-            typeface = Hud.condensed
-            gravity = Gravity.CENTER_HORIZONTAL
+            typeface = Hud.monoBold(context)
+            maxLines = 2
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            gravity = Gravity.CENTER_VERTICAL
         }
-        addView(name, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+        labels.addView(name, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+        count.apply {
+            text = itemsText(context, folder.itemCount)
+            typeface = Hud.mono(context)
+            includeFontPadding = false
+        }
+        labels.addView(count, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply {
+            topMargin = Hud.dpi(context, 4f)
+        })
+        addView(labels, LayoutParams(0, LayoutParams.MATCH_PARENT, 1f))
         isClickable = true
         isFocusable = true
         contentDescription = context.getString(
@@ -160,6 +190,27 @@ internal class FolderTile(context: Context, private val folder: PanelFolder, ico
             folder.title,
             itemsText(context, folder.itemCount),
         )
+        setOnTouchListener { view, event ->
+            when (event.actionMasked) {
+                android.view.MotionEvent.ACTION_DOWN -> {
+                    if (android.animation.ValueAnimator.areAnimatorsEnabled()) {
+                        view.animate().scaleX(0.98f).scaleY(0.98f).setDuration(150L).start()
+                    }
+                }
+                android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
+                    if (android.animation.ValueAnimator.areAnimatorsEnabled()) {
+                        view.animate().scaleX(1f).scaleY(1f).setDuration(150L).start()
+                    } else {
+                        view.scaleX = 1f
+                        view.scaleY = 1f
+                    }
+                    if (event.actionMasked == android.view.MotionEvent.ACTION_UP && look?.tick == true) {
+                        view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                    }
+                }
+            }
+            false
+        }
     }
 
     fun setActive(value: Boolean) {
@@ -170,8 +221,18 @@ internal class FolderTile(context: Context, private val folder: PanelFolder, ico
     override fun applyLook(look: PanelLook) {
         this.look = look
         foreground = pressGlow(context, look.edge)
+        accentBar.setBackgroundColor(look.folder)
+        val backgroundColor = if (look.base == Theme.SYSTEM) look.skin else Hud.withAlpha(look.skin, 0.92f)
+        background = GradientDrawable().apply {
+            setColor(backgroundColor)
+            cornerRadius = Hud.dp(context, 8f)
+            setStroke(Hud.dpi(context, if (active) 2f else 1f), if (active) look.edge else Hud.withAlpha(look.edge, 0.45f))
+        }
+        icon.applyLook(look)
         name.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10.5f * look.fontScale)
-        name.setTextColor(if (active) look.decor else look.secondaryText)
+        name.setTextColor(if (active) look.text else look.secondaryText)
+        count.setTextSize(TypedValue.COMPLEX_UNIT_SP, 9f * look.fontScale)
+        count.setTextColor(if (look.base == Theme.SYSTEM) look.text else look.folder)
         val showRing = active && look.ring
         ring.visibility = if (showRing) VISIBLE else INVISIBLE
         ring.spinning = showRing

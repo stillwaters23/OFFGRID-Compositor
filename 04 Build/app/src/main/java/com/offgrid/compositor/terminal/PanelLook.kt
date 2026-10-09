@@ -32,13 +32,13 @@ internal enum class SystemRole(private val resId: Int, private val fallback: Int
     NEUTRAL1_100(android.R.color.system_neutral1_100, 0xFFE4E4E4.toInt()),
     NEUTRAL1_1000(android.R.color.system_neutral1_1000, 0xFF000000.toInt()),
     NEUTRAL2_900(android.R.color.system_neutral2_900, 0xFF1B1B1B.toInt()),
-    SYSTEM_TEXT(0, 0xFFF4ECFF.toInt());
+    SYSTEM_TEXT(0, 0xFFFFFFFF.toInt());
 
     fun resolve(context: Context): Int {
         if (this == SYSTEM_TEXT) {
             val night = context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK ==
                 Configuration.UI_MODE_NIGHT_YES
-            return if (night) 0xFFF4ECFF.toInt() else 0xFF17131C.toInt()
+            return if (night) 0xFFFFFFFF.toInt() else 0xFF000000.toInt()
         }
         return try {
             context.getColor(resId) or 0xFF000000.toInt()
@@ -64,17 +64,28 @@ internal enum class Theme(val key: String, val title: String, val blurb: String)
         "Titanium frame, sapphire glass, and phone-aware text.",
     ),
     TERMUX("termux", "Termux Black", "Plain black. Green text. No glow."),
-    SYSTEM("system", "System Colors", "Your phone's colors everywhere. Calm, with no pulse."),
+    SYSTEM("system", "System", "Pure black and white follow the selected theme mode."),
     HOLO("holo", "Holo Classic", "The Step 2 look. Cyan and gold lines."),
     UV_BLACK_LIGHT("uv_black_light", "UV Black Light", "Black glass with ultraviolet neon colors.");
 
     companion object {
-        fun from(key: String?): Theme = entries.firstOrNull { it.key == key } ?: OLED
+        fun from(key: String?): Theme = entries.firstOrNull { it == SYSTEM && it.key == key } ?: SYSTEM
+    }
+}
+
+internal enum class ThemeMode(val key: String) {
+    AUTO("auto"),
+    DAY("day"),
+    NIGHT("night");
+
+    companion object {
+        fun from(key: String?): ThemeMode = entries.firstOrNull { it.key == key } ?: AUTO
     }
 }
 
 /** Keys for the look settings. Typed numbers are 0 to 100. */
 internal object LookKeys {
+    const val THEME_MODE = "theme_mode"
     const val OPACITY = "opacity"
     const val TYPING = "typing"
     const val FONT_SIZE = "font_size"
@@ -225,15 +236,15 @@ internal object Themes {
                 ColorPart.STATUS to phone(SystemRole.SYSTEM_TEXT),
             ),
             numbers = mapOf(
-                LookKeys.OPACITY to 75, LookKeys.CORNERS to 6, LookKeys.GLOW to 32,
-                LookKeys.PULSE_SPEED to 50,
+                LookKeys.OPACITY to 100, LookKeys.CORNERS to 6, LookKeys.GLOW to 32,
+                LookKeys.PULSE_SPEED to 42,
                 LookKeys.CURSOR_GLOW to 0,
             ),
             toggles = mapOf(
                 LookKeys.SCAN_LINE to false, LookKeys.RING to true, LookKeys.UNFOLD to true,
-                LookKeys.EDGE_GLOW to true, LookKeys.OUTER_GLOW to true, LookKeys.PULSE to false,
+                LookKeys.EDGE_GLOW to true, LookKeys.OUTER_GLOW to true, LookKeys.PULSE to true,
                 LookKeys.GLOW_ON to true,
-                LookKeys.TITANIUM_FRAME to true, LookKeys.SAPPHIRE_GLASS to true,
+                LookKeys.TITANIUM_FRAME to false, LookKeys.SAPPHIRE_GLASS to false,
                 LookKeys.TOUCH_GLOW to true, LookKeys.TYPING_GLOW to true,
             ),
         )
@@ -369,6 +380,12 @@ internal class ThemeStore(private val context: Context, private val prefs: Panel
 
     fun base(): Theme = Theme.from(prefs.text(BASE))
 
+    fun themeMode(): ThemeMode = ThemeMode.from(prefs.text(THEME_MODE))
+
+    fun setThemeMode(mode: ThemeMode) {
+        prefs.write { text(THEME_MODE, mode.key) }
+    }
+
     private fun spec(): ThemeSpec = Themes.spec(base())
 
     fun number(key: String): Int {
@@ -409,6 +426,19 @@ internal class ThemeStore(private val context: Context, private val prefs: Panel
     fun systemColor(part: ColorPart): Int = part(part).role.resolve(context)
 
     fun color(part: ColorPart): Int {
+        if (base() == Theme.SYSTEM) {
+            val dark = when (themeMode()) {
+                ThemeMode.AUTO -> context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK ==
+                    Configuration.UI_MODE_NIGHT_YES
+                ThemeMode.DAY -> false
+                ThemeMode.NIGHT -> true
+            }
+            when (part) {
+                ColorPart.SKIN -> return if (dark) 0xFF000000.toInt() else 0xFFFFFFFF.toInt()
+                ColorPart.TEXT, ColorPart.STATUS -> return if (dark) 0xFFFFFFFF.toInt() else 0xFF000000.toInt()
+                else -> Unit
+            }
+        }
         val state = part(part)
         return if (state.system) state.role.resolve(context) else state.custom
     }
@@ -500,11 +530,11 @@ internal class ThemeStore(private val context: Context, private val prefs: Panel
             text = text,
             cursor = color(ColorPart.CURSOR),
             folder = folder,
-            secondaryText = if (base == Theme.HOLO) Hud.HOLO_TEXT else Hud.withAlpha(text, 0.78f),
+            secondaryText = if (base == Theme.SYSTEM) text else Hud.withAlpha(text, 0.78f),
             status = color(ColorPart.STATUS),
-            label = if (base == Theme.HOLO) Hud.HOLO_LABEL else Hud.lighten(text, 0.55f),
-            decor = if (base == Theme.HOLO) Hud.HOLO_GOLD else edge,
-            specialFolder = if (base == Theme.HOLO) Hud.HOLO_GOLD else folder,
+            label = if (base == Theme.SYSTEM) text else Hud.lighten(text, 0.55f),
+            decor = edge,
+            specialFolder = folder,
             opacity = number(LookKeys.OPACITY) / 100f,
             glowStrength = if (glowOn) PanelGeometry.glowStrength(number(LookKeys.GLOW)) else 0f,
             glowBoost = if (glowOn) PanelGeometry.glowBoost(number(LookKeys.GLOW)) else 0f,

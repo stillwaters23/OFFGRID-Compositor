@@ -6,7 +6,7 @@ import android.graphics.Paint
 import com.offgrid.compositor.R
 import android.view.View
 
-internal class BackOrbView(context: Context) : View(context) {
+internal class BackOrbView(context: Context) : View(context), Styled {
     private val ring = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeWidth = Hud.dp(context, 2.5f)
@@ -23,6 +23,13 @@ internal class BackOrbView(context: Context) : View(context) {
     }
     private val arrowPath = android.graphics.Path()
     private val radius = Hud.dp(context, 19f)
+    private var look: PanelLook? = null
+    var breath = 0.5f
+        set(value) {
+            if (field == value) return
+            field = value
+            invalidate()
+        }
     var enabledState: Boolean = true
         set(value) {
             field = value
@@ -49,7 +56,22 @@ internal class BackOrbView(context: Context) : View(context) {
         val cy = height / 2f
         fill.color = if (isPressed) Hud.withAlpha(NeonPalette.UV_VIOLET, 0.35f) else Hud.INK
         canvas.drawCircle(cx, cy, radius, fill)
+        val current = look
+        val pulse = if (current?.pulse == true) 0.85f + 0.3f * breath else 1f
+        ring.alpha = (255f * pulse).toInt()
         canvas.drawCircle(cx, cy, radius, ring)
+        ring.alpha = 255
+        canvas.save()
+        canvas.translate((width - Hud.dpi(context, 48f)) / 2f, 0f)
         canvas.drawPath(arrowPath, arrow)
+        canvas.restore()
+    }
+
+    override fun applyLook(look: PanelLook) {
+        this.look = look
+        ring.color = look.edge
+        ring.setShadowLayer(Hud.dp(context, 7f) * (0.85f + 0.3f * breath), 0f, 0f, look.outerGlow)
+        arrow.color = look.text
+        invalidate()
     }
 }

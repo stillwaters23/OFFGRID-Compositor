@@ -96,22 +96,20 @@ class PanelUiTest {
                 val visible = (0 until bar.childCount).map(bar::getChildAt).filter { it.visibility == View.VISIBLE }
                 val controlCenter = visible.first().top + visible.first().height / 2 + insetTop
                 visible.forEachIndexed { index, child ->
-                    assertEquals("$widthDp dp control $index height", Hud.dpi(context, 48f), child.height)
+                    assertEquals("$widthDp dp control $index height", Hud.dpi(context, 40f), child.height)
                     assertTrue(
                         "$widthDp dp control $index center",
                         abs(child.top + child.height / 2 + insetTop - controlCenter) <= 1,
                     )
                 }
                 visible.zipWithNext().forEachIndexed { index, (first, second) ->
-                    if (index > 1) {
-                        assertEquals("$widthDp dp control gap $index", Hud.dpi(context, 8f), second.left - first.right)
-                    }
+                    assertEquals("$widthDp dp control gap $index", Hud.dpi(context, 8f), second.left - first.right)
                 }
                 assertEquals(orb, bar.getChildAt(0))
                 assertEquals(bar.width - bar.paddingRight, visible.last().right)
                 val boxesVisible = (bar.widthInput.parent as View).visibility == View.VISIBLE &&
                     (bar.heightInput.parent as View).visibility == View.VISIBLE
-                assertEquals(widthDp >= 400, boxesVisible)
+                assertTrue(boxesVisible)
             }
         }
     }
@@ -214,7 +212,7 @@ class PanelUiTest {
             }
         }.toSet())
         assertTrue(microphone.notes.contains("Everything runs on this phone. Nothing goes to the cloud."))
-        assertEquals(FolderView.BIG_LIST, FolderSettings(PanelPrefs(context)).view)
+        assertEquals(FolderView.GRID_2, FolderSettings(PanelPrefs(context)).view)
     }
 
     @Test
@@ -229,9 +227,60 @@ class PanelUiTest {
         val night = SystemRole.SYSTEM_TEXT.resolve(configured(Configuration.UI_MODE_NIGHT_YES))
 
         assertNotEquals(day, night)
-        assertEquals(SystemRole.SYSTEM_TEXT, Themes.spec(Theme.OLED).parts.getValue(ColorPart.TEXT).role)
         assertEquals(SystemRole.SYSTEM_TEXT, Themes.spec(Theme.SYSTEM).parts.getValue(ColorPart.TEXT).role)
-        assertEquals(Theme.UV_BLACK_LIGHT, Theme.from(Theme.UV_BLACK_LIGHT.key))
+        assertEquals(Theme.SYSTEM, Theme.from("oled"))
+        val dayStore = ThemeStore(configured(Configuration.UI_MODE_NIGHT_NO), PanelPrefs(context))
+        val nightStore = ThemeStore(configured(Configuration.UI_MODE_NIGHT_YES), PanelPrefs(context))
+        assertEquals(0xFFFFFFFF.toInt(), dayStore.color(ColorPart.SKIN))
+        assertEquals(0xFF000000.toInt(), dayStore.color(ColorPart.TEXT))
+        assertEquals(0xFF000000.toInt(), nightStore.color(ColorPart.SKIN))
+        assertEquals(0xFFFFFFFF.toInt(), nightStore.color(ColorPart.TEXT))
+    }
+
+    @Test
+    fun systemThemeUsesPureBlackAndWhiteAndModePersists() {
+        val store = ThemeStore(context, PanelPrefs(context))
+        store.setThemeMode(ThemeMode.NIGHT)
+        assertEquals(0xFF000000.toInt(), store.color(ColorPart.SKIN))
+        assertEquals(0xFFFFFFFF.toInt(), store.color(ColorPart.TEXT))
+        assertEquals(0xFFFFFFFF.toInt(), store.color(ColorPart.STATUS))
+
+        store.setThemeMode(ThemeMode.DAY)
+        assertEquals(0xFFFFFFFF.toInt(), store.color(ColorPart.SKIN))
+        assertEquals(0xFF000000.toInt(), store.color(ColorPart.TEXT))
+        assertEquals(0xFF000000.toInt(), store.color(ColorPart.STATUS))
+        assertEquals(ThemeMode.DAY, ThemeStore(context, PanelPrefs(context)).themeMode())
+    }
+
+    @Test
+    fun themePickerContainsOnlySystemAndModePickerContainsAutoDayNight() {
+        val themes = PanelTree.build().folders.single { it.id == "panel_settings" }
+            .folders.single { it.id == "themes" }
+        assertEquals(listOf(Theme.SYSTEM), themes.items.filterIsInstance<ThemeItem>().map { it.theme })
+        val mode = themes.folders.single { it.id == "theme_mode" }.items.single() as ChoiceItem
+        assertEquals(listOf("auto", "day", "night"), mode.choices.map { it.value })
+    }
+
+    @Test
+    fun effectLibraryContainsEveryCuratedHttpsLinkInNonEmptyCategories() {
+        assertTrue(EffectLinks.categories.isNotEmpty())
+        assertTrue(EffectLinks.categories.all { it.links.isNotEmpty() })
+        val links = EffectLinks.categories.flatMap { it.links }
+        assertEquals(12, links.size)
+        assertTrue(links.all { it.url.startsWith("https://") })
+        assertTrue(links.all { android.net.Uri.parse(it.url).host?.isNotBlank() == true })
+        assertEquals(EffectLinks.LICENSE_NOTE, PanelTree.build().folders.single {
+            it.id == "panel_settings"
+        }.folders.single { it.id == "effects_library" }.notes.single())
+    }
+
+    @Test
+    fun neonPaletteHasThirtyColorsAndASeparateCyberGroup() {
+        assertEquals(31, NeonPalette.swatches.size)
+        assertEquals(4, NeonPalette.swatches.count { it.cyber })
+        assertTrue(NeonPalette.swatches.filterNot { it.cyber }.all {
+            RainbowMix.hex(it.color).matches(Regex("#[0-9A-F]{6}"))
+        })
     }
 
     @Test

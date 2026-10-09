@@ -21,12 +21,14 @@ internal class PanelPrefs(context: Context) {
      * Step 2.2 already let go of the Step 2.1 size and place the same way.
      */
     private fun migrate() {
+        val savedTheme = prefs.getString(TEXT + "base_theme", null)
         prefs.edit {
             remove(TEXT + "side_mode")
             remove("system_color.side_text")
             remove("custom.side_text")
             remove("role.side_text")
             remove("mix.side_text")
+            if (savedTheme != "system") putString(TEXT + "base_theme", "system")
         }
         val was = prefs.getInt(LAYOUT, 0)
         if (was >= LAYOUT_NOW) return
@@ -109,6 +111,15 @@ internal class PanelPrefs(context: Context) {
         return out
     }
 
+    /** A profile includes look, position, camera mode, and typed effect settings, but not test marks. */
+    fun profileEntries(): Map<String, Any> {
+        val out = HashMap<String, Any>()
+        for ((key, value) in prefs.all) {
+            if (value != null && isProfileKey(key)) out[key] = value
+        }
+        return out
+    }
+
     /** Swaps the whole saved look for [entries] in one write. Effects, marks, and place stay. */
     fun replaceLook(entries: Map<String, Any>) {
         prefs.edit {
@@ -126,6 +137,27 @@ internal class PanelPrefs(context: Context) {
         }
     }
 
+    fun replaceProfile(entries: Map<String, Any>) {
+        prefs.edit {
+            for (key in prefs.all.keys) if (isProfileKey(key)) remove(key)
+            for ((key, value) in entries) {
+                if (!isProfileKey(key)) continue
+                when {
+                    key == POSITION_X || key == POSITION_Y ->
+                        putFloat(key, ((value as? Number)?.toFloat() ?: continue).coerceIn(0f, 1f))
+                    key.startsWith(NUMBER) ->
+                        putInt(key, ((value as? Number)?.toInt() ?: continue).coerceIn(0, 100))
+                    key.startsWith(COLOR) ->
+                        putInt(key, (value as? Number)?.toInt() ?: continue)
+                    key.startsWith(TOGGLE) ->
+                        putBoolean(key, value as? Boolean ?: continue)
+                    key.startsWith(TEXT) ->
+                        putString(key, (value as? String)?.takeIf { it.length <= MAX_PROFILE_TEXT } ?: continue)
+                }
+            }
+        }
+    }
+
     private fun isLook(key: String): Boolean {
         val name = when {
             key.startsWith(NUMBER) -> key.removePrefix(NUMBER)
@@ -137,6 +169,25 @@ internal class PanelPrefs(context: Context) {
         return !name.startsWith(TEST_PREFIX) && !name.startsWith(EFFECT_PREFIX) && name != DIAMOND &&
             !name.startsWith(FOLDER_PREFIX)
     }
+
+    private fun isProfileKey(key: String): Boolean {
+        if (key == POSITION_X || key == POSITION_Y) return true
+        val name = when {
+            key.startsWith(NUMBER) -> key.removePrefix(NUMBER)
+            key.startsWith(TOGGLE) -> key.removePrefix(TOGGLE)
+            key.startsWith(TEXT) -> key.removePrefix(TEXT)
+            key.startsWith(COLOR) -> key.removePrefix(COLOR)
+            else -> return false
+        }
+        if (name.startsWith(TEST_PREFIX)) return false
+        if (key.startsWith(TEXT)) {
+            return name == "base_theme" || name == "theme_mode" || name == "toggle_style" ||
+                name.startsWith("fx.") || name.startsWith("role.") || name.startsWith("mix.")
+        }
+        return isLook(key) || name.startsWith("fx.")
+    }
+
+    fun isProfileEntryAllowed(key: String): Boolean = isProfileKey(key)
 
     var minimized: Boolean
         get() = prefs.getBoolean(MINIMIZED, false)
@@ -199,6 +250,7 @@ internal class PanelPrefs(context: Context) {
         private const val ACTIVE_FOLDER = "active_folder"
         private const val POSITION_X = "position_x"
         private const val POSITION_Y = "position_y"
+        private const val MAX_PROFILE_TEXT = 256
         const val LAYOUT = "layout_version"
 
         /** 2 was Step 2.2 to 2.4. 3 is the final build. */

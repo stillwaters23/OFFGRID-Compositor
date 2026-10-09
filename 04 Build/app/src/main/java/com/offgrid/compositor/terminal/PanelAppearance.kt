@@ -89,9 +89,11 @@ internal fun TerminalPanel.styleGuidance(typer: LaserTypeView) {
         PanelGlassDrawable(density, 0f, pane = true).apply { look = current }
     } else {
         GradientDrawable().apply {
-            setColor(Hud.withAlpha(Hud.blend(current.skin, Hud.INK, 0.6f), 0.55f))
+            val background = if (current.base == Theme.SYSTEM) current.skin else
+                Hud.withAlpha(Hud.blend(current.skin, Hud.INK, 0.6f), 0.55f)
+            setColor(background)
             cornerRadius = chromeRadius(context, current)
-            setStroke(dpi(1f), Hud.withAlpha(current.text, 0.22f))
+            setStroke(dpi(1f), if (current.base == Theme.SYSTEM) current.text else Hud.withAlpha(current.text, 0.22f))
         }
     }
 }

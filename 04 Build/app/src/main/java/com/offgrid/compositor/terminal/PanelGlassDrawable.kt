@@ -67,7 +67,7 @@ internal class PanelGlassDrawable(
             canvas.drawBitmap(glow.resizeBar, null, resizeMaskTarget, maskPaint)
             val level = current.glowValue
             if (level <= 0) return
-            val pulse = resizeBarPulse
+            val pulse = resizeBarPulse * if (current.pulse) PanelGeometry.pulseScale(breath) else 1f
             drawAdditiveMask(
                 canvas,
                 glow.resizeCore,
@@ -374,6 +374,7 @@ internal class PanelGlassDrawable(
                 Hud.withAlpha(Hud.HOLO_GLASS_BOTTOM, 0.45f + 0.5f * opacity),
                 Shader.TileMode.CLAMP,
             )
+            pane && current.base == Theme.SYSTEM -> fill.color = current.skin
             pane -> fill.color = Hud.withAlpha(Hud.blend(current.skin, current.edge, 0.07f), 0.5f + 0.45f * opacity)
             current.holo -> fill.shader = LinearGradient(
                 0f, glass.top, 0f, glass.bottom,

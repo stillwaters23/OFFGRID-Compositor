@@ -68,6 +68,8 @@ internal object PanelGeometry {
     fun resizeBarLayerAlphaSum(value: Int): Float =
         resizeBarLayerAlpha(value, 0) + resizeBarLayerAlpha(value, 1) + resizeBarLayerAlpha(value, 2)
 
+    fun pulseScale(breath: Float): Float = 0.85f + 0.3f * breath.coerceIn(0f, 1f)
+
     fun glowStrength(value: Int): Float {
         val amount = value.coerceIn(0, 100) / 100f
         return if (amount <= 0.5f) 1.4f * amount else 0.7f + 0.3f * ((amount - 0.5f) * 2f).pow(1.4f)
