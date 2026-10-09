@@ -2,6 +2,7 @@ package com.offgrid.live
 
 import java.net.InetAddress
 import java.net.Socket
+import java.net.ServerSocket
 import java.util.concurrent.Executors
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -18,6 +19,7 @@ class RemoteSecurityTest {
             val key = PairingKey.generate()
             assertEquals(128, key.length)
             assertTrue(PairingKey.isValid(key))
+            assertEquals(6, PairingKey.fingerprint(key).length)
             assertTrue(keys.add(key))
         }
     }
@@ -54,6 +56,13 @@ class RemoteSecurityTest {
 
         val wrongReceiver = EncryptedChannel(ByteArray(32) { (it + 1).toByte() }, byteArrayOf(1, 2, 3, 4))
         assertFalse(runCatching { wrongReceiver.decrypt(frame) }.isSuccess)
+
+        val orderedSender = EncryptedChannel(key, byteArrayOf(5, 6, 7, 8))
+        val orderedReceiver = EncryptedChannel(key, byteArrayOf(5, 6, 7, 8))
+        val first = orderedSender.encrypt(byteArrayOf(1))
+        val second = orderedSender.encrypt(byteArrayOf(2))
+        assertFalse(runCatching { orderedReceiver.decrypt(second) }.isSuccess)
+        assertArrayEquals(byteArrayOf(1), orderedReceiver.decrypt(first))
     }
 
     @Test
@@ -98,6 +107,66 @@ class RemoteSecurityTest {
                     }
                 }
                 assertEquals(RemoteMessage("fx.cam.on", "setting", "true"), received.get())
+            } finally {
+                executor.shutdownNow()
+            }
+        }
+    }
+
+    @Test
+    fun authenticatedSessionCarriesControlsAndFinishedVideoFrames() {
+        val loopback = InetAddress.getLoopbackAddress()
+        val pairingKey = PairingKey.generate()
+        val executor = Executors.newSingleThreadExecutor()
+        ServerSocket(0, 1, loopback).use { server ->
+            try {
+                val remote = executor.submit<RemoteSession> {
+                    RemoteSession.establish(server.accept(), pairingKey, false)
+                }
+                RemoteSession.establish(Socket(loopback, server.localPort), pairingKey, true).use { camera ->
+                    remote.get().use { controller ->
+                        controller.sendControl(RemoteMessage("fx.cam.on", "setting", "false"))
+                        val setting = camera.receive() as RemotePacket.Control
+                        assertEquals("fx.cam.on", setting.message.key)
+                        assertEquals("false", setting.message.value)
+
+                        camera.sendVideo(byteArrayOf(1, 2, 3), 24_000L, 1)
+                        val frame = controller.receive() as RemotePacket.Video
+                        assertArrayEquals(byteArrayOf(1, 2, 3), frame.sample)
+                        assertEquals(24_000L, frame.presentationTimeUs)
+                    }
+                }
+            } finally {
+                executor.shutdownNow()
+            }
+        }
+    }
+
+    @Test
+    fun authenticatedSessionRejectsDifferentPairingKeys() {
+        val loopback = InetAddress.getLoopbackAddress()
+        val pairingKey = PairingKey.generate()
+        val executor = Executors.newSingleThreadExecutor()
+        ServerSocket(0, 1, loopback).use { server ->
+            try {
+                val remote = executor.submit<Boolean> {
+                    val socket = server.accept()
+                    try {
+                        RemoteSession.establish(socket, PairingKey.generate(), false).close()
+                        false
+                    } catch (error: IllegalArgumentException) {
+                        error.message == "Keys don't match"
+                    }
+                }
+                val failure = runCatching {
+                    RemoteSession.establish(
+                        Socket(loopback, server.localPort),
+                        pairingKey,
+                        true,
+                    )
+                }.exceptionOrNull()
+                assertEquals("Keys don't match", failure?.message)
+                assertTrue(remote.get())
             } finally {
                 executor.shutdownNow()
             }

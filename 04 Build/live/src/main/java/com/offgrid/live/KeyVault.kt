@@ -11,7 +11,7 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
-class KeyVault(context: Context) {
+internal class KeyVault(context: Context) {
     private val preferences = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
     private val keyStore = KeyStore.getInstance(ANDROID_KEY_STORE).apply { load(null) }
 
@@ -40,6 +40,8 @@ class KeyVault(context: Context) {
                 .toString(Charsets.US_ASCII)
                 .takeIf(PairingKey::isValid)
         } catch (error: java.security.GeneralSecurityException) {
+            null
+        } catch (error: IllegalArgumentException) {
             null
         }
     }

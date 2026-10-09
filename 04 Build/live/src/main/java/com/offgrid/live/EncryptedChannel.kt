@@ -12,6 +12,7 @@ class EncryptedChannel(
     private val secret = SecretKeySpec(key.copyOf(), "AES")
     private var sendCounter = 0L
     private var receiveCounter = 0L
+    private val createdAtNanos = System.nanoTime()
 
     init {
         require(key.size == 32)
@@ -20,6 +21,7 @@ class EncryptedChannel(
 
     @Synchronized
     fun encrypt(plainText: ByteArray): ByteArray {
+        checkSession()
         check(sendCounter < REKEY_LIMIT) { "Session must be rekeyed" }
         val counter = sendCounter++
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
@@ -33,6 +35,7 @@ class EncryptedChannel(
 
     @Synchronized
     fun decrypt(frame: ByteArray): ByteArray {
+        checkSession()
         require(frame.size >= Long.SIZE_BYTES + TAG_LENGTH)
         val buffer = ByteBuffer.wrap(frame)
         val counter = buffer.long
@@ -49,9 +52,16 @@ class EncryptedChannel(
     private fun nonce(counter: Long): ByteArray =
         ByteBuffer.allocate(NONCE_LENGTH).put(noncePrefix).putLong(counter).array()
 
+    private fun checkSession() {
+        check(System.nanoTime() - createdAtNanos < SESSION_LIFETIME_NANOS) {
+            "Session must be rekeyed"
+        }
+    }
+
     private companion object {
         const val NONCE_LENGTH = 12
         const val TAG_LENGTH = 16
         const val REKEY_LIMIT = 1L shl 20
+        const val SESSION_LIFETIME_NANOS = 30L * 60 * 1_000_000_000
     }
 }

@@ -67,3 +67,19 @@ States: passed, waiting for review, blocked, or waiting for Royalty's phone test
 - **PR / commit:** Pull request #4, not merged. Commit `259933a`.
 - **State:** waiting for review
 - **Next:** Rex (Agent 04) reviews pull request #4 and does not merge it. Then Royalty installs step-2-preview on the Galaxy S25 Ultra and the Galaxy A37 and runs the test steps in pull request #4, including the yellow diamond video check. Do not start Step 3 or Step 7.
+
+## 2026-10-09 7:53 AM CT — Lane C
+
+- **Bootloader step:** Lane C. Live and Remote
+- **What was done:** Added the `live` Android library with a small secure overlay, foreground service, pairing-key and local-session foundations, focused security tests, and the Bigo live guide. App-side integration and phone checks are pending because this checkout has no `final-build` or Lane A/B changes.
+- **PR / commit:** Pull request #13. Commit `d5b2852` plus Lane C changes.
+- **State:** blocked
+- **Next:** Run Gradle tests/build/lint when the Android Gradle plugin can be resolved; merge A and B into `final-build`, then add the C9 hooks and complete emulator and two-phone checks.
+
+## 2026-10-09 8:15 AM CT — Lane C verification
+
+- **Bootloader step:** Lane C. Live and Remote
+- **What was done:** The RFC 5869, key-generation, AES-GCM, X25519, wrong-key, replay, loopback-control, and video-frame checks pass with the standalone Kotlin compiler. The Android build task cannot resolve AGP 8.13.2 in this environment.
+- **PR / commit:** Pull request #13. Lane C changes are in progress.
+- **State:** blocked
+- **Next:** Resolve Android Gradle plugin and SDK access, integrate after Lanes A and B are in `final-build`, then run device and screenshot checks.

@@ -12,6 +12,8 @@ interface OffgridHost {
 
 fun interface FrameSink {
     fun attach(surface: Surface, width: Int, height: Int)
+
+    fun detach(surface: Surface) = Unit
 }
 
 object LiveHostRegistry {
