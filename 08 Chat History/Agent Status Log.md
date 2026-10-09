@@ -157,3 +157,18 @@ States: passed, waiting for review, blocked, or waiting for Royalty's phone test
 - **PR / commit:** Branch `final-build`, not merged.
 - **State:** waiting for review
 - **Next:** Milestone 4, the effects and the rest of the roadmap (everything except voice).
+
+## 2026-10-08 9:40 PM CT — Agent 05, Claude Code (stop point, session limit)
+
+- **Bootloader step:** FINAL full build. Milestone 4 of 5: effects and the rest of the roadmap. Partly done.
+- **What was done so far in M4:**
+  - A GPU camera stage now sits between the camera and the video. It does mirror, time freeze with a glitch, quiet mode, echo trail, takeover with a flip-flop small box, blackout, the cloak void, ghost (last picture or blank), depth shift, and shatter. When nothing is on, the camera goes out exactly as before.
+  - A saved no-face mode covers the very first picture with no fade, and ghost never freezes a live face.
+  - Drawn effects are painted with Android's Canvas on their own thread and baked into the picture under the panel, so viewers see them and never the panel.
+  - First drawn effects are in `effects/layers`: emoji rain, fireworks, glow border, red sweep, laser writing, ink, face diamond, radar, optical illusions, quiet light, and the test code.
+  - The network permission a video library asked for is removed. CAMERA is the only permission.
+  - Unit tests check the stage math, including no more than 3 flickers a second.
+- **Where it stopped:** the helper agents hit the session limit before the beach, clouds, status label, flying heroes, roller coaster, and portal were drawn. I was writing the panel folders for 📁 Camera, 📁 Effects, 📁 Record, the platform kick tools, and the test results, in a new file so `TerminalPanel.kt` stops growing. Nothing in the panel turns the new effects on yet.
+- **PR / commit:** Branch `final-build`, not merged.
+- **State:** blocked on session limit, then continuing
+- **Next:** finish the missing drawn effects, the effect folders, and the camera screen wiring, then M5.
