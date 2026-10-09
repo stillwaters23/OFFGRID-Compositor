@@ -1,0 +1,17 @@
+{
+  "identity": "AURIC 777",
+  "masterFile": "public/brand/auric_777_diamond_crown_emblem.png",
+  "masterSHA256": "cf5e541c48bb73c1cea62c6a7f3648d885e8ec9de96704ff002f5c7313c9176d",
+  "masterMode": "RGB",
+  "originalFile": "public/brand/auric_777_diamond_crown_emblem.original.jpg",
+  "originalSHA256": "0ab8d022504af2fff919b6cd019c5e5a1d81bcdff64b97248e86a5e447b52619",
+  "originalFormat": "JPEG bytes supplied with .png filename; canonical PNG preserves every decoded RGB pixel",
+  "masterPreserved": true,
+  "displayTreatment": "Original opaque master, contained on black glass; no checkerboard cutout used.",
+  "launcherSource": "public/brand/auric-launcher-source.png",
+  "launcherSourceSHA256": "65c55114bf6474bf0d5bab39f5f1763b8174a949a9466d4c37101005983b099a",
+  "launcherMethod": "Built-in image generation; icon-only simplification of supplied 777 master. Full prompt in public/brand/README.md.",
+  "exports": "Pillow contain/Lanczos PNG size exports; no stretching or master redraw.",
+  "smallMarks": "Code-native faceted diamond for 16/32px favicon and 96px white-alpha notification badge.",
+  "maskableVisibleRadiusLimit": 0.4
+}
