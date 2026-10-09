@@ -60,9 +60,9 @@ internal class PanelDetailBuilder(
 
         if (folder.folders.isNotEmpty()) {
             content.addView(sectionLabel(R.string.terminal_section_folders))
-            val tiles = TileGrid(context, 84f)
+            val tiles = TileGrid(context, 84f, singleColumn = true)
             for (child in folder.folders) {
-                val tile = FolderTile(context, child, 50f)
+                val tile = FolderTile(context, child, 50f, bigTile = true)
                 tile.setOnClickListener { onFolder(child, tile) }
                 tiles.addView(tile)
             }
@@ -103,14 +103,14 @@ internal class PanelDetailBuilder(
                     LinearLayout.LayoutParams(MATCH, WRAP),
                 )
             }
-            if (folder.colors.isNotEmpty()) {
-                content.addView(sectionLabel(R.string.terminal_section_colors))
-                folder.colors.forEach { item ->
-                    content.addView(
-                        NeonColorRow(context, item, prefs.color(item.key, item.default)) { onColor(item, it) },
-                        LinearLayout.LayoutParams(MATCH, WRAP),
-                    )
-                }
+        }
+        if (folder.colors.isNotEmpty()) {
+            content.addView(sectionLabel(R.string.terminal_section_colors))
+            folder.colors.forEach { item ->
+                content.addView(
+                    NeonColorRow(context, item, prefs.color(item.key, item.default)) { onColor(item, it) },
+                    LinearLayout.LayoutParams(MATCH, WRAP),
+                )
             }
         }
         if (folder.actions.isNotEmpty()) {

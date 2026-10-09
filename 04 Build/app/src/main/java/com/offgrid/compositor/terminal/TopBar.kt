@@ -33,6 +33,7 @@ internal class TopBar(
     private val widthControl: FrameLayout
     private val heightControl: FrameLayout
     private val back = BackOrbView(context)
+    private lateinit var titleView: TextView
     private val camera = QuickToggleView(context, false, prefs.toggle(FxKeys.CAMERA_ON, true))
     private val microphone = QuickToggleView(context, true, prefs.toggle(FxKeys.MIC_ON, false))
     private var currentWidth = width
@@ -45,17 +46,18 @@ internal class TopBar(
         contentDescription = context.getString(R.string.terminal_drag)
         back.setOnClickListener { onBack() }
         addView(back, LayoutParams(Hud.dpi(context, 48f), Hud.dpi(context, 48f)))
-        addView(TextView(context).apply {
+        titleView = TextView(context).apply {
             text = context.getString(R.string.terminal_title)
             typeface = Hud.monoBold(context)
             textSize = 12.5f
             letterSpacing = 0.12f
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
-            setTextColor(NeonPalette.BLACKLIGHT_WHITE)
+            setTextColor(Hud.TEXT)
             setShadowLayer(Hud.dp(context, 6f), 0f, 0f, NeonPalette.ELECTRIC_PURPLE)
             setPadding(Hud.dpi(context, 8f), 0, Hud.dpi(context, 8f), 0)
-        }, LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        }
+        addView(titleView, LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         camera.onChanged = { onToggle(FxKeys.CAMERA_ON, it, "Camera") }
         addView(camera, LayoutParams(Hud.dpi(context, 48f), Hud.dpi(context, 48f)).withStartGap(context))
         microphone.onChanged = { onToggle(FxKeys.MIC_ON, it, "Mic") }
@@ -97,6 +99,12 @@ internal class TopBar(
 
     fun setBackEnabled(enabled: Boolean) {
         back.enabledState = enabled
+    }
+
+    fun applySystemTextColor() {
+        titleView.setTextColor(Hud.TEXT)
+        widthInput.setTextColor(Hud.TEXT)
+        heightInput.setTextColor(Hud.TEXT)
     }
 
     fun setQuickToggle(key: String, on: Boolean) {

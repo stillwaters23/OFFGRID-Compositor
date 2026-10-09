@@ -238,7 +238,7 @@ internal object PanelTree {
             ),
             colorsFolder(),
             themesFolder(),
-            simpleFolder("presets", "Presets"),
+            simpleFolder("presets", "Presets", kind = FolderKind.SETTINGS),
             resetFolder(),
         ),
         notes = listOf(
@@ -252,7 +252,19 @@ internal object PanelTree {
         title = "Camera",
         tag = null,
         kind = FolderKind.EFFECTS,
-        toggles = listOf(ToggleItem(FxKeys.CAMERA_ON, "Camera", "Camera output is on.", true, false)),
+        choices = listOf(
+            ChoiceItem(FxKeys.CAMERA_MODE, "Camera mode", "Choose the camera presentation.", listOf("Normal", "Mirror"), "Normal"),
+        ),
+        toggles = listOf(
+            ToggleItem(FxKeys.CAMERA_ON, "Camera", "Camera output is on.", true, false),
+            ToggleItem(FxKeys.FACE_DIAMOND, "Face diamond", "Show the face diamond.", false, false),
+            ToggleItem(FxKeys.CLOAK_VOID, "Cloak void", "Hide the face in a dark void.", false, false),
+            ToggleItem(FxKeys.STATUS_LABEL, "Status label", "Show the camera status label.", false, false),
+            ToggleItem(FxKeys.GHOST, "Ghost", "Show a trailing camera image.", false, false),
+            ToggleItem(FxKeys.TAKEOVER, "Takeover", "Apply the takeover effect.", false, false),
+            ToggleItem(FxKeys.MIRROR_SCAN, "Mirror plus scan", "Mirror the image and add a scan.", false, false),
+        ),
+        notes = listOf("Camera controls the picture and face effects."),
     )
 
     private fun recordFolder() = PanelFolder(
@@ -261,6 +273,7 @@ internal object PanelTree {
         tag = null,
         kind = FolderKind.EFFECTS,
         toggles = listOf(ToggleItem(FxKeys.MIC_ON, "Mic", "Mic audio goes into the recording.", false, false)),
+        notes = listOf("Choose what goes into a recording."),
     )
 
     private fun effectsFolder() = PanelFolder(
@@ -269,13 +282,61 @@ internal object PanelTree {
         tag = null,
         kind = FolderKind.EFFECTS,
         folders = listOf(
-            simpleFolder("camera_effects", "Camera Effects"),
-            simpleFolder("screen_effects", "Screen Effects"),
-            simpleFolder("particle_effects", "Particle Effects"),
-            simpleFolder("light_laser_effects", "Light and Laser Effects"),
+            simpleFolder(
+                "camera_effects",
+                "Camera Effects",
+                listOf(
+                    ToggleItem(FxKeys.TIME_FREEZE, "Time freeze", "Freeze the camera image.", false, false),
+                    ToggleItem(FxKeys.ECHO_TRAIL, "Echo trail", "Leave a trail behind movement.", false, false),
+                    ToggleItem(FxKeys.DEPTH_SHIFT, "Depth shift", "Shift the image depth.", false, false),
+                    ToggleItem(FxKeys.SHATTER, "Shatter", "Break the image into pieces.", false, false),
+                    ToggleItem(FxKeys.QUIET_MODE, "Quiet mode", "Reduce visual movement.", false, false),
+                ),
+                "Camera effects change the video image.",
+            ),
+            simpleFolder(
+                "screen_effects",
+                "Screen Effects",
+                listOf(
+                    ToggleItem(FxKeys.SCREEN_BEACH, "Beach", "Add a beach scene.", false, false),
+                    ToggleItem(FxKeys.SCREEN_CLOUDS, "Clouds", "Add moving clouds.", false, false),
+                    ToggleItem(FxKeys.SCREEN_PORTAL, "Portal", "Open a portal effect.", false, false),
+                    ToggleItem(FxKeys.SCREEN_OPTICAL_ILLUSIONS, "Optical illusions", "Add an optical illusion.", false, false),
+                    ToggleItem(FxKeys.SCREEN_ROLLER_COASTER, "Roller coaster", "Add a moving ride scene.", false, false),
+                ),
+                "Screen effects change the background.",
+            ),
+            simpleFolder(
+                "particle_effects",
+                "Particle Effects",
+                listOf(
+                    ToggleItem(FxKeys.PARTICLE_EMOJI_RAIN, "Emoji rain", "Drop emoji across the image.", false, false),
+                    ToggleItem(FxKeys.PARTICLE_FIREWORKS, "Fireworks", "Add fireworks to the image.", false, false),
+                    ToggleItem(FxKeys.PARTICLE_FLYING_HEROES, "Flying heroes", "Add flying figures to the image.", false, false),
+                ),
+                "Particles move across the image.",
+            ),
+            simpleFolder(
+                "light_laser_effects",
+                "Light and Laser Effects",
+                listOf(
+                    ToggleItem(FxKeys.GLOW_BORDER, "Glow border", "Add a glowing video border.", false, false),
+                    ToggleItem(FxKeys.LASER_WRITING, "Laser writing", "Write with a laser effect.", false, false),
+                    ToggleItem(FxKeys.RADAR_SWEEP, "Radar sweep", "Sweep a radar line across the image.", false, false),
+                    ToggleItem(FxKeys.RED_SWEEP, "Red sweep", "Sweep a red line across the image.", false, false),
+                    ToggleItem(FxKeys.DRAWING, "Drawing", "Draw over the image.", false, false),
+                ),
+                "Light effects add lines and color.",
+            ),
             microphoneEffectsFolder(),
-            simpleFolder("sound_effects", "Sound Effects"),
+            simpleFolder(
+                "sound_effects",
+                "Sound Effects",
+                listOf(ToggleItem(FxKeys.SOUNDBOARD_ON, "Soundboard", "Play sound effects in the video.", false, false)),
+                "Soundboard audio can be included in recordings.",
+            ),
         ),
+        notes = listOf("Picture, light, particle, microphone and sound effects."),
     )
 
     private fun microphoneEffectsFolder() = PanelFolder(
@@ -329,13 +390,14 @@ internal object PanelTree {
             PanelActionItem(PanelAction.LIVE_CLEAN_OUTPUT, "Clean output", "Hide private panel content."),
             PanelActionItem(PanelAction.REMOTE_OPEN_PAIRING, "Remote pairing", "Open remote pairing."),
         ),
+        notes = listOf("Control the live overlay and phone pairing."),
     )
 
     private fun resetFolder() = PanelFolder(
         id = "reset",
         title = "Reset",
         tag = null,
-        kind = FolderKind.SETTINGS,
+        kind = kind,
         actions = listOf(PanelActionItem(PanelAction.RESET_ALL, "Reset all", "Restore the start settings.")),
     )
 
@@ -345,14 +407,22 @@ internal object PanelTree {
         tag = null,
         kind = FolderKind.PLATFORM,
         folders = PLATFORMS.mapIndexed { index, platform -> platformFolder(index + 1, platform) },
+        notes = listOf("Platform folders keep their settings separate."),
     )
 
-    private fun simpleFolder(id: String, title: String) = PanelFolder(
+    private fun simpleFolder(
+        id: String,
+        title: String,
+        toggles: List<ToggleItem> = emptyList(),
+        description: String? = null,
+        kind: FolderKind = FolderKind.EFFECTS,
+    ) = PanelFolder(
         id = id,
         title = title,
         tag = null,
-        kind = FolderKind.SETTINGS,
-        notes = emptyList(),
+        kind = kind,
+        toggles = toggles,
+        notes = description?.let(::listOf) ?: emptyList(),
     )
 
     private fun offgridFolder() = PanelFolder(

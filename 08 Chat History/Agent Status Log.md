@@ -75,3 +75,11 @@ States: passed, waiting for review, blocked, or waiting for Royalty's phone test
 - **PR / commit:** Pull request #15, draft, targeting `final-build`.
 - **State:** blocked
 - **Next:** Complete the remaining Lane A acceptance items, add supported focused tests, run `assembleDebug testDebugUnitTest lintDebug`, and collect emulator/device evidence. Gradle currently cannot resolve Android Gradle Plugin 8.13.2; the current Actions run is `action_required` with no jobs.
+
+## 2026-10-09 8:20 AM CT — Lane A follow-up
+
+- **Bootloader step:** Lane A. Panel UI
+- **What was done:** Filled the reorganized camera and effect folders, made detail folders use large single-column tiles, exposed the neon color editor, updated typed text for light/dark themes, and added callbacks for numeric `fx.` settings. The panel source-level checks confirm 44 unique effect keys are each referenced once, valid resource XML, the glow curve and border-thickness mapping, and `TerminalPanel.kt` at 999 lines. Forbidden-term and whitespace checks are clean.
+- **PR / commit:** Pull request #15, draft, targeting `final-build`.
+- **State:** blocked
+- **Next:** Wire effect values to Lane B's shared settings store and Lane C's panel actions; finish test/device evidence and remaining visual acceptance checks. The prescribed Gradle build stops before compilation because Android Gradle Plugin 8.13.2 cannot be resolved. GitHub reports the PR run as `action_required` with no jobs. No emulator or target-phone evidence is available in this environment.

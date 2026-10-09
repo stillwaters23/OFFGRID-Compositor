@@ -247,7 +247,7 @@ internal class NumberRow(
             setText(start.toString())
             typeface = Hud.monoBold(context)
             textSize = 15f
-            setTextColor(Hud.CYAN)
+            setTextColor(Hud.TEXT)
             setHintTextColor(Hud.TEXT_DIM)
             highlightColor = Hud.withAlpha(Hud.CYAN, 0.35f)
             gravity = Gravity.CENTER
@@ -260,7 +260,7 @@ internal class NumberRow(
             setSelectAllOnFocus(true)
             background = fieldBackground(context)
             textCursorDrawable = GradientDrawable().apply {
-                setColor(Hud.CYAN)
+                setColor(Hud.TEXT)
                 setSize(Hud.dpi(context, 2f), Hud.dpi(context, 18f))
             }
             setPadding(Hud.dpi(context, 4f), 0, Hud.dpi(context, 4f), 0)

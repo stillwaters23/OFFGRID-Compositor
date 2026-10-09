@@ -84,6 +84,7 @@ class TerminalPanel @JvmOverloads constructor(
     private var gestureInsets = android.graphics.Insets.NONE
     private var contentInsets = android.graphics.Insets.NONE
     var onSettingChanged: ((String, Boolean) -> Unit)? = null
+    var onNumberSettingChanged: ((String, Int) -> Unit)? = null
     var onChoiceChanged: ((String, String) -> Unit)? = null
     var onPanelAction: ((PanelAction) -> Unit)? = null
     private var lastSizeLog: String? = null
@@ -448,8 +449,8 @@ class TerminalPanel @JvmOverloads constructor(
         val right = if (atRight) minOf(width - touch, width - gestureInsets.right) else width - touch
         val inBottom = y >= bottom - touch && y <= bottom
         if (inBottom) {
-            if (x <= left + touch) return ResizeEdge.BOTTOM_LEFT
-            if (x >= right - touch) return ResizeEdge.BOTTOM_RIGHT
+            if (x in left.toFloat()..(left + touch).toFloat()) return ResizeEdge.BOTTOM_LEFT
+            if (x in (right - touch).toFloat()..right.toFloat()) return ResizeEdge.BOTTOM_RIGHT
             return ResizeEdge.BOTTOM
         }
         if (y >= height / 2f) {
@@ -677,7 +678,6 @@ class TerminalPanel @JvmOverloads constructor(
     }
 
     private fun typingLettersPerSecond(): Float = 12f + typingSpeed * 1.38f
-
     private fun say(message: String) {
         statusLine.type(PanelText.line(message))
     }
@@ -687,7 +687,6 @@ class TerminalPanel @JvmOverloads constructor(
         prefs.activeFolder = id
         gridTiles.forEach { (key, tile) -> tile.setActive(key == id) }
     }
-
     private fun openFromTop(folder: PanelFolder, from: View) {
         markActive(folder.id)
         showFolder(folder, from)
@@ -832,7 +831,6 @@ class TerminalPanel @JvmOverloads constructor(
     }
 
     private fun buildDetail(folder: PanelFolder) = detailBuilder.build(folder, detailContent)
-
     private fun performAction(action: PanelAction) {
         when (action) {
             PanelAction.RESET_ALL -> resetSettings(home)
@@ -846,7 +844,10 @@ class TerminalPanel @JvmOverloads constructor(
 
     private fun resetSettings(folder: PanelFolder) {
         fun reset(current: PanelFolder) {
-            current.numbers.forEach { prefs.setNumber(it.key, it.default) }
+            current.numbers.forEach {
+                prefs.setNumber(it.key, it.default)
+                if (it.key.startsWith("fx.")) onNumberSettingChanged?.invoke(it.key, it.default)
+            }
             current.toggles.forEach {
                 val key = toggleKey(current, it)
                 prefs.setToggle(key, it.default)
@@ -879,6 +880,7 @@ class TerminalPanel @JvmOverloads constructor(
 
     private fun saveNumber(item: NumberItem, value: Int, announce: Boolean) {
         prefs.setNumber(item.key, value)
+        if (item.key.startsWith("fx.")) onNumberSettingChanged?.invoke(item.key, value)
         when (item.key) {
             PanelTree.OPACITY -> opacity = value
             PanelTree.GLOW -> glowLevel = value
@@ -945,6 +947,7 @@ class TerminalPanel @JvmOverloads constructor(
         super.onConfigurationChanged(newConfig)
         Hud.updateSystemTheme(newConfig)
         applyLook()
+        topBar?.applySystemTextColor()
         openFolder?.let(::buildDetail)
         applyTextTheme(expanded)
         applyTextTheme(pill)

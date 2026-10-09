@@ -25,7 +25,7 @@ internal class NeonColorRow(
             typeface = Hud.monoBold(context)
             textSize = 12f
             setTextColor(Hud.TEXT)
-            contentDescription = item.help
+            contentDescription = "${item.label}. ${item.help}"
         })
         addView(EditText(context).apply {
             setText(initialHex)
@@ -36,7 +36,7 @@ internal class NeonColorRow(
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
             filters = arrayOf(InputFilter.LengthFilter(7))
             singleLine = true
-            contentDescription = item.help
+            contentDescription = "${item.label}. ${item.help}"
             background = GradientDrawable().apply {
                 setColor(Hud.INK)
                 cornerRadius = Hud.dp(context, 4f)
@@ -52,12 +52,13 @@ internal class NeonColorRow(
                         lastValidHex = "#$typed"
                         onColorChanged(Color.parseColor("#$typed"))
                     }
+                }
                 override fun afterTextChanged(s: android.text.Editable?) = Unit
             })
             setOnFocusChangeListener { _, hasFocus ->
                 if (!hasFocus && !text.toString().removePrefix("#").matches(HEX_COLOR)) {
-                    error = "Use six hex digits."
                     setText(lastValidHex)
+                    error = "Use six hex digits."
                 }
             }
         }, LayoutParams(LayoutParams.MATCH_PARENT, Hud.dpi(context, 48f)).apply {
