@@ -16,6 +16,9 @@ class EffectSnapshot(
 ) {
     fun on(key: String): Boolean = toggles[key] == true
 
+    /** The toggle, or [default] when the panel does not have this key. */
+    fun on(key: String, default: Boolean): Boolean = toggles[key] ?: default
+
     /** The typed number, 0 to 100. */
     fun raw(key: String): Int = (numbers[key] ?: 50).coerceIn(0, 100)
 
