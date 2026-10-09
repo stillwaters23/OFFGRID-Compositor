@@ -67,3 +67,11 @@ States: passed, waiting for review, blocked, or waiting for Royalty's phone test
 - **PR / commit:** Pull request #4, not merged. Commit `259933a`.
 - **State:** waiting for review
 - **Next:** Rex (Agent 04) reviews pull request #4 and does not merge it. Then Royalty installs step-2-preview on the Galaxy S25 Ultra and the Galaxy A37 and runs the test steps in pull request #4, including the yellow diamond video check. Do not start Step 3 or Step 7.
+
+## 2026-10-09 8:14 AM CT — Lane A
+
+- **Bootloader step:** Lane A. Panel UI
+- **What was done:** Began the Lane A panel work in pull request #15. Removed the side list, added the reorganized home folders and microphone setting keys, and split top-bar and folder-detail rendering into focused files. Added full-window sizing, inset-aware rounded borders, edge and pinch resizing, quick toggles, theme colors, and a visible scroll thumb. Verified panel sizing/glow math, resource XML, key references, and forbidden-term greps. The existing checkout has no unit-test sources or test dependencies.
+- **PR / commit:** Pull request #15, draft, targeting `final-build`.
+- **State:** blocked
+- **Next:** Complete the remaining Lane A acceptance items, add supported focused tests, run `assembleDebug testDebugUnitTest lintDebug`, and collect emulator/device evidence. Gradle currently cannot resolve Android Gradle Plugin 8.13.2; the current Actions run is `action_required` with no jobs.

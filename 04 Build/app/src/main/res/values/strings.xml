@@ -27,7 +27,8 @@
     <string name="terminal_open">Open the panel</string>
     <string name="terminal_drag">Top bar. Drag it to move the panel.</string>
     <string name="terminal_back">‹ BACK</string>
-    <string name="terminal_back_label">Go back one folder</string>
+    <string name="terminal_back_label">Back</string>
+    <string name="terminal_view_options">Folder view options</string>
     <string name="terminal_home">HOME</string>
     <string name="terminal_welcome">Terminal is on. Tap a folder to open it. Drag the top bar to move this panel.</string>
     <string name="terminal_panel_open">The panel is open again.</string>
@@ -50,6 +51,8 @@
     <string name="terminal_section_folders">FOLDERS</string>
     <string name="terminal_section_numbers">TYPED NUMBERS</string>
     <string name="terminal_section_toggles">TOGGLES</string>
+    <string name="terminal_section_choices">CHOICES</string>
+    <string name="terminal_section_actions">ACTIONS</string>
     <string name="terminal_folder_description">%1$s folder. %2$s.</string>
     <plurals name="terminal_items">
         <item quantity="one">%d item</item>

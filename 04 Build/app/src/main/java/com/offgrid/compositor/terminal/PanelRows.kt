@@ -43,35 +43,61 @@ internal fun pressGlow(context: Context): Drawable {
 }
 
 /** A big glowing folder in a grid, with its name under it. */
-internal class FolderTile(context: Context, folder: PanelFolder, iconDp: Float) : LinearLayout(context) {
+internal class FolderTile(
+    context: Context,
+    folder: PanelFolder,
+    iconDp: Float,
+    private val bigTile: Boolean = false,
+) : LinearLayout(context) {
     private val ring: HoloRingView
     private val name: TextView
 
     init {
-        orientation = VERTICAL
-        gravity = Gravity.CENTER_HORIZONTAL
-        setPadding(0, 0, 0, Hud.dpi(context, 6f))
+        orientation = if (bigTile) HORIZONTAL else VERTICAL
+        gravity = if (bigTile) Gravity.CENTER_VERTICAL else Gravity.CENTER_HORIZONTAL
+        setPadding(
+            if (bigTile) Hud.dpi(context, 8f) else 0,
+            if (bigTile) Hud.dpi(context, 8f) else 0,
+            if (bigTile) Hud.dpi(context, 8f) else 0,
+            if (bigTile) Hud.dpi(context, 8f) else Hud.dpi(context, 6f),
+        )
         val accent = accentFor(folder.kind)
-        val ringSize = Hud.dpi(context, iconDp * 1.34f)
+        val ringSize = Hud.dpi(context, if (bigTile) 56f else iconDp * 1.34f)
         val frame = FrameLayout(context)
         ring = HoloRingView(context, accent).apply { visibility = INVISIBLE }
         frame.addView(ring, FrameLayout.LayoutParams(ringSize, ringSize, Gravity.CENTER))
         frame.addView(
-            FolderIconView(context, accent, folder.itemCount, folder.tag, compact = false),
-            FrameLayout.LayoutParams(Hud.dpi(context, iconDp), Hud.dpi(context, iconDp * 0.86f), Gravity.CENTER),
+            FolderIconView(context, accent, folder.itemCount, folder.tag, compact = false, showCount = !bigTile),
+            FrameLayout.LayoutParams(
+                Hud.dpi(context, if (bigTile) 48f else iconDp),
+                Hud.dpi(context, if (bigTile) 40f else iconDp * 0.86f),
+                Gravity.CENTER,
+            ),
         )
-        addView(frame, LayoutParams(ringSize, ringSize))
+        addView(frame, LayoutParams(ringSize, ringSize).apply {
+            if (bigTile) marginEnd = Hud.dpi(context, 8f)
+        })
         name = TextView(context).apply {
             text = folder.title
             typeface = Hud.condensed
-            textSize = 10.5f
+            textSize = if (bigTile) 15f else 10.5f
             setTextColor(Hud.TEXT)
-            gravity = Gravity.CENTER_HORIZONTAL
+            gravity = if (bigTile) Gravity.CENTER_VERTICAL else Gravity.CENTER_HORIZONTAL
             maxLines = 2
             ellipsize = TextUtils.TruncateAt.END
             setShadowLayer(Hud.dp(context, 3f), 0f, 0f, Hud.INK)
         }
-        addView(name, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+        addView(name, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
+        if (bigTile) {
+            addView(TextView(context).apply {
+                text = folder.itemCount.toString()
+                typeface = Hud.monoBold(context)
+                textSize = 13f
+                setTextColor(accentFor(folder.kind))
+                contentDescription = itemsText(context, folder.itemCount)
+            }, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT))
+            minimumHeight = Hud.dpi(context, 72f)
+        }
         isClickable = true
         isFocusable = true
         foreground = pressGlow(context)
@@ -86,66 +112,6 @@ internal class FolderTile(context: Context, folder: PanelFolder, iconDp: Float) 
         ring.visibility = if (active) VISIBLE else INVISIBLE
         ring.spinning = active
         name.setTextColor(if (active) Hud.GOLD else Hud.TEXT)
-    }
-}
-
-/** One line in the side list: a small folder, its name, and how many items it holds. */
-internal class SideRow(context: Context, folder: PanelFolder) : LinearLayout(context) {
-    private val bar = View(context)
-    private val ring: HoloRingView
-    private val name: TextView
-
-    init {
-        orientation = HORIZONTAL
-        gravity = Gravity.CENTER_VERTICAL
-        setPadding(0, Hud.dpi(context, 2f), Hud.dpi(context, 4f), Hud.dpi(context, 2f))
-        val accent = accentFor(folder.kind)
-        bar.setBackgroundColor(Hud.GOLD)
-        bar.visibility = INVISIBLE
-        addView(bar, LayoutParams(Hud.dpi(context, 2f), Hud.dpi(context, 22f)))
-        val frame = FrameLayout(context)
-        val ringSize = Hud.dpi(context, 27f)
-        ring = HoloRingView(context, accent).apply { visibility = INVISIBLE }
-        frame.addView(ring, FrameLayout.LayoutParams(ringSize, ringSize, Gravity.CENTER))
-        frame.addView(
-            FolderIconView(context, accent, folder.itemCount, null, compact = true),
-            FrameLayout.LayoutParams(Hud.dpi(context, 17f), Hud.dpi(context, 15f), Gravity.CENTER),
-        )
-        addView(frame, LayoutParams(ringSize, ringSize).apply { marginStart = Hud.dpi(context, 2f) })
-        name = TextView(context).apply {
-            text = folder.label
-            typeface = Hud.condensed
-            textSize = 10.5f
-            setTextColor(Hud.TEXT)
-            maxLines = 2
-            ellipsize = TextUtils.TruncateAt.END
-        }
-        addView(name, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f).apply { marginStart = Hud.dpi(context, 3f) })
-        val count = TextView(context).apply {
-            text = folder.itemCount.toString()
-            typeface = Hud.mono(context)
-            textSize = 10f
-            setTextColor(Hud.withAlpha(accent, 0.85f))
-        }
-        addView(count, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply {
-            marginStart = Hud.dpi(context, 4f)
-        })
-        isClickable = true
-        isFocusable = true
-        foreground = pressGlow(context)
-        contentDescription = context.getString(
-            R.string.terminal_folder_description,
-            folder.title,
-            itemsText(context, folder.itemCount),
-        )
-    }
-
-    fun setActive(active: Boolean) {
-        bar.visibility = if (active) VISIBLE else INVISIBLE
-        ring.visibility = if (active) VISIBLE else INVISIBLE
-        ring.spinning = active
-        name.setTextColor(if (active) Hud.GOLD else Hud.TEXT)
-        setBackgroundColor(if (active) Hud.withAlpha(Hud.CYAN, 0.08f) else 0)
     }
 }
 
@@ -170,6 +136,87 @@ internal class ToggleRow(
         toggle.contentDescription = item.label
         toggle.onToggled = onChange
         addView(toggle)
+    }
+}
+
+internal class ChoiceRow(
+    context: Context,
+    private val item: ChoiceItem,
+    selected: String,
+    private val onChange: (String) -> Unit,
+) : LinearLayout(context) {
+    private val options = mutableMapOf<String, TextView>()
+
+    init {
+        orientation = VERTICAL
+        val title = rowTitle(context, item.label)
+        addView(title)
+        addView(rowNote(context, item.help))
+        val choices = LinearLayout(context).apply {
+            orientation = HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        for (option in item.options) {
+            val choice = TextView(context).apply {
+                text = option
+                typeface = Hud.monoBold(context)
+                textSize = 11f
+                gravity = Gravity.CENTER
+                minHeight = Hud.dpi(context, 40f)
+                setPadding(Hud.dpi(context, 8f), 0, Hud.dpi(context, 8f), 0)
+                isClickable = true
+                isFocusable = true
+                setOnClickListener { onChange(option) }
+            }
+            options[option] = choice
+            choices.addView(choice, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginEnd = Hud.dpi(context, 8f)
+            })
+        }
+        addView(choices, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply {
+            topMargin = Hud.dpi(context, 8f)
+        })
+        setSelected(selected)
+    }
+
+    fun setSelected(selected: String) {
+        options.forEach { (value, view) ->
+            val active = value == selected
+            view.setTextColor(if (active) NeonPalette.BLACKLIGHT_WHITE else Hud.TEXT_DIM)
+            view.background = GradientDrawable().apply {
+                setColor(if (active) Hud.withAlpha(NeonPalette.UV_VIOLET, 0.45f) else Hud.INK)
+                cornerRadius = Hud.dp(context, 4f)
+                setStroke(
+                    Hud.dpi(context, 1f),
+                    if (active) NeonPalette.HOT_MAGENTA else Hud.withAlpha(Hud.TEXT_DIM, 0.5f),
+                )
+            }
+        }
+    }
+}
+
+internal class ActionRow(
+    context: Context,
+    item: PanelActionItem,
+    onClick: () -> Unit,
+) : TextView(context) {
+    init {
+        text = item.label
+        typeface = Hud.monoBold(context)
+        textSize = 12f
+        setTextColor(NeonPalette.HOT_MAGENTA)
+        gravity = Gravity.CENTER_VERTICAL
+        setPadding(Hud.dpi(context, 12f), 0, Hud.dpi(context, 12f), 0)
+        minHeight = Hud.dpi(context, 48f)
+        contentDescription = "${item.label}. ${item.help}"
+        background = GradientDrawable().apply {
+            setColor(Hud.withAlpha(NeonPalette.UV_VIOLET, 0.12f))
+            cornerRadius = Hud.dp(context, 4f)
+            setStroke(Hud.dpi(context, 1f), Hud.withAlpha(NeonPalette.HOT_MAGENTA, 0.7f))
+        }
+        isClickable = true
+        isFocusable = true
+        setOnClickListener { onClick() }
     }
 }
 
@@ -304,13 +351,23 @@ private fun rowNote(context: Context, text: String) = TextView(context).apply {
 }
 
 /** Lays tiles out in as many columns as fit. */
-internal class TileGrid(context: Context, private val minCellDp: Float) : ViewGroup(context) {
+internal class TileGrid(
+    context: Context,
+    private val minCellDp: Float,
+    private val singleColumn: Boolean = false,
+) : ViewGroup(context) {
     private var columns = 1
+    private var forcedColumns: Int? = if (singleColumn) 1 else null
+
+    fun setColumnCount(count: Int?) {
+        forcedColumns = count?.coerceAtLeast(1)
+        requestLayout()
+    }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val width = MeasureSpec.getSize(widthMeasureSpec)
         val inner = (width - paddingLeft - paddingRight).coerceAtLeast(0)
-        columns = (inner / Hud.dp(context, minCellDp)).toInt().coerceAtLeast(1)
+        columns = forcedColumns ?: (inner / Hud.dp(context, minCellDp)).toInt().coerceAtLeast(1)
         val cell = inner / columns
         var height = paddingTop + paddingBottom
         var rowHeight = 0
@@ -348,26 +405,6 @@ internal class TileGrid(context: Context, private val minCellDp: Float) : ViewGr
     }
 }
 
-/** Six small dots that show where to grab the panel. */
-internal class GripView(context: Context) : View(context) {
-    private val dot = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Hud.withAlpha(Hud.CYAN, 0.8f) }
-
-    init {
-        importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
-    }
-
-    override fun onDraw(canvas: Canvas) {
-        val radius = Hud.dp(context, 1.6f)
-        for (row in 0 until 3) {
-            for (column in 0 until 2) {
-                val x = width * (0.3f + 0.4f * column)
-                val y = height * (0.2f + 0.3f * row)
-                canvas.drawCircle(x, y, radius, dot)
-            }
-        }
-    }
-}
-
 /** The small button that shrinks the panel to a glowing tag. */
 internal class ShrinkButton(context: Context) : View(context) {
     private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -382,7 +419,7 @@ internal class ShrinkButton(context: Context) : View(context) {
     }
 
     override fun onDraw(canvas: Canvas) {
-        val size = minOf(width, height) * 0.62f
+        val size = minOf(width, height) * 0.8f
         val left = (width - size) / 2f
         val top = (height - size) / 2f
         stroke.strokeWidth = Hud.dp(context, 1.2f)

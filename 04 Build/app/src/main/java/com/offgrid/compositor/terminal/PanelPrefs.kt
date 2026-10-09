@@ -24,6 +24,12 @@ internal class PanelPrefs(context: Context) {
         prefs.edit { putBoolean(TOGGLE + key, value) }
     }
 
+    fun choice(key: String, default: String): String = prefs.getString(CHOICE + key, default) ?: default
+
+    fun setChoice(key: String, value: String) {
+        prefs.edit { putString(CHOICE + key, value) }
+    }
+
     var minimized: Boolean
         get() = prefs.getBoolean(MINIMIZED, false)
         set(value) = prefs.edit { putBoolean(MINIMIZED, value) }
@@ -51,6 +57,7 @@ internal class PanelPrefs(context: Context) {
         const val FILE_NAME = "terminal_panel"
         const val NUMBER = "number."
         const val TOGGLE = "toggle."
+        const val CHOICE = "choice."
         const val MINIMIZED = "minimized"
         const val ACTIVE_FOLDER = "active_folder"
         const val POSITION_X = "position_x"

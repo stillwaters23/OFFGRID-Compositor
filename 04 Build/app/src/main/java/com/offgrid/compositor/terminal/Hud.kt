@@ -1,6 +1,7 @@
 package com.offgrid.compositor.terminal
 
 import android.content.Context
+import android.content.res.Configuration
 import android.content.res.Resources
 import android.graphics.Typeface
 import androidx.core.content.res.ResourcesCompat
@@ -14,9 +15,10 @@ internal object Hud {
     const val CYAN = 0xFF46F0FF.toInt()
     const val GOLD = 0xFFFFC34D.toInt()
     const val LASER = 0xFF33FF00.toInt()
-    const val LASER_BRIGHT = 0xFFCCFF99.toInt()
-    const val TEXT = 0xFFDDF8FF.toInt()
-    const val TEXT_DIM = 0xFF8DB4BF.toInt()
+    var isLightTheme = false
+        private set
+    val TEXT: Int get() = if (isLightTheme) 0xFF000000.toInt() else 0xFFFFFFFF.toInt()
+    val TEXT_DIM: Int get() = if (isLightTheme) 0xFF303030.toInt() else 0xFFB8B8C0.toInt()
     const val GLASS_TOP = 0xFF0D1E26.toInt()
     const val GLASS_BOTTOM = 0xFF03090D.toInt()
     const val INK = 0xFF000000.toInt()
@@ -55,5 +57,9 @@ internal object Hud {
     fun withAlpha(color: Int, alpha: Float): Int {
         val a = (alpha.coerceIn(0f, 1f) * 255f + 0.5f).toInt()
         return (color and 0x00FFFFFF) or (a shl 24)
+    }
+
+    fun updateSystemTheme(configuration: Configuration) {
+        isLightTheme = configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK != Configuration.UI_MODE_NIGHT_YES
     }
 }

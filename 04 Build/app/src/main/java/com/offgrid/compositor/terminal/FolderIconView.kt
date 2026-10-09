@@ -19,6 +19,7 @@ internal class FolderIconView(
     private val count: Int,
     private val tag: String?,
     private val compact: Boolean,
+    private val showCount: Boolean = true,
 ) : View(context) {
     private val outline = Path()
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -96,15 +97,17 @@ internal class FolderIconView(
             words.color = Hud.withAlpha(accent, 0.95f)
             canvas.drawText(tag, width * 0.26f, height * 0.235f, words)
         }
-        words.typeface = boldFace
-        words.textSize = height * 0.28f
-        words.color = Hud.withAlpha(0xFFFFFFFF.toInt(), 0.95f)
-        words.setShadowLayer(height * 0.08f, 0f, 0f, accent)
-        canvas.drawText(countText, width / 2f, height * 0.69f, words)
-        words.clearShadowLayer()
-        words.typeface = regularFace
-        words.textSize = height * 0.1f
-        words.color = Hud.withAlpha(accent, 0.9f)
-        canvas.drawText(itemsWord, width / 2f, height * 0.83f, words)
+        if (showCount) {
+            words.typeface = boldFace
+            words.textSize = height * 0.28f
+            words.color = Hud.withAlpha(0xFFFFFFFF.toInt(), 0.95f)
+            words.setShadowLayer(height * 0.08f, 0f, 0f, accent)
+            canvas.drawText(countText, width / 2f, height * 0.69f, words)
+            words.clearShadowLayer()
+            words.typeface = regularFace
+            words.textSize = height * 0.1f
+            words.color = Hud.withAlpha(accent, 0.9f)
+            canvas.drawText(itemsWord, width / 2f, height * 0.83f, words)
+        }
     }
 }

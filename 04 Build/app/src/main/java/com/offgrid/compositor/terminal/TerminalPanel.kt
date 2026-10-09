@@ -6,14 +6,19 @@ import android.animation.ObjectAnimator
 import android.animation.PropertyValuesHolder
 import android.animation.ValueAnimator
 import android.content.Context
+import android.content.res.Configuration
 import android.graphics.drawable.GradientDrawable
-import android.text.TextUtils
 import android.util.AttributeSet
+import android.util.Log
 import android.view.Gravity
 import android.view.MotionEvent
+import android.view.HapticFeedbackConstants
+import android.view.RoundedCorner
+import android.view.ScaleGestureDetector
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.ViewGroup
+import android.view.WindowInsets
 import android.view.animation.DecelerateInterpolator
 import android.view.animation.LinearInterpolator
 import android.view.inputmethod.InputMethodManager
@@ -26,14 +31,16 @@ import androidx.activity.OnBackPressedCallback
 import androidx.core.animation.doOnEnd
 import androidx.core.animation.doOnStart
 import androidx.core.view.isVisible
+import androidx.core.view.ViewCompat
+import androidx.core.view.accessibility.AccessibilityViewCommand
+import com.offgrid.compositor.effects.FxKeys
 import com.offgrid.compositor.R
 import kotlin.math.hypot
 
 /**
  * Step 2. The floating terminal panel (features 3, 4, 5, and 13).
  *
- * Dark frosted glass with cyan and gold glow lines. A side list and a grid of big
- * glowing folders. Folders slide out like holograms. A soft ring turns around the
+ * Dark glass with a one-column folder list. Folders slide out like holograms. A soft ring turns around the
  * active folder. A soft scan line sweeps the glass. Text is laser typed.
  *
  * Drag the top bar to move it. Opacity is a typed number from 0 to 100.
@@ -63,37 +70,138 @@ class TerminalPanel @JvmOverloads constructor(
     private val scanLine = ScanLineView(context)
     private val pill = LinearLayout(context)
     private val pillRing = HoloRingView(context, Hud.GOLD)
+    private var topBar: TopBar? = null
+    private var homeGrid: TileGrid? = null
 
     private val gridTiles = HashMap<String, FolderTile>()
-    private val listRows = HashMap<String, SideRow>()
-    private var guidance: LaserTypeView? = null
     private var openFolder: PanelFolder? = null
     private var activeId = prefs.activeFolder ?: home.folders.first().id
     private var detailAnim: Animator? = null
     private var panelAnim: Animator? = null
 
     private var opacity = prefs.number(PanelTree.OPACITY, 50)
-    private var glowLevel = prefs.number(PanelTree.GLOW, 70)
+    private var glowLevel = prefs.number(PanelTree.GLOW, 50)
     private var typingSpeed = prefs.number(PanelTree.TYPING, 50)
+    private var widthPercent = prefs.number(PanelTree.WIDTH, 80)
+    private var heightPercent = prefs.number(PanelTree.HEIGHT, 60)
+    private var fullScreen = prefs.toggle(PanelTree.FULL_SCREEN, false)
+    private var seeThroughAtFullSize = prefs.toggle(PanelTree.SEE_THROUGH_FULL_SIZE, false)
+    private var borderThickness = prefs.number(PanelTree.BORDER_THICKNESS, 50)
+    private var tickOnSave = prefs.toggle(PanelTree.TICK_ON_SAVE, true)
+    private var fullBleed = false
+    private var cornerSafeTop = 0
+    private var gestureInsets = android.graphics.Insets.NONE
+    private var contentInsets = android.graphics.Insets.NONE
+    var onSettingChanged: ((String, Boolean) -> Unit)? = null
+    var onChoiceChanged: ((String, String) -> Unit)? = null
+    var onPanelAction: ((PanelAction) -> Unit)? = null
+    private var lastSizeLog: String? = null
+    private var resizeEdge = ResizeEdge.NONE
+    private var resizeStartX = 0f
+    private var resizeStartY = 0f
+    private var resizeStartWidth = 0
+    private var resizeStartWidthPercent = 0
+    private var resizeStartHeightPercent = 0
+    private var resizeStartTranslationX = 0f
+    private var pinchWidthPercent = 0
+    private var pinchHeightPercent = 0
+    private val scaleDetector = ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+        override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
+            if (minimized || detector.currentSpan <= 0f) return false
+            resizeEdge = ResizeEdge.NONE
+            fullScreen = false
+            prefs.setToggle(PanelTree.FULL_SCREEN, false)
+            pinchWidthPercent = widthPercent
+            pinchHeightPercent = heightPercent
+            return true
+        }
+
+        override fun onScale(detector: ScaleGestureDetector): Boolean {
+            pinchWidthPercent = (pinchWidthPercent * detector.scaleFactor).toInt().coerceIn(1, 100)
+            pinchHeightPercent = (pinchHeightPercent * detector.scaleFactor).toInt().coerceIn(1, 100)
+            widthPercent = pinchWidthPercent
+            heightPercent = pinchHeightPercent
+            prefs.setNumber(PanelTree.WIDTH, widthPercent)
+            prefs.setNumber(PanelTree.HEIGHT, heightPercent)
+            topBar?.setDimensions(widthPercent, heightPercent)
+            requestLayout()
+            return true
+        }
+
+        override fun onScaleEnd(detector: ScaleGestureDetector) {
+            if (tickOnSave) performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+            savePosition()
+        }
+    })
     private var scanLineOn = prefs.toggle(PanelTree.SCAN_LINE, true)
     private var laserTypingOn = prefs.toggle(PanelTree.LASER_TYPING, true)
     private var minimized = prefs.minimized
+    private val detailBuilder by lazy(LazyThreadSafetyMode.NONE) {
+        PanelDetailBuilder(
+            context = context,
+            prefs = prefs,
+            onNumber = ::saveNumber,
+            onToggle = ::saveToggle,
+            onChoice = ::saveChoice,
+            onAction = ::performAction,
+            onFolder = ::showFolder,
+            onProblem = ::say,
+            typing = { typingLettersPerSecond() to laserTypingOn },
+        )
+    }
 
     private var placed = false
     private var userY = 0f
-    private var keyboardLift = 0f
 
     /** The phone's Back key closes one folder at a time. */
     val backCallback = object : OnBackPressedCallback(false) {
         override fun handleOnBackPressed() = goUp()
     }
 
+    private enum class ResizeEdge { NONE, BOTTOM, LEFT, RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT }
+
+    private fun updateQuickToggle(key: String, value: Boolean, label: String) {
+        prefs.setToggle(key, value)
+        onSettingChanged?.invoke(key, value)
+        say(
+            if (key == FxKeys.MIC_ON && value) {
+                "Mic is on. Your voice goes into the video."
+            } else {
+                "$label is ${if (value) "on" else "off"}."
+            },
+        )
+    }
+
+    fun setToggleSetting(key: String, on: Boolean) {
+        prefs.setToggle(key, on)
+        onSettingChanged?.invoke(key, on)
+        when (key) {
+            FxKeys.CAMERA_ON -> updateQuickToggleState(camera = on)
+            FxKeys.MIC_ON -> updateQuickToggleState(microphone = on)
+        }
+    }
+
+    private fun updateQuickToggleState(camera: Boolean? = null, microphone: Boolean? = null) {
+        camera?.let { topBar?.setQuickToggle(FxKeys.CAMERA_ON, it) }
+        microphone?.let { topBar?.setQuickToggle(FxKeys.MIC_ON, it) }
+    }
+
     init {
+        Hud.updateSystemTheme(resources.configuration)
+        statusLine.applySystemTextColor()
         // A tiny spot that takes focus when a number box lets go, so the keyboard stays shut.
         focusSink.isFocusable = true
         focusSink.isFocusableInTouchMode = true
         focusSink.importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
         addView(focusSink, LayoutParams(1, 1))
+        ViewCompat.addAccessibilityAction(this, "Bigger", AccessibilityViewCommand { _, _ ->
+            adjustSize(5, 5)
+            true
+        })
+        ViewCompat.addAccessibilityAction(this, "Smaller", AccessibilityViewCommand { _, _ ->
+            adjustSize(-5, -5)
+            true
+        })
 
         expanded.orientation = LinearLayout.VERTICAL
         expanded.addView(buildHeader(), LinearLayout.LayoutParams(MATCH, WRAP))
@@ -109,14 +217,6 @@ class TerminalPanel @JvmOverloads constructor(
             },
         )
         val body = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
-        body.addView(buildSideList(), LinearLayout.LayoutParams(dpi(SIDE_LIST_DP), MATCH))
-        body.addView(
-            glowRule(Hud.CYAN, GradientDrawable.Orientation.TOP_BOTTOM),
-            LinearLayout.LayoutParams(dpi(1f), MATCH).apply {
-                topMargin = dpi(8f)
-                bottomMargin = dpi(14f)
-            },
-        )
         body.addView(buildMainArea(), LinearLayout.LayoutParams(0, MATCH, 1f))
         expanded.addView(body, LinearLayout.LayoutParams(MATCH, 0, 1f))
         addView(expanded, LayoutParams(MATCH, MATCH))
@@ -135,18 +235,10 @@ class TerminalPanel @JvmOverloads constructor(
         say(context.getString(R.string.terminal_welcome))
     }
 
-    /** Lifts the panel above the keyboard while a number is typed. */
+    /** Keeps the panel in place when the keyboard opens. */
     fun onKeyboardInset(bottomInset: Int) {
-        val area = parent as? View ?: return
-        val visibleBottom = area.height - bottomInset
-        val panelBottom = userY + height
-        val edge = dp(EDGE_DP)
-        keyboardLift = if (bottomInset > 0 && panelBottom > visibleBottom - edge) {
-            (panelBottom - (visibleBottom - edge)).coerceAtMost(userY)
-        } else {
-            0f
-        }
-        translationY = userY - keyboardLift
+        if (bottomInset < 0) return
+        translationY = if (fullBleed) 0f else userY
     }
 
     /** Hides the panel while the saved video plays, so the whole video can be checked. */
@@ -156,6 +248,7 @@ class TerminalPanel @JvmOverloads constructor(
         }
         visibility = if (hidden) GONE else VISIBLE
         backCallback.isEnabled = !hidden && !minimized && openFolder != null
+        topBar?.setBackEnabled(!hidden && !minimized && openFolder != null)
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
@@ -165,22 +258,45 @@ class TerminalPanel @JvmOverloads constructor(
         }
         val availableWidth = MeasureSpec.getSize(widthMeasureSpec)
         val availableHeight = MeasureSpec.getSize(heightMeasureSpec)
-        val edges = dpi(EDGE_DP) * 2
-        val panelWidth = minOf(availableWidth - edges, dpi(MAX_WIDTH_DP)).coerceAtLeast(0)
-        val panelHeight = (availableHeight * HEIGHT_SHARE).toInt()
-            .coerceIn(dpi(MIN_HEIGHT_DP), dpi(MAX_HEIGHT_DP))
-            .coerceAtMost(availableHeight - edges)
-            .coerceAtLeast(0)
+        val wasFullBleed = fullBleed
+        fullBleed = fullScreen || (widthPercent == 100 && heightPercent == 100)
+        if (wasFullBleed != fullBleed) {
+            updateContentInsets()
+            glass.fullBleed = fullBleed
+            glass.seeThroughAtFullSize = seeThroughAtFullSize
+            glass.lightSkin = Hud.isLightTheme
+        }
+        val panelWidth = if (fullBleed) availableWidth else PanelGeometry.panelDimension(
+            availableWidth,
+            widthPercent,
+            dpi(MAX_WIDTH_DP),
+        )
+        val panelHeight = if (fullBleed) availableHeight else PanelGeometry.panelDimension(
+            availableHeight,
+            heightPercent,
+            availableHeight,
+        ).let { if (heightPercent == 0) 0 else it.coerceAtLeast(minOf(dpi(MIN_HEIGHT_DP), availableHeight)) }
         super.onMeasure(
             MeasureSpec.makeMeasureSpec(panelWidth, MeasureSpec.EXACTLY),
             MeasureSpec.makeMeasureSpec(panelHeight, MeasureSpec.EXACTLY),
         )
+        val measured = "${measuredWidth}x$measuredHeight/${availableWidth}x$availableHeight"
+        if (measured != lastSizeLog) {
+            lastSizeLog = measured
+            Log.d("OFFGRID size", "glass=${measuredWidth}x$measuredHeight display=${availableWidth}x$availableHeight")
+        }
     }
 
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         super.onLayout(changed, left, top, right, bottom)
         val area = parent as? View ?: return
         if (area.width == 0 || area.height == 0) return
+        if (fullBleed) {
+            userY = 0f
+            translationX = 0f
+            translationY = 0f
+            return
+        }
         if (!placed) {
             placed = true
             val saved = prefs.position()
@@ -195,7 +311,69 @@ class TerminalPanel @JvmOverloads constructor(
         }
     }
 
+    override fun onApplyWindowInsets(insets: WindowInsets): WindowInsets {
+        val bars = insets.getInsets(WindowInsets.Type.systemBars())
+        val cutout = insets.getInsets(WindowInsets.Type.displayCutout())
+        gestureInsets = insets.getInsets(WindowInsets.Type.systemGestures())
+        contentInsets = android.graphics.Insets.of(
+            maxOf(bars.left, cutout.left),
+            maxOf(bars.top, cutout.top),
+            maxOf(bars.right, cutout.right),
+            maxOf(bars.bottom, cutout.bottom),
+        )
+        val positions = listOf(
+            RoundedCorner.POSITION_TOP_LEFT,
+            RoundedCorner.POSITION_TOP_RIGHT,
+            RoundedCorner.POSITION_BOTTOM_RIGHT,
+            RoundedCorner.POSITION_BOTTOM_LEFT,
+        )
+        val windowLocation = IntArray(2)
+        getLocationInWindow(windowLocation)
+        val corners = positions.map { position ->
+            val rounded = insets.getRoundedCorner(position) ?: return@map DisplayCorner(0f, 0f, 0f)
+            val center = rounded.center
+            DisplayCorner(
+                rounded.radius.toFloat(),
+                center.x - windowLocation[0].toFloat(),
+                center.y - windowLocation[1].toFloat(),
+            )
+        }
+        glass.setDisplayCornerGeometry(corners)
+        cornerSafeTop = maxOf(corners[0].radius, corners[1].radius).toInt()
+        updateContentInsets()
+        requestLayout()
+        return super.onApplyWindowInsets(insets)
+    }
+
+    private fun updateContentInsets() {
+        if (fullBleed) {
+            expanded.setPadding(contentInsets.left, contentInsets.top, contentInsets.right, contentInsets.bottom)
+        } else {
+            expanded.setPadding(0, 0, 0, 0)
+        }
+        val header = expanded.getChildAt(0) ?: return
+        header.setPadding(
+            dpi(16f),
+            dpi(8f) + if (fullBleed) cornerSafeTop else 0,
+            0,
+            dpi(2f),
+        )
+        val detailParams = detailPane.layoutParams as? FrameLayout.LayoutParams
+        if (detailParams != null) {
+            val margin = if (fullBleed) 0 else dpi(4f)
+            detailParams.setMargins(margin, margin, if (fullBleed) 0 else dpi(8f), if (fullBleed) 0 else dpi(10f))
+            detailPane.layoutParams = detailParams
+        }
+    }
+
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        if (event.pointerCount > 1 && resizeEdge != ResizeEdge.NONE) {
+            resizeEdge = ResizeEdge.NONE
+            glass.resizeGlow = 0f
+        }
+        scaleDetector.onTouchEvent(event)
+        if (scaleDetector.isInProgress) return true
+        if (handleResizeTouch(event)) return true
         if (event.actionMasked == MotionEvent.ACTION_DOWN) {
             val focused = findFocus()
             if (focused is EditText && !isInside(focused, event)) {
@@ -203,6 +381,99 @@ class TerminalPanel @JvmOverloads constructor(
             }
         }
         return super.dispatchTouchEvent(event)
+    }
+
+    private fun handleResizeTouch(event: MotionEvent): Boolean {
+        val area = parent as? View ?: return false
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                resizeEdge = findResizeEdge(event.x, event.y)
+                if (resizeEdge == ResizeEdge.NONE) return false
+                resizeStartX = event.rawX
+                resizeStartY = event.rawY
+                resizeStartWidth = width
+                resizeStartWidthPercent = widthPercent
+                resizeStartHeightPercent = heightPercent
+                resizeStartTranslationX = translationX
+                if (fullScreen) {
+                    fullScreen = false
+                    prefs.setToggle(PanelTree.FULL_SCREEN, false)
+                }
+                parent?.requestDisallowInterceptTouchEvent(true)
+                return true
+            }
+            MotionEvent.ACTION_MOVE -> {
+                if (resizeEdge == ResizeEdge.NONE) return false
+                val dx = event.rawX - resizeStartX
+                val dy = event.rawY - resizeStartY
+                val changeWidth = resizeEdge == ResizeEdge.LEFT || resizeEdge == ResizeEdge.RIGHT ||
+                    resizeEdge == ResizeEdge.BOTTOM_LEFT || resizeEdge == ResizeEdge.BOTTOM_RIGHT
+                val changeHeight = resizeEdge == ResizeEdge.BOTTOM || resizeEdge == ResizeEdge.BOTTOM_LEFT ||
+                    resizeEdge == ResizeEdge.BOTTOM_RIGHT
+                if (changeWidth) {
+                    val direction = if (resizeEdge == ResizeEdge.LEFT || resizeEdge == ResizeEdge.BOTTOM_LEFT) -1 else 1
+                    widthPercent = (resizeStartWidthPercent + direction * dx * 100f / area.width.coerceAtLeast(1)).toInt().coerceIn(1, 100)
+                    prefs.setNumber(PanelTree.WIDTH, widthPercent)
+                    topBar?.setDimensions(widthPercent, heightPercent)
+                }
+                if (changeHeight) {
+                    heightPercent = (resizeStartHeightPercent + dy * 100f / area.height.coerceAtLeast(1)).toInt().coerceIn(1, 100)
+                    prefs.setNumber(PanelTree.HEIGHT, heightPercent)
+                    topBar?.setDimensions(widthPercent, heightPercent)
+                }
+                if (resizeEdge == ResizeEdge.LEFT || resizeEdge == ResizeEdge.BOTTOM_LEFT) {
+                    val nextWidth = PanelGeometry.panelDimension(area.width, widthPercent, dpi(MAX_WIDTH_DP))
+                    translationX = (resizeStartTranslationX + resizeStartWidth - nextWidth)
+                        .coerceIn(0f, (area.width - nextWidth).toFloat().coerceAtLeast(0f))
+                }
+                glass.resizeGlow = 1f
+                requestLayout()
+                return true
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                if (resizeEdge == ResizeEdge.NONE) return false
+                resizeEdge = ResizeEdge.NONE
+                glass.resizeGlow = 0f
+                if (event.actionMasked == MotionEvent.ACTION_UP && tickOnSave) {
+                    performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                }
+                savePosition()
+                return true
+            }
+        }
+        return false
+    }
+
+    private fun findResizeEdge(x: Float, y: Float): ResizeEdge {
+        if (minimized || width == 0 || height == 0) return ResizeEdge.NONE
+        val area = parent as? View ?: return ResizeEdge.NONE
+        val touch = dpi(24f)
+        val atBottom = userY + height >= area.height - 1
+        val atLeft = translationX <= 1f
+        val atRight = translationX + width >= area.width - 1
+        val bottom = height - if (atBottom) gestureInsets.bottom else 0
+        val left = if (atLeft) maxOf(touch, gestureInsets.left) else touch
+        val right = if (atRight) minOf(width - touch, width - gestureInsets.right) else width - touch
+        val inBottom = y >= bottom - touch && y <= bottom
+        if (inBottom) {
+            if (x <= left + touch) return ResizeEdge.BOTTOM_LEFT
+            if (x >= right - touch) return ResizeEdge.BOTTOM_RIGHT
+            return ResizeEdge.BOTTOM
+        }
+        if (y >= height / 2f) {
+            if (x >= left && x <= left + touch) return ResizeEdge.LEFT
+            if (x >= right - touch && x <= right) return ResizeEdge.RIGHT
+        }
+        return ResizeEdge.NONE
+    }
+
+    private fun adjustSize(widthChange: Int, heightChange: Int) {
+        widthPercent = (widthPercent + widthChange).coerceIn(1, 100)
+        heightPercent = (heightPercent + heightChange).coerceIn(1, 100)
+        prefs.setNumber(PanelTree.WIDTH, widthPercent)
+        prefs.setNumber(PanelTree.HEIGHT, heightPercent)
+        topBar?.setDimensions(widthPercent, heightPercent)
+        requestLayout()
     }
 
     private fun isInside(view: View, event: MotionEvent): Boolean {
@@ -214,60 +485,36 @@ class TerminalPanel @JvmOverloads constructor(
     }
 
     private fun buildHeader(): View {
-        val header = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dpi(16f), dpi(8f), dpi(8f), dpi(2f))
-            contentDescription = context.getString(R.string.terminal_drag)
-        }
-        header.addView(GripView(context), LinearLayout.LayoutParams(dpi(12f), dpi(18f)).apply {
-            marginEnd = dpi(10f)
-        })
-        val title = TextView(context).apply {
-            text = context.getString(R.string.terminal_title)
-            typeface = Hud.monoBold(context)
-            textSize = 12.5f
-            letterSpacing = 0.12f
-            maxLines = 1
-            ellipsize = TextUtils.TruncateAt.END
-            setTextColor(Hud.CYAN)
-            setShadowLayer(dp(6f), 0f, 0f, Hud.CYAN)
-        }
-        header.addView(title, LinearLayout.LayoutParams(0, WRAP, 1f))
-        val shrink = ShrinkButton(context).apply {
-            contentDescription = context.getString(R.string.terminal_shrink)
-            setOnClickListener { showMinimized(true, animate = true) }
-        }
-        header.addView(shrink, LinearLayout.LayoutParams(dpi(48f), dpi(36f)))
-        header.setOnTouchListener(dragHandle())
-        return header
+        val bar = TopBar(
+            context = context,
+            prefs = prefs,
+            width = widthPercent,
+            height = heightPercent,
+            onBack = ::goUp,
+            onShrink = { showMinimized(true, animate = true) },
+            onToggle = ::updateQuickToggle,
+            onDimensionChanged = ::onDimensionChanged,
+            onViewModeChanged = { homeGrid?.setColumnCount(it) },
+        )
+        topBar = bar
+        bar.setOnTouchListener(dragHandle())
+        return bar
     }
 
-    private fun buildSideList(): View {
-        val rows = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dpi(6f), dpi(6f), dpi(2f), dpi(12f))
-        }
-        for (folder in home.folders) {
-            val row = SideRow(context, folder)
-            row.setOnClickListener { openFromTop(folder, row) }
-            listRows[folder.id] = row
-            rows.addView(row, LinearLayout.LayoutParams(MATCH, WRAP))
-        }
-        return ScrollView(context).apply {
-            isVerticalScrollBarEnabled = false
-            overScrollMode = OVER_SCROLL_NEVER
-            addView(rows)
-        }
+    private fun onDimensionChanged(key: String, value: Int) {
+        if (key == PanelTree.WIDTH) widthPercent = value else heightPercent = value
+        prefs.setNumber(key, value)
+        requestLayout()
     }
 
     private fun buildMainArea(): View {
         val area = FrameLayout(context)
-        val grid = TileGrid(context, GRID_CELL_DP).apply {
+        val grid = TileGrid(context, GRID_CELL_DP, singleColumn = true).apply {
             setPadding(dpi(4f), dpi(6f), dpi(4f), dpi(14f))
         }
+        homeGrid = grid
         for (folder in home.folders) {
-            val tile = FolderTile(context, folder, GRID_ICON_DP)
+            val tile = FolderTile(context, folder, GRID_ICON_DP, bigTile = true)
             tile.setOnClickListener { openFromTop(folder, tile) }
             gridTiles[folder.id] = tile
             grid.addView(tile)
@@ -276,6 +523,7 @@ class TerminalPanel @JvmOverloads constructor(
         gridScroll.overScrollMode = OVER_SCROLL_NEVER
         gridScroll.addView(grid)
         area.addView(gridScroll, LayoutParams(MATCH, MATCH))
+        area.addView(GlowScrollBar(context, gridScroll), LayoutParams(dpi(24f), MATCH, Gravity.END))
 
         detailPane.background = holoGlass
         detailPane.isClickable = true
@@ -286,6 +534,7 @@ class TerminalPanel @JvmOverloads constructor(
         detailScroll.overScrollMode = OVER_SCROLL_NEVER
         detailScroll.addView(detailContent)
         detailPane.addView(detailScroll, LayoutParams(MATCH, MATCH))
+        detailPane.addView(GlowScrollBar(context, detailScroll), LayoutParams(dpi(24f), MATCH, Gravity.END))
         holoSweep.background = GradientDrawable(
             GradientDrawable.Orientation.TOP_BOTTOM,
             intArrayOf(0, Hud.withAlpha(Hud.CYAN, 0.32f), 0),
@@ -378,7 +627,7 @@ class TerminalPanel @JvmOverloads constructor(
         val area = parent as? View ?: return
         translationX = x.coerceIn(0f, (area.width - width).toFloat().coerceAtLeast(0f))
         userY = y.coerceIn(0f, (area.height - height).toFloat().coerceAtLeast(0f))
-        translationY = userY - keyboardLift
+        translationY = userY
     }
 
     private fun savePosition() {
@@ -400,6 +649,7 @@ class TerminalPanel @JvmOverloads constructor(
         scanLine.isVisible = !value && scanLineOn
         background = if (value) null else glass
         backCallback.isEnabled = !value && openFolder != null
+        topBar?.setBackEnabled(!value && openFolder != null)
         requestLayout()
         if (animate && !value) {
             post { hologramIn(this, 0f, 0f, isDetail = false) }
@@ -409,19 +659,28 @@ class TerminalPanel @JvmOverloads constructor(
 
     private fun applyLook() {
         val share = opacity / 100f
-        for (drawable in listOf(glass, pillGlass, holoGlass)) {
-            drawable.opacity = share
+        glass.opacity = if (fullBleed && !seeThroughAtFullSize) 1f else share
+        glass.glow = glowLevel / 100f
+        glass.fullBleed = fullBleed
+        glass.seeThroughAtFullSize = seeThroughAtFullSize
+        glass.borderThickness = PanelGeometry.borderThickness(borderThickness)
+        glass.lightSkin = Hud.isLightTheme
+        glass.uvTheme = prefs.choice(PanelTree.THEME, "OLED Bioluminescent") == "UV Black Light"
+        for (drawable in listOf(pillGlass, holoGlass)) {
+            drawable.opacity = if (fullBleed && !seeThroughAtFullSize && drawable === holoGlass) 1f else share
             drawable.glow = glowLevel / 100f
+            drawable.lightSkin = Hud.isLightTheme
         }
+        holoGlass.solidSkin = fullBleed && !seeThroughAtFullSize
+        requestLayout()
         // The words dim a little with the glass, but never fade away.
-        val contentAlpha = 0.7f + 0.3f * share
+        val contentAlpha = if (fullBleed && !seeThroughAtFullSize) 1f else 0.7f + 0.3f * share
         expanded.alpha = contentAlpha
         pill.alpha = contentAlpha
         scanLine.isVisible = scanLineOn && !minimized
-        for (typer in listOfNotNull(statusLine, guidance)) {
-            typer.speed = typingLettersPerSecond()
-            typer.animateTyping = laserTypingOn
-        }
+        statusLine.speed = typingLettersPerSecond()
+        statusLine.animateTyping = laserTypingOn
+        detailBuilder.updateTyping(typingLettersPerSecond(), laserTypingOn)
     }
 
     private fun typingLettersPerSecond(): Float = 12f + typingSpeed * 1.38f
@@ -434,7 +693,6 @@ class TerminalPanel @JvmOverloads constructor(
         activeId = id
         prefs.activeFolder = id
         gridTiles.forEach { (key, tile) -> tile.setActive(key == id) }
-        listRows.forEach { (key, row) -> row.setActive(key == id) }
     }
 
     private fun openFromTop(folder: PanelFolder, from: View) {
@@ -448,6 +706,7 @@ class TerminalPanel @JvmOverloads constructor(
         val wasOpen = openFolder != null
         openFolder = folder
         backCallback.isEnabled = true
+        topBar?.setBackEnabled(true)
         buildDetail(folder)
         detailScroll.scrollTo(0, 0)
         detailPane.visibility = VISIBLE
@@ -477,6 +736,7 @@ class TerminalPanel @JvmOverloads constructor(
         hideKeyboard()
         openFolder = null
         backCallback.isEnabled = false
+        topBar?.setBackEnabled(false)
         gridScroll.animate().cancel()
         gridScroll.visibility = VISIBLE
         gridScroll.animate().alpha(1f).setDuration(GRID_FADE_MS).start()
@@ -495,7 +755,7 @@ class TerminalPanel @JvmOverloads constructor(
                 if (openFolder == null) {
                     detailPane.visibility = INVISIBLE
                     detailContent.removeAllViews()
-                    guidance = null
+                    detailBuilder.clear()
                 }
                 detailPane.scaleX = 1f
                 detailPane.scaleY = 1f
@@ -578,139 +838,49 @@ class TerminalPanel @JvmOverloads constructor(
             .start()
     }
 
-    private fun buildDetail(folder: PanelFolder) {
-        detailContent.removeAllViews()
-        detailContent.addView(pathBar(folder), LinearLayout.LayoutParams(MATCH, WRAP))
-        detailContent.addView(folderHeading(folder), LinearLayout.LayoutParams(MATCH, WRAP))
+    private fun buildDetail(folder: PanelFolder) = detailBuilder.build(folder, detailContent)
 
-        val typer = LaserTypeView(context).apply {
-            textSize = 10.5f
-            setPadding(dpi(9f), dpi(7f), dpi(9f), dpi(8f))
-            background = GradientDrawable().apply {
-                setColor(Hud.withAlpha(Hud.INK, 0.5f))
-                cornerRadius = dp(6f)
-                setStroke(dpi(1f), Hud.withAlpha(Hud.LASER, 0.2f))
-            }
-            speed = typingLettersPerSecond()
-            animateTyping = laserTypingOn
-        }
-        guidance = typer
-        detailContent.addView(typer, LinearLayout.LayoutParams(MATCH, WRAP))
-        typer.type(PanelText.guidance(folder, folder.results(::markOf)))
-
-        if (folder.folders.isNotEmpty()) {
-            detailContent.addView(sectionLabel(R.string.terminal_section_folders))
-            val tiles = TileGrid(context, SUB_CELL_DP)
-            for (child in folder.folders) {
-                val tile = FolderTile(context, child, SUB_ICON_DP)
-                tile.setOnClickListener { showFolder(child, tile) }
-                tiles.addView(tile)
-            }
-            detailContent.addView(tiles, LinearLayout.LayoutParams(MATCH, WRAP))
-        }
-        if (folder.numbers.isNotEmpty()) {
-            detailContent.addView(sectionLabel(R.string.terminal_section_numbers))
-            for (item in folder.numbers) {
-                val row = NumberRow(
-                    context,
-                    item,
-                    prefs.number(item.key, item.default),
-                    onChange = { value, announce -> saveNumber(item, value, announce) },
-                    onProblem = { say(it) },
-                )
-                detailContent.addView(row, LinearLayout.LayoutParams(MATCH, WRAP))
-            }
-        }
-        if (folder.toggles.isNotEmpty()) {
-            detailContent.addView(sectionLabel(R.string.terminal_section_toggles))
-            for (item in folder.toggles) {
-                val note = if (item.isTest) markText(markOf(folder, item)) else item.help
-                val on = prefs.toggle(toggleKey(folder, item), item.default)
-                val row = ToggleRow(context, item, note, on) { value -> saveToggle(folder, item, value) }
-                detailContent.addView(row, LinearLayout.LayoutParams(MATCH, WRAP))
-            }
+    private fun performAction(action: PanelAction) {
+        when (action) {
+            PanelAction.RESET_ALL -> resetSettings(home)
+            PanelAction.RESET_FOLDER -> resetSettings(openFolder ?: home)
+            PanelAction.LIVE_OPEN_OVERLAY_SETTINGS,
+            PanelAction.LIVE_CLEAN_OUTPUT,
+            PanelAction.REMOTE_OPEN_PAIRING,
+            -> onPanelAction?.invoke(action)
         }
     }
 
-    private fun pathBar(folder: PanelFolder): View {
-        val bar = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
+    private fun resetSettings(folder: PanelFolder) {
+        fun reset(current: PanelFolder) {
+            current.numbers.forEach { prefs.setNumber(it.key, it.default) }
+            current.toggles.forEach {
+                val key = toggleKey(current, it)
+                prefs.setToggle(key, it.default)
+                if (it.key.startsWith("fx.")) onSettingChanged?.invoke(it.key, it.default)
+            }
+            current.choices.forEach {
+                prefs.setChoice(it.key, it.default)
+                onChoiceChanged?.invoke(it.key, it.default)
+            }
+            current.folders.forEach(::reset)
         }
-        val back = TextView(context).apply {
-            text = context.getString(R.string.terminal_back)
-            typeface = Hud.monoBold(context)
-            textSize = 11f
-            setTextColor(Hud.GOLD)
-            setPadding(dpi(6f), dpi(9f), dpi(10f), dpi(9f))
-            isClickable = true
-            isFocusable = true
-            foreground = pressGlow(context)
-            contentDescription = context.getString(R.string.terminal_back_label)
-            setOnClickListener { goUp() }
-        }
-        bar.addView(back)
-        val path = TextView(context).apply {
-            text = (listOf(context.getString(R.string.terminal_home)) + folder.trail().map { it.label })
-                .joinToString(" › ")
-            typeface = Hud.mono(context)
-            textSize = 9.5f
-            setTextColor(Hud.TEXT_DIM)
-            maxLines = 1
-            ellipsize = TextUtils.TruncateAt.START
-        }
-        bar.addView(path, LinearLayout.LayoutParams(0, WRAP, 1f))
-        return bar
-    }
-
-    private fun folderHeading(folder: PanelFolder): View {
-        val accent = accentFor(folder.kind)
-        val row = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, 0, 0, dpi(6f))
-        }
-        val frame = FrameLayout(context)
-        val ringSize = dpi(60f)
-        frame.addView(
-            HoloRingView(context, accent).apply { spinning = true },
-            LayoutParams(ringSize, ringSize, Gravity.CENTER),
-        )
-        frame.addView(
-            FolderIconView(context, accent, folder.itemCount, folder.tag, compact = false),
-            LayoutParams(dpi(42f), dpi(36f), Gravity.CENTER),
-        )
-        row.addView(frame, LinearLayout.LayoutParams(ringSize, ringSize))
-        val names = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dpi(8f), 0, 0, 0)
-        }
-        names.addView(TextView(context).apply {
-            text = folder.title
-            typeface = Hud.condensedBold
-            textSize = 16f
-            setTextColor(Hud.TEXT)
-            setShadowLayer(dp(6f), 0f, 0f, accent)
-        })
-        names.addView(TextView(context).apply {
-            text = itemsText(context, folder.itemCount)
-            typeface = Hud.mono(context)
-            textSize = 10.5f
-            setTextColor(accent)
-        })
-        row.addView(names, LinearLayout.LayoutParams(0, WRAP, 1f))
-        return row
-    }
-
-    private fun sectionLabel(textRes: Int): View {
-        return TextView(context).apply {
-            text = context.getString(textRes)
-            typeface = Hud.monoBold(context)
-            textSize = 9.5f
-            letterSpacing = 0.12f
-            setTextColor(Hud.GOLD)
-            setPadding(0, dpi(12f), 0, dpi(4f))
-        }
+        reset(folder)
+        opacity = prefs.number(PanelTree.OPACITY, 50)
+        glowLevel = prefs.number(PanelTree.GLOW, 50)
+        typingSpeed = prefs.number(PanelTree.TYPING, 50)
+        widthPercent = prefs.number(PanelTree.WIDTH, 80)
+        heightPercent = prefs.number(PanelTree.HEIGHT, 60)
+        fullScreen = prefs.toggle(PanelTree.FULL_SCREEN, false)
+        seeThroughAtFullSize = prefs.toggle(PanelTree.SEE_THROUGH_FULL_SIZE, false)
+        borderThickness = prefs.number(PanelTree.BORDER_THICKNESS, 50)
+        tickOnSave = prefs.toggle(PanelTree.TICK_ON_SAVE, true)
+        scanLineOn = prefs.toggle(PanelTree.SCAN_LINE, true)
+        laserTypingOn = prefs.toggle(PanelTree.LASER_TYPING, true)
+        topBar?.setDimensions(widthPercent, heightPercent)
+        applyLook()
+        openFolder?.let(::buildDetail)
+        say("Settings reset.")
     }
 
     private fun saveNumber(item: NumberItem, value: Int, announce: Boolean) {
@@ -719,6 +889,12 @@ class TerminalPanel @JvmOverloads constructor(
             PanelTree.OPACITY -> opacity = value
             PanelTree.GLOW -> glowLevel = value
             PanelTree.TYPING -> typingSpeed = value
+            PanelTree.WIDTH -> widthPercent = value
+            PanelTree.HEIGHT -> heightPercent = value
+            PanelTree.BORDER_THICKNESS -> borderThickness = value
+        }
+        if (item.key == PanelTree.WIDTH || item.key == PanelTree.HEIGHT) {
+            topBar?.setDimensions(widthPercent, heightPercent)
         }
         applyLook()
         if (announce) {
@@ -728,6 +904,7 @@ class TerminalPanel @JvmOverloads constructor(
 
     private fun saveToggle(folder: PanelFolder, item: ToggleItem, on: Boolean) {
         prefs.setToggle(toggleKey(folder, item), on)
+        onSettingChanged?.invoke(item.key, on)
         if (item.isTest) {
             val message = if (on) R.string.terminal_test_on else R.string.terminal_test_off
             say(context.getString(message, item.label))
@@ -736,33 +913,56 @@ class TerminalPanel @JvmOverloads constructor(
         when (item.key) {
             PanelTree.SCAN_LINE -> scanLineOn = on
             PanelTree.LASER_TYPING -> laserTypingOn = on
+            PanelTree.FULL_SCREEN -> fullScreen = on
+            PanelTree.SEE_THROUGH_FULL_SIZE -> seeThroughAtFullSize = on
+            PanelTree.TICK_ON_SAVE -> tickOnSave = on
         }
         applyLook()
         val message = if (on) R.string.terminal_toggle_on else R.string.terminal_toggle_off
         say(context.getString(message, item.label))
     }
 
+    private fun saveChoice(item: ChoiceItem, value: String) {
+        prefs.setChoice(item.key, value)
+        onChoiceChanged?.invoke(item.key, value)
+        applyLook()
+        say("${item.label} is $value.")
+    }
+
     private fun toggleKey(folder: PanelFolder, item: ToggleItem): String {
         return if (item.isTest) "test.${folder.id}.${item.key}" else item.key
     }
-
-    /** Step 2 has no real checks yet, so every test starts as not tested. Step 10 adds the checks. */
-    @Suppress("UNUSED_PARAMETER")
-    private fun markOf(folder: PanelFolder, item: ToggleItem): TestMark = TestMark.NOT_TESTED
-
-    private fun markText(mark: TestMark): String = context.getString(
-        when (mark) {
-            TestMark.NOT_TESTED -> R.string.terminal_not_tested
-            TestMark.SUCCESS -> R.string.terminal_success
-            TestMark.FAILED -> R.string.terminal_failed
-        },
-    )
 
     private fun hideKeyboard() {
         val focused = findFocus() ?: return
         if (focused is EditText) {
             focused.clearFocus()
             context.getSystemService(InputMethodManager::class.java)?.hideSoftInputFromWindow(windowToken, 0)
+        }
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        Hud.updateSystemTheme(newConfig)
+        applyLook()
+        openFolder?.let(::buildDetail)
+        applyTextTheme(expanded)
+        applyTextTheme(pill)
+    }
+
+    private fun applyTextTheme(view: View) {
+        if (view is TextView && view !is EditText) {
+            val current = view.currentTextColor
+            if (current == 0xFFDDF8FF.toInt() || current == 0xFFFFFFFF.toInt() ||
+                current == 0xFF000000.toInt() || current == 0xFF8DB4BF.toInt() ||
+                current == 0xFFB8B8C0.toInt()
+            ) {
+                view.setTextColor(Hud.TEXT)
+            }
+            if (view is LaserTypeView) view.applySystemTextColor()
+        }
+        if (view is ViewGroup) {
+            for (index in 0 until view.childCount) applyTextTheme(view.getChildAt(index))
         }
     }
 
@@ -785,14 +985,9 @@ class TerminalPanel @JvmOverloads constructor(
         const val EDGE_DP = 8f
         const val MAX_WIDTH_DP = 440f
         const val MIN_HEIGHT_DP = 300f
-        const val MAX_HEIGHT_DP = 470f
-        const val HEIGHT_SHARE = 0.44f
         const val DEFAULT_BOTTOM_SHARE = 0.82f
-        const val SIDE_LIST_DP = 116f
         const val GRID_CELL_DP = 76f
         const val GRID_ICON_DP = 54f
-        const val SUB_CELL_DP = 84f
-        const val SUB_ICON_DP = 50f
         const val OPEN_MS = 420L
         const val CLOSE_MS = 220L
         const val SWEEP_MS = 520L

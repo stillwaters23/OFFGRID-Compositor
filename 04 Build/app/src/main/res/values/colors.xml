@@ -5,5 +5,13 @@
     <!-- Step 2 look: cyan and gold glow lines on dark glass. -->
     <color name="hud_cyan">#FF46F0FF</color>
     <color name="hud_gold">#FFFFC34D</color>
-    <color name="hud_text">#FFDDF8FF</color>
+    <color name="hud_text">#FFFFFFFF</color>
+    <color name="neon_uv_violet">#FF7B02B3</color>
+    <color name="neon_electric_purple">#FFB026FF</color>
+    <color name="neon_hot_magenta">#FFFF00A6</color>
+    <color name="neon_pink">#FFFF2BD6</color>
+    <color name="neon_cyan">#FF00E5FC</color>
+    <color name="neon_deep_blue">#FF0032FF</color>
+    <color name="neon_toxic_lime">#FFB6FF00</color>
+    <color name="neon_blacklight_white">#FFF4ECFF</color>
 </resources>

@@ -35,7 +35,7 @@ internal class LaserTypeView(context: Context) : AppCompatTextView(context) {
     private var blinking = false
     private var blinkUntil = 0L
     private var attachedAndShown = false
-    private val caretPaint = Paint().apply { color = Hud.LASER }
+    private val caretPaint = Paint().apply { color = Hud.TEXT }
     private val metrics = Paint.FontMetrics()
 
     private val blink = object : Runnable {
@@ -56,11 +56,17 @@ internal class LaserTypeView(context: Context) : AppCompatTextView(context) {
 
     init {
         typeface = Hud.mono(context)
-        setTextColor(Hud.LASER)
+        setTextColor(Hud.TEXT)
         setLineSpacing(0f, 1.12f)
         // An opaque shadow color follows each letter's own alpha, so hidden letters cast no shadow.
         setShadowLayer(Hud.dp(context, 3f), 0f, 0f, Hud.INK)
         setOnClickListener { finishNow() }
+    }
+
+    fun applySystemTextColor() {
+        setTextColor(Hud.TEXT)
+        caretPaint.color = Hud.TEXT
+        invalidate()
     }
 
     /** Types [text] letter by letter. */
