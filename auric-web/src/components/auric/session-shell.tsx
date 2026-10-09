@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FolderGrid } from "@/components/auric/folder-grid";
 import { FolderLayoutSheet } from "@/components/auric/folder-layout-sheet";
 import { FolderStage } from "@/components/auric/folder-stage";
@@ -207,6 +207,23 @@ function HomeDesk({ alerts }: { alerts: number }) {
   const [folderPreferences, setFolderPreferences] = useState(DEFAULT_FOLDER_PREFERENCES);
   const [folderSettingsOpen, setFolderSettingsOpen] = useState(false);
   const [folderPreferencesReady, setFolderPreferencesReady] = useState(false);
+  const folderBeforeRects = useRef(new Map<string, DOMRect>());
+
+  const updateFolderPreferences = (next: typeof folderPreferences) => {
+    if (
+      next.layout !== folderPreferences.layout ||
+      next.folderOrder.join("\u0000") !== folderPreferences.folderOrder.join("\u0000")
+    ) {
+      const before = new Map<string, DOMRect>();
+      document.querySelectorAll<HTMLElement>(".tx-folder-grid > li[data-folder-id]").forEach((item) => {
+        const id = item.dataset.folderId;
+        const button = item.querySelector<HTMLButtonElement>(".tx-folder-tile");
+        if (id && button) before.set(id, button.getBoundingClientRect());
+      });
+      folderBeforeRects.current = before;
+    }
+    setFolderPreferences(next);
+  };
 
   useEffect(() => {
     setFolderPreferences(readFolderPreferences());
@@ -258,12 +275,16 @@ function HomeDesk({ alerts }: { alerts: number }) {
                 ⋯
               </button>
             </div>
-            <FolderGrid preferences={folderPreferences} onChangePreferences={setFolderPreferences} />
+            <FolderGrid
+              preferences={folderPreferences}
+              beforeRects={folderBeforeRects}
+              onChangePreferences={updateFolderPreferences}
+            />
             <FolderLayoutSheet
               open={folderSettingsOpen}
               specs={MODULES}
               preferences={folderPreferences}
-              onChange={setFolderPreferences}
+              onChange={updateFolderPreferences}
               onClose={() => setFolderSettingsOpen(false)}
             />
           </TxPanel>

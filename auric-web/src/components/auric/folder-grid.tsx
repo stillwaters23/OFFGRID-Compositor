@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 
 type FolderGridProps = {
   preferences: FolderPreferences;
+  beforeRects: { current: Map<string, DOMRect> };
   onChangePreferences: (next: FolderPreferences) => void;
 };
 
@@ -101,14 +102,11 @@ function springBack(
   window.requestAnimationFrame(step);
 }
 
-export function FolderGrid({ preferences, onChangePreferences }: FolderGridProps) {
+export function FolderGrid({ preferences, beforeRects, onChangePreferences }: FolderGridProps) {
   const installed = useAuric((s) => s.installedModules);
   const glow = useAuric((s) => s.glowIntensity);
   const gridRef = useRef<HTMLUListElement>(null);
   const tileRefs = useRef(new Map<string, HTMLLIElement>());
-  const beforeRects = useRef(new Map<string, DOMRect>());
-  const previousLayout = useRef(preferences.layout);
-  const previousOrder = useRef(preferences.folderOrder.join("\u0000"));
   const activeInteraction = useRef<Interaction | null>(null);
   const suppressClick = useRef(false);
   const [containerWidth, setContainerWidth] = useState(() =>
@@ -123,39 +121,32 @@ export function FolderGrid({ preferences, onChangePreferences }: FolderGridProps
   const updatePreferences = onChangePreferences;
 
   useLayoutEffect(() => {
-    const currentTiles = tileRefs.current;
-    const order = preferences.folderOrder.join("\u0000");
-    const layoutChanged = previousLayout.current !== preferences.layout || previousOrder.current !== order;
-    if (layoutChanged) {
-      for (const item of currentTiles.values()) {
-        item.querySelector<HTMLButtonElement>(".tx-folder-tile")?.getAnimations().forEach((animation) => animation.cancel());
-      }
-    }
-    if (layoutChanged && beforeRects.current.size && !reducedMotion()) {
-      for (const [id, item] of currentTiles) {
+    if (beforeRects.current.size) {
+      for (const item of tileRefs.current.values()) {
         const button = item.querySelector<HTMLButtonElement>(".tx-folder-tile");
-        const old = beforeRects.current.get(id);
-        if (!button || !old) continue;
-        const next = button.getBoundingClientRect();
-        const dx = old.left - next.left;
-        const dy = old.top - next.top;
-        if (dx || dy) {
-          button.animate(
-            [{ transform: `translate(${dx}px, ${dy}px)`, opacity: 0.78 }, { transform: "translate(0, 0)", opacity: 1 }],
-            { duration: 320, easing: "cubic-bezier(.2,.8,.2,1)" },
-          );
+        button?.getAnimations().forEach((animation) => animation.cancel());
+      }
+      if (!reducedMotion()) {
+        for (const [id, item] of tileRefs.current) {
+          const button = item.querySelector<HTMLButtonElement>(".tx-folder-tile");
+          const old = beforeRects.current.get(id);
+          if (!button || !old) continue;
+          if (old.bottom <= 0 || old.top >= window.innerHeight) continue;
+          const next = button.getBoundingClientRect();
+          if (next.bottom <= 0 || next.top >= window.innerHeight) continue;
+          const dx = old.left - next.left;
+          const dy = old.top - next.top;
+          if (dx || dy) {
+            button.animate(
+              [{ transform: `translate(${dx}px, ${dy}px)`, opacity: 0.78 }, { transform: "translate(0, 0)", opacity: 1 }],
+              { duration: 320, easing: "cubic-bezier(.2,.8,.2,1)" },
+            );
+          }
         }
       }
     }
-    beforeRects.current = new Map(
-      [...currentTiles].flatMap(([id, item]) => {
-        const button = item.querySelector<HTMLButtonElement>(".tx-folder-tile");
-        return button ? [[id, button.getBoundingClientRect()] as const] : [];
-      }),
-    );
-    previousLayout.current = preferences.layout;
-    previousOrder.current = order;
-  });
+    beforeRects.current.clear();
+  }, [preferences.layout, preferences.folderOrder, beforeRects]);
 
   useLayoutEffect(() => {
     const grid = gridRef.current;
@@ -280,9 +271,13 @@ export function FolderGrid({ preferences, onChangePreferences }: FolderGridProps
       const delta = event.clientX - interaction.startX;
       if (Math.abs(delta) >= 48) setSingleIndex((index) => Math.max(0, Math.min(rows.length - 1, index + (delta < 0 ? 1 : -1))));
     } else if (interaction.moved && !interaction.longPressed) {
-      const hit = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>("[data-folder-id]");
-      const targetId = hit?.dataset.folderId;
-      const targetButton = targetId ? tileRefs.current.get(targetId)?.querySelector<HTMLButtonElement>(".tx-folder-tile") : null;
+      const hovered = [...tileRefs.current].find(([id, item]) => {
+        if (id === interaction.id) return false;
+        const rect = item.getBoundingClientRect();
+        return event.clientX >= rect.left && event.clientX <= rect.right && event.clientY >= rect.top && event.clientY <= rect.bottom;
+      });
+      const targetId = hovered?.[0];
+      const targetButton = hovered?.[1].querySelector<HTMLButtonElement>(".tx-folder-tile") ?? null;
       const targetRect = targetButton?.getBoundingClientRect();
       const targetOrder = targetId && targetId !== interaction.id ? [...savedOrder] : null;
       if (targetOrder) {

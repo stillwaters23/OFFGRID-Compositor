@@ -9,6 +9,7 @@ import {
 } from "../src/lib/folder-layout.ts";
 
 test("folder metrics clamp size and choose layout columns by available width", () => {
+  assert.equal(folderMetrics(100, 8, "grid").iconPx, 0);
   for (const width of [320, 390, 1280]) {
     for (const size of [0, 50, 100]) {
       const grid = folderMetrics(size, width, "grid");

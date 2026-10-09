@@ -87,7 +87,7 @@ export function folderMetrics(size: number, containerWidth: number, layout: Fold
   const tileWidth = Math.max(0, (width - 16 * (columns - 1)) / columns);
   const preferredIcon = layout === "single" ? 64 + safeSize * 0.32 : 32 + safeSize * 0.48;
   const reservedWidth = 16 + 8 + 32 + 40;
-  const iconPx = Math.max(24, Math.min(preferredIcon, tileWidth - reservedWidth));
+  const iconPx = Math.min(tileWidth, Math.max(24, Math.min(preferredIcon, tileWidth - reservedWidth)));
 
   return {
     iconPx,

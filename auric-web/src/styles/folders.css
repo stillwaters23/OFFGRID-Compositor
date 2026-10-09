@@ -38,6 +38,7 @@
 .tx-folder-sheet input:focus-visible,
 .tx-folder-sheet select:focus-visible,
 .tx-folder-control input:focus-visible {
+  /* Keep a crisp 2px focus outline; it is a high-contrast accessibility hairline. */
   outline: 2px solid var(--tx-cyan);
   outline-offset: 2px;
 }
@@ -64,6 +65,7 @@
   position: relative;
   min-width: 0;
   max-width: 100%;
+  /* The existing folder artwork used a 10px top offset for its tab. */
   padding-top: 10px;
 }
 .tx-folder-grid[data-layout="single"] > li { min-height: 100%; }
@@ -127,7 +129,7 @@
   color: #f7fcff;
   text-shadow: 0 1px 0 rgba(2, 10, 12, 0.72), 0 0 3px rgba(230, 250, 255, 0.22);
 }
-.tx-folder-row .tx-folder-name.is-locked { color: #ffd0d4; }
+.tx-folder-row .tx-folder-name.is-locked { color: #f7fcff; }
 .tx-folder-row .tx-folder-state {
   font-size: 11px;
   color: #e7f4f7;
@@ -155,7 +157,6 @@
   color: var(--tx-ink);
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.62), 0 0 3px rgba(255, 255, 255, 0.18);
 }
-.tx-root[data-mood="light"] .tx-folder-row .tx-folder-name.is-locked,
 .tx-root[data-mood="light"] .tx-folder-row .tx-folder-state.is-off { color: var(--tx-red); }
 .tx-root[data-mood="light"] .tx-folder-art.is-etched { color: var(--tx-ink); }
 

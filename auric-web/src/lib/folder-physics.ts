@@ -2,10 +2,10 @@ import type { Rect } from "./folder-layout.ts";
 
 export type SpringState = { position: number; velocity: number; target: number };
 
-const SPRING_OMEGA = 20;
+const SPRING_OMEGA = 30;
 
 export function springStep(state: SpringState, deltaMs: number): SpringState {
-  const seconds = Math.max(0, Math.min(deltaMs, 32)) / 1000;
+  const seconds = Number.isFinite(deltaMs) ? Math.max(0, deltaMs) / 1000 : 0;
   const displacement = state.position - state.target;
   const coefficient = state.velocity + SPRING_OMEGA * displacement;
   const decay = Math.exp(-SPRING_OMEGA * seconds);
