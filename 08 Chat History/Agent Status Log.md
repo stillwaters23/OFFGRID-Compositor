@@ -225,7 +225,7 @@ States: passed, waiting for review, blocked, or waiting for Royalty's phone test
   - Mic capture releases on read failure and `stop()` is idempotent. Added an error-path release test.
   - Mic denial is retained in the capture state so the pipeline stays off. Added a denied-state test.
   - Added `CompositorProcessor.setExtraOutput` for effects-only encoder outputs, with registry bookkeeping tests.
-  - Split camera startup, status/capture handling, recording, and playback out of `MainActivity.kt`; it is now 355 lines and each new source file is below 400 lines.
+  - Split camera startup, status/capture handling, recording, and playback out of `MainActivity.kt`; it is now 354 lines and each new source file is below 400 lines.
 - **Checks and remaining work:**
   - Pure JVM checks for capture state, output bookkeeping, and mic error cleanup pass. Gradle cannot resolve Android Gradle Plugin 8.13.2 from the configured repositories in this sandbox.
   - The radar sound already enters recorded audio through `SoundBoard` and `SoundMixer` when Sounds in video is enabled. Replay audio is still not implemented; replay remains picture-only.
