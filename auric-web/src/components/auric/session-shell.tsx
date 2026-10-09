@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { FolderGrid } from "@/components/auric/folder-grid";
+import { FolderLayoutSheet } from "@/components/auric/folder-layout-sheet";
 import { FolderStage } from "@/components/auric/folder-stage";
 import {
   AuricWordmark,
@@ -10,7 +11,8 @@ import {
   TaskbarPill,
   TxPanel,
 } from "@/components/auric/termux-chrome";
-import { FREE_MODULE_IDS, moduleById } from "@/lib/modules";
+import { DEFAULT_FOLDER_PREFERENCES, normalizeFolderPreferences } from "@/lib/folder-layout";
+import { FREE_MODULE_IDS, MODULES, moduleById } from "@/lib/modules";
 import { unlockAudio } from "@/lib/audio";
 import { cn } from "@/lib/utils";
 import { useAuric } from "@/lib/store";
@@ -57,6 +59,16 @@ const SESSION_HEADING = "TERMUX SESSION";
 const TYPE_MS = 18;
 const PKG_TICK_MS = 70;
 const PKG_STEPS = 5;
+const FOLDER_PREFERENCES_KEY = "auric-folder-settings-v1";
+
+function readFolderPreferences() {
+  try {
+    const saved = window.localStorage.getItem(FOLDER_PREFERENCES_KEY);
+    return normalizeFolderPreferences(saved ? JSON.parse(saved) : null, MODULES.map((module) => module.id));
+  } catch {
+    return normalizeFolderPreferences(null, MODULES.map((module) => module.id));
+  }
+}
 
 const SESSION_PACKAGES = [
   { id: "core", tag: "[core]", name: "time engine", done: "installed" },
@@ -192,6 +204,24 @@ function HomeDesk({ alerts }: { alerts: number }) {
   const openModuleId = useAuric((s) => s.openModuleId);
   const previewModuleId = useAuric((s) => s.previewModuleId);
   const stacked = Boolean(openModuleId || previewModuleId);
+  const [folderPreferences, setFolderPreferences] = useState(DEFAULT_FOLDER_PREFERENCES);
+  const [folderSettingsOpen, setFolderSettingsOpen] = useState(false);
+  const [folderPreferencesReady, setFolderPreferencesReady] = useState(false);
+
+  useEffect(() => {
+    setFolderPreferences(readFolderPreferences());
+    setFolderPreferencesReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!folderPreferencesReady) return;
+    try {
+      window.localStorage.setItem(FOLDER_PREFERENCES_KEY, JSON.stringify(folderPreferences));
+    } catch {
+      // Folder settings remain usable for the current session if storage is unavailable.
+    }
+  }, [folderPreferences, folderPreferencesReady]);
+
   return (
     <div className="tx-desk" onClick={() => unlockAudio()}>
       <AuricWordmark />
@@ -215,8 +245,27 @@ function HomeDesk({ alerts }: { alerts: number }) {
             <StatusLine alerts={alerts} />
             <BootLog />
             <HelpBlock />
-            <p className="tx-prompt">~ $ ls folders</p>
-            <FolderGrid />
+            <div className="tx-folder-command">
+              <p className="tx-prompt">~ $ ls folders</p>
+              <button
+                type="button"
+                className="tx-folder-menu-button"
+                aria-label="Folder layout settings"
+                aria-haspopup="dialog"
+                aria-expanded={folderSettingsOpen}
+                onClick={() => setFolderSettingsOpen(true)}
+              >
+                ⋯
+              </button>
+            </div>
+            <FolderGrid preferences={folderPreferences} onChangePreferences={setFolderPreferences} />
+            <FolderLayoutSheet
+              open={folderSettingsOpen}
+              specs={MODULES}
+              preferences={folderPreferences}
+              onChange={setFolderPreferences}
+              onClose={() => setFolderSettingsOpen(false)}
+            />
           </TxPanel>
         </div>
         {openModuleId ? (

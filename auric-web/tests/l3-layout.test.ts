@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { folderMetrics, hitZone, paddedLabelRect } from "../src/lib/folder-layout.ts";
+import {
+  folderMetrics,
+  hitZone,
+  normalizeFolderPreferences,
+  orderFolderIds,
+  paddedLabelRect,
+} from "../src/lib/folder-layout.ts";
 
 test("folder metrics clamp size and choose layout columns by available width", () => {
   for (const width of [320, 390, 1280]) {
@@ -32,4 +38,27 @@ test("label hit zone expands to 44px and stays within tile bounds", () => {
   assert.equal(hitZone({ x: 42, y: 50 }, tile, title), "label");
   assert.equal(hitZone({ x: 41, y: 50 }, tile, title), "body");
   assert.equal(hitZone({ x: 159, y: 50 }, tile, title), "body");
+});
+
+test("folder preference hydration clamps values and appends newly installed module ids", () => {
+  assert.deepEqual(orderFolderIds(["timer", "clock", "new"], ["clock", "removed"]), ["clock", "timer", "new"]);
+  const restored = normalizeFolderPreferences(
+    {
+      layout: "single",
+      folderSizeAll: 120,
+      folderSizes: { timer: -5, clock: 72 },
+      folderOrder: ["clock"],
+      folderIconStyle: { timer: "3d", clock: "unknown" },
+      folderNames: { timer: "  Clockwork  ", clock: "   ", long: "01234567890123456789012345" },
+    },
+    ["timer", "clock", "new"],
+  );
+  assert.deepEqual(restored, {
+    layout: "single",
+    folderSizeAll: 100,
+    folderSizes: { timer: 0, clock: 72 },
+    folderOrder: ["clock", "timer", "new"],
+    folderIconStyle: { timer: "3d" },
+    folderNames: { timer: "Clockwork", long: "012345678901234567890123" },
+  });
 });
