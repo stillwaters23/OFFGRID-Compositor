@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import { Palette, Sparkles, Type, Droplets, Shapes } from "lucide-react";
+import { Palette, Sparkles, Type, Droplets, Shapes, Zap } from "lucide-react";
 import { DrumReel } from "@/components/auric/drum-reel";
+import { ReelLookFolder } from "@/components/auric/reel-look-folder";
 import { PitButton } from "@/components/auric/pit-button";
 import {
   PARTS,
@@ -28,6 +29,7 @@ const FOLDERS = [
   { id: "themes" as const, name: "Themes", hint: "Palettes, icons, light/dark, floor.", icon: Sparkles },
   { id: "sizing" as const, name: "Sizing", hint: "Number font and scale.", icon: Type },
   { id: "opacity" as const, name: "Opacity", hint: "Glass and glow. 0 is clear.", icon: Droplets },
+  { id: "laser" as const, name: "Laser & Numbers", hint: "Beam color, intensity, and readable numerals.", icon: Zap },
 ];
 
 export function AppearanceStudio() {
@@ -43,7 +45,7 @@ export function AppearanceStudio() {
     <div className="relative flex min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-x-hidden overflow-y-auto px-5 pb-16">
       <p className="mt-1 font-display text-lg text-accent">{folder ? FOLDERS.find((f) => f.id === folder)?.name : "Choose a folder"}</p>
       <p className="text-sm text-muted">{dirty ? "Unsaved draft. Apply to keep it, Discard to leave it." : "Preview locally. Apply commits. Discard keeps the saved look."}</p>
-      {!folder ? <FolderList /> : folder === "color" ? <ColorFolder /> : folder === "themes" || folder === "icons" ? <ThemesFolder /> : folder === "sizing" ? <SizingFolder /> : <OpacityFolder />}
+      {!folder ? <FolderList /> : folder === "color" ? <ColorFolder /> : folder === "themes" || folder === "icons" ? <ThemesFolder /> : folder === "sizing" ? <SizingFolder /> : folder === "laser" ? <ReelLookFolder /> : <OpacityFolder />}
       <StudioActions />
     </div>
   );
