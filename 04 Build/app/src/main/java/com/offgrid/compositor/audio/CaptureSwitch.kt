@@ -16,24 +16,26 @@ enum class CaptureAction {
 }
 
 /**
- * Keeps track of what is running and says what to change when a toggle flips.
- * The camera starts bound and the mic starts released. Each call returns only what changed.
+ * Keeps track of what is running and says what to change when a toggle flips or the app is hidden.
+ * Nothing runs at first, so the first update while the app is showing binds the camera.
+ * Each call returns only what changed.
  */
 class CaptureSwitch {
-    var cameraRunning = true
+    var cameraRunning = false
         private set
     var micRunning = false
         private set
 
     /**
-     * [micAllowed] is whether the phone gave the mic permission. [foreground] is false while the app is hidden.
-     * The mic is only used when it is wanted, allowed, and the app is showing.
+     * [micAllowed] is whether the phone gave the mic permission. [foreground] is false while the app is hidden:
+     * then the camera and the mic are both let go.
      */
     fun update(cameraWanted: Boolean, micWanted: Boolean, micAllowed: Boolean, foreground: Boolean = true): List<CaptureAction> {
         val actions = ArrayList<CaptureAction>(2)
-        if (cameraWanted != cameraRunning) {
-            cameraRunning = cameraWanted
-            actions += if (cameraWanted) CaptureAction.BIND_CAMERA else CaptureAction.UNBIND_CAMERA
+        val cameraNeeded = cameraWanted && foreground
+        if (cameraNeeded != cameraRunning) {
+            cameraRunning = cameraNeeded
+            actions += if (cameraNeeded) CaptureAction.BIND_CAMERA else CaptureAction.UNBIND_CAMERA
         }
         val micNeeded = micWanted && micAllowed && foreground
         if (micNeeded != micRunning) {

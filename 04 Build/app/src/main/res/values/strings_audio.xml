@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="mic_needs_ok">The mic is only used for your videos. Tap Allow.</string>
+    <string name="mic_denied">Mic is off. To allow it: Settings, Apps, OFFGRID, Permissions, Microphone.</string>
+    <string name="mic_failed">The mic did not start. It stays off.</string>
+    <string name="camera_off">Camera is off. Viewers see black and your effects.</string>
+    <string name="record_no_sound">Recorder did not start. This video has no sound.</string>
+    <string name="replay_memory_limited">Replay memory is full. It keeps the last %1$d seconds.</string>
+    <string name="dark_picture">Black picture with your effects. The camera is off.</string>
+</resources>

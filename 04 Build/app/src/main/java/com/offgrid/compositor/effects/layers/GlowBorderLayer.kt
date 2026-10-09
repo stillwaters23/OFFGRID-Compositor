@@ -75,7 +75,7 @@ class GlowBorderLayer : OverlayLayer {
         if (w <= 0 || h <= 0) return
         val unit = min(w, h).toFloat()
         val thick = unit * EffectMath.lerp(THICK_MIN, THICK_MAX, s.value(FxKeys.BORDER_THICKNESS))
-        val glow = s.value(FxKeys.BORDER_GLOW)
+        val glow = (s.value(FxKeys.BORDER_GLOW) + frame.beat * BEAT_GLOW_BOOST).coerceAtMost(1f)
         var lap = EffectMath.lerp(LAP_SLOW, LAP_FAST, s.value(FxKeys.BORDER_SPEED))
         if (frame.reducedMotion) lap *= CALM_SLOWER
         plan(w, h, thick / 2f, unit)
@@ -281,6 +281,7 @@ class GlowBorderLayer : OverlayLayer {
 
         /** Less motion: laps take twice as long. */
         const val CALM_SLOWER = 2f
+        const val BEAT_GLOW_BOOST = 0.6f
 
         const val CORNER_SHARE = 0.045f
 

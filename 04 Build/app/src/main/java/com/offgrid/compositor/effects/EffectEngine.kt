@@ -2,6 +2,7 @@ package com.offgrid.compositor.effects
 
 import android.graphics.Canvas
 import android.os.SystemClock
+import com.offgrid.compositor.audio.MicKeys
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
@@ -90,6 +91,8 @@ class EffectFrame(
     val modeChangedAt: Float = -100f,
     /** The camera mode before the last change. */
     val previousMode: String = FxKeys.MODE_LIVE,
+    /** The mic beat as a glow pulse from 0 to 1. It is 0 unless Beat glow is on. */
+    val beat: Float = 0f,
 ) {
     /** The most recent firing of [kind], or null. */
     fun last(kind: Fire): Fired? = fired.lastOrNull { it.kind == kind }
@@ -145,6 +148,12 @@ class EffectEngine {
     @Volatile
     var previousMode: String = FxKeys.MODE_LIVE
         private set
+
+    /** Counts the mic's beats so far, when the mic is on. Set by the camera screen. */
+    @Volatile
+    var beatCount: () -> Long = { 0L }
+
+    private val beatPulse = BeatPulse()
 
     /** Seconds since the engine started. */
     fun now(): Float = (SystemClock.elapsedRealtimeNanos() - startNanos) / 1_000_000_000f
@@ -209,6 +218,7 @@ class EffectEngine {
             reducedMotion = reducedMotion,
             modeChangedAt = modeChangedAt,
             previousMode = previousMode,
+            beat = if (shown.on(MicKeys.BEAT_GLOW) && !reducedMotion) beatPulse.level(time, beatCount()) else 0f,
         )
     }
 

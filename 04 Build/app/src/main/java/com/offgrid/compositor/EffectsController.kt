@@ -36,6 +36,9 @@ internal class EffectsController(
     private val main = Handler(Looper.getMainLooper())
     private val worker = GallerySaver.background
     private val sounds = SoundBoard()
+
+    /** The soundboard's sounds, ready to be mixed into a recording's audio. */
+    val videoSounds get() = sounds.videoMix
     private val handshake by lazy { Handshake(context) }
 
     /** The camera's painter, once the camera starts. */
@@ -228,6 +231,7 @@ internal class EffectsController(
         say(context.getString(R.string.fx_saving))
         worker.execute {
             val file = File(context.cacheDir, REPLAY_FILE)
+            val limit = painter.replayMemoryLimitSeconds()
             val kept = painter.saveReplay(file)
             val name = if (kept) GallerySaver.save(context, file, kind = "Replay") else null
             file.delete()
@@ -235,8 +239,10 @@ internal class EffectsController(
                 say(
                     when {
                         !kept -> context.getString(R.string.fx_replay_empty)
-                        name != null -> context.getString(R.string.fx_gallery_saved, name)
-                        else -> context.getString(R.string.fx_gallery_failed)
+                        name == null -> context.getString(R.string.fx_gallery_failed)
+                        limit != null -> context.getString(R.string.fx_gallery_saved, name) + " " +
+                            context.getString(R.string.replay_memory_limited, limit)
+                        else -> context.getString(R.string.fx_gallery_saved, name)
                     },
                 )
             }

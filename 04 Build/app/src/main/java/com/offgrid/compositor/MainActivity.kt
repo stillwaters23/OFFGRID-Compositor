@@ -53,6 +53,10 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import com.offgrid.compositor.audio.CaptureAction
+import com.offgrid.compositor.audio.CaptureSwitch
+import com.offgrid.compositor.audio.MicKeys
+import com.offgrid.compositor.audio.MicPipeline
 import com.offgrid.compositor.effects.EffectEngine
 import com.offgrid.compositor.effects.EffectLayers
 import com.offgrid.compositor.effects.FxKeys
@@ -61,13 +65,15 @@ import com.offgrid.compositor.terminal.TerminalPanel
 import java.io.File
 
 /**
- * Step 1. Shows the painted camera picture, records a few seconds, and plays it back.
- * The mic stays off.
+ * Step 1. Shows the painted camera picture, records, and plays it back.
  * Step 2. The floating terminal panel sits on top. It is not painted into the video.
  * Step 2.1. The yellow test diamond is off unless Panel settings turns it on.
  * Final build. The effects, the no-face camera modes, and the face finder are baked into the
  * video. The screen shows the same picture viewers get, not a mirror. Videos can be any
  * length and also go to the gallery.
+ * Lane B. The camera and mic toggles in the panel start and release the camera and the mic.
+ * Videos are recorded by [AvSession], with the mic and its effects. While the camera is off,
+ * [DarkStage] shows black with the effects drawn over it.
  */
 class MainActivity : AppCompatActivity() {
 
@@ -90,6 +96,16 @@ class MainActivity : AppCompatActivity() {
     private var activeRecording: Recording? = null
     private var bindGeneration = 0
     private var permissionAsked = false
+    private val capture = CaptureSwitch()
+    private lateinit var mic: MicPipeline
+    private lateinit var darkStage: DarkStage
+    private var avSession: AvSession? = null
+    private var resumed = false
+    private var cameraDark = false
+    private var micAsking = false
+
+    /** The words for why the mic is off even though its toggle is on, or 0. */
+    private var micProblem = 0
     private var recording = false
     private var stopRequested = false
     private var playRequested = false
@@ -114,10 +130,18 @@ class MainActivity : AppCompatActivity() {
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
         if (granted) {
-            startCamera()
+            if (effects.engine.settings.on(MicKeys.CAM_ON, true)) startCamera()
         } else {
             showPermissionHelp()
         }
+    }
+
+    private val micPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        micAsking = false
+        if (!granted) micProblem = R.string.mic_denied
+        applyCapture()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -147,6 +171,8 @@ class MainActivity : AppCompatActivity() {
         )
         terminalPanel.onTestDiamond = { on -> onTestDiamondChanged(on) }
         val engine = EffectEngine()
+        mic = MicPipeline()
+        engine.beatCount = { mic.beats.beats }
         faces = FaceTracker(this, engine)
         effects = EffectsController(this, terminalPanel, engine)
         effects.lastVideo = { recordingFile() }
@@ -160,7 +186,8 @@ class MainActivity : AppCompatActivity() {
             terminalPanel.onScreenEdges(screenEdges(insets))
             insets
         }
-        recordButton.setOnClickListener { startFiveSecondRecording() }
+        darkStage = DarkStage(this, findViewById(R.id.root), previewView) { processor }
+        recordButton.setOnClickListener { toggleRecording() }
         playButton.setOnClickListener { showPlayback() }
         backButton.setOnClickListener { hidePlayback() }
         playbackView.surfaceTextureListener = playbackListener
@@ -171,9 +198,12 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         effects.resume()
         hideSystemBars()
+        resumed = true
+        applyCapture()
         if (hasCameraPermission()) {
-            startCamera()
-        } else if (!permissionAsked) {
+            return
+        }
+        if (!permissionAsked) {
             permissionAsked = true
             showMessage(R.string.camera_needs_ok, ButtonMode.NONE)
             permissionLauncher.launch(Manifest.permission.CAMERA)
@@ -186,11 +216,14 @@ class MainActivity : AppCompatActivity() {
         effects.pause()
         hidePlayback()
         stopRecording()
-        unbindCamera()
+        resumed = false
+        applyCapture()
         super.onPause()
     }
 
     override fun onDestroy() {
+        mic.stop()
+        darkStage.hide()
         effects.release()
         processor?.onFirstFrame = null
         processor?.onFailed = null
@@ -237,28 +270,34 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
+    /** The compositor draws the camera, or black while the camera is off. It is made once. */
+    private fun ensureProcessor(): CompositorProcessor {
+        processor?.let { return it }
+        val created = CompositorProcessor(effects.engine, EffectLayers.all())
+        created.onFirstFrame = {
+            created.inputSize?.let { size ->
+                faces.streamAspect = maxOf(size.width, size.height).toFloat() / minOf(size.width, size.height)
+            }
+            showLivePicture()
+        }
+        created.onEffectsFailed = {
+            effectsBroken = true
+            showLivePicture()
+        }
+        created.onFailed = {
+            stopRecording()
+            showMessage(R.string.camera_failed, ButtonMode.NONE)
+        }
+        created.testShapeOn = terminalPanel.testDiamondOn
+        created.reducedMotion = reducedMotion()
+        effects.processor = created
+        processor = created
+        return created
+    }
+
     @OptIn(ExperimentalMirrorMode::class)
     private fun bindCamera(provider: ProcessCameraProvider, withFrameRate: Boolean) {
-        val painter = processor ?: CompositorProcessor(effects.engine, EffectLayers.all()).also { created ->
-            created.onFirstFrame = {
-                created.inputSize?.let { size ->
-                    faces.streamAspect = maxOf(size.width, size.height).toFloat() / minOf(size.width, size.height)
-                }
-                showLivePicture()
-            }
-            created.onEffectsFailed = {
-                effectsBroken = true
-                showLivePicture()
-            }
-            created.onFailed = {
-                stopRecording()
-                showMessage(R.string.camera_failed, ButtonMode.NONE)
-            }
-            processor = created
-        }
-        painter.testShapeOn = terminalPanel.testDiamondOn
-        painter.reducedMotion = reducedMotion()
-        effects.processor = painter
+        val painter = ensureProcessor()
         faces.outputAspect = previewView.width.toFloat() / previewView.height
         val effect = CompositorEffect(
             painter.executor,
@@ -272,7 +311,8 @@ class MainActivity : AppCompatActivity() {
         )
         val rotation = previewView.display?.rotation ?: Surface.ROTATION_0
         // Quality.HD is a 720p picture. The phone video chip saves it as H.264.
-        // Portrait rotation plays it as 720 by 1280. Audio stays off.
+        // Portrait rotation plays it as 720 by 1280. This recorder is only the fallback when AvSession
+        // cannot start, and it has no audio.
         val recorder = Recorder.Builder()
             .setQualitySelector(
                 QualitySelector.from(
@@ -329,23 +369,49 @@ class MainActivity : AppCompatActivity() {
         videoCapture = null
     }
 
-    private fun startFiveSecondRecording() {
-        val capture = videoCapture ?: return
+    private fun toggleRecording() {
         if (recording) {
             // While recording, the same button is Stop.
             requestStop()
             return
         }
+        val painter = processor ?: return
         val temp = File(filesDir, TEMP_NAME)
         if (temp.exists() && !temp.delete()) {
             showMessage(R.string.record_failed, ButtonMode.LIVE)
             return
         }
-        recording = true
         stopRequested = false
         diamondInVideo = terminalPanel.testDiamondOn
+        val session = avSession ?: AvSession(painter, mic.engine, effects.videoSounds).also { avSession = it }
+        if (session.start(temp) { whole -> onRecordingFinished(temp, whole) }) {
+            beginRecording()
+            val seconds = recordSeconds()
+            if (seconds > 0) {
+                val stopTask = Runnable { requestStop() }
+                stopRecordingTask = stopTask
+                mainHandler.postDelayed(stopTask, seconds * 1000L)
+            }
+        } else {
+            startFallbackRecording(temp)
+        }
+    }
+
+    private fun beginRecording() {
+        recording = true
         showMessage(R.string.recording_now, ButtonMode.RECORDING)
         recordSeconds().takeIf { it > 0 }?.let { statusText.text = getString(R.string.recording_timed, it) }
+    }
+
+    /** Records with the camera's own recorder when [AvSession] would not start. It has no sound. */
+    private fun startFallbackRecording(temp: File) {
+        val capture = videoCapture
+        if (capture == null) {
+            showMessage(R.string.record_failed, ButtonMode.LIVE)
+            return
+        }
+        beginRecording()
+        statusText.setText(R.string.record_no_sound)
         val options = FileOutputOptions.Builder(temp).build()
         val pending = capture.output.prepareRecording(this, options)
         val started = pending.start(ContextCompat.getMainExecutor(this)) { event ->
@@ -369,7 +435,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
         stopRequested = true
-        activeRecording?.stop()
+        if (avSession?.active == true) avSession?.stop() else activeRecording?.stop()
     }
 
     private fun onRecordEvent(event: VideoRecordEvent, temp: File) {
@@ -393,35 +459,47 @@ class MainActivity : AppCompatActivity() {
                 // closing when the app goes to the background. Those videos are kept.
                 val kept = !event.hasError() || (event.error in KEPT_ERRORS && temp.exists() && temp.length() > 0L)
                 if (event.hasError()) Log.e(TAG, "Recording ended with code ${event.error}, kept: $kept")
-                if (!kept) {
-                    if (temp.exists()) {
-                        temp.delete()
-                    }
-                    showMessage(R.string.record_failed, ButtonMode.LIVE)
-                } else {
-                    val saved = recordingFile()
-                    if (saved.exists()) {
-                        saved.delete()
-                    }
-                    val moved = temp.renameTo(saved)
-                    if (!moved) {
-                        temp.copyTo(saved, overwrite = true)
-                        temp.delete()
-                    }
-                    showMessage(R.string.record_saved, ButtonMode.LIVE)
-                    if (effects.engine.settings.on(FxKeys.RECORD_GALLERY)) {
-                        GallerySaver.saveLater(this, saved) { name ->
-                            // Only change the words if they still say the video was saved.
-                            if (isDestroyed || shownMessage != R.string.record_saved) return@saveLater
-                            showMessage(
-                                if (name != null) R.string.record_saved_gallery else R.string.record_gallery_failed,
-                                ButtonMode.LIVE,
-                            )
-                        }
-                    }
-                }
+                finishRecording(temp, kept)
             }
             else -> Unit
+        }
+    }
+
+    private fun onRecordingFinished(temp: File, whole: Boolean) {
+        stopRecordingTask?.let { mainHandler.removeCallbacks(it) }
+        stopRecordingTask = null
+        recording = false
+        finishRecording(temp, whole && temp.exists() && temp.length() > 0L)
+    }
+
+    /** Moves a finished video into place and says so, or says it failed. */
+    private fun finishRecording(temp: File, kept: Boolean) {
+        if (!kept) {
+            if (temp.exists()) {
+                temp.delete()
+            }
+            showMessage(R.string.record_failed, ButtonMode.LIVE)
+            return
+        }
+        val saved = recordingFile()
+        if (saved.exists()) {
+            saved.delete()
+        }
+        val moved = temp.renameTo(saved)
+        if (!moved) {
+            temp.copyTo(saved, overwrite = true)
+            temp.delete()
+        }
+        showMessage(R.string.record_saved, ButtonMode.LIVE)
+        if (effects.engine.settings.on(FxKeys.RECORD_GALLERY)) {
+            GallerySaver.saveLater(this, saved) { name ->
+                // Only change the words if they still say the video was saved.
+                if (isDestroyed || shownMessage != R.string.record_saved) return@saveLater
+                showMessage(
+                    if (name != null) R.string.record_saved_gallery else R.string.record_gallery_failed,
+                    ButtonMode.LIVE,
+                )
+            }
         }
     }
 
@@ -484,7 +562,7 @@ class MainActivity : AppCompatActivity() {
             player.setDataSource(fd.fileDescriptor, 0, file.length())
             player.setSurface(surface)
             player.isLooping = true
-            player.setVolume(0f, 0f)
+            player.setVolume(1f, 1f)
             player.setOnVideoSizeChangedListener { mp, width, height ->
                 if (mediaPlayer !== mp) {
                     return@setOnVideoSizeChangedListener
@@ -630,7 +708,9 @@ class MainActivity : AppCompatActivity() {
         val settings = effects.engine.settings
         val hidingFace = settings.on(FxKeys.DIAMOND_ON) || !settings.chose(FxKeys.CAMERA_MODE, FxKeys.MODE_LIVE)
         val message = when {
-            effectsBroken && hidingFace -> R.string.effects_failed
+            effectsBroken && hidingFace && !cameraDark -> R.string.effects_failed
+            micProblem != 0 -> micProblem
+            cameraDark -> R.string.camera_off
             settings.chose(FxKeys.CAMERA_MODE, FxKeys.MODE_GHOST) -> R.string.ghost_on
             terminalPanel.testDiamondOn -> R.string.shape_ready
             else -> R.string.camera_ready
@@ -651,10 +731,65 @@ class MainActivity : AppCompatActivity() {
     private fun onEffectSettings() {
         if (!::effects.isInitialized) return
         processor?.reducedMotion = reducedMotion()
+        applyCapture()
         if (shownMessage in LIVE_MESSAGES) {
             showLivePicture()
         } else if (!recording) {
             setRecordLabel()
+        }
+    }
+
+    private fun hasMicPermission(): Boolean = ContextCompat.checkSelfPermission(
+        this,
+        Manifest.permission.RECORD_AUDIO,
+    ) == PackageManager.PERMISSION_GRANTED
+
+    /**
+     * Makes the camera and the mic match the two toggles in the panel, and the mic's Microphone Effects
+     * match their typed values. The camera and the mic are both let go while the app is hidden.
+     */
+    private fun applyCapture() {
+        val settings = effects.engine.settings
+        val cameraWanted = settings.on(MicKeys.CAM_ON, true)
+        val micToggle = settings.on(MicKeys.MIC_ON)
+        if (!micToggle) micProblem = 0
+        mic.apply(settings)
+        if (resumed && micToggle && micProblem == 0 && !hasMicPermission() && !micAsking) askForMic()
+        val micWanted = micToggle && micProblem == 0
+        val actions = capture.update(cameraWanted, micWanted, hasMicPermission(), resumed)
+        for (action in actions) {
+            when (action) {
+                CaptureAction.UNBIND_CAMERA -> unbindCamera()
+                CaptureAction.BIND_CAMERA -> if (hasCameraPermission()) startCamera()
+                CaptureAction.START_MIC -> if (!mic.start()) {
+                    capture.micFailed()
+                    micProblem = R.string.mic_failed
+                }
+                CaptureAction.RELEASE_MIC -> mic.stop()
+            }
+        }
+        showDark(resumed && !cameraWanted)
+        if (resumed && shownMessage in LIVE_MESSAGES) showLivePicture()
+    }
+
+    /** Says why first, then asks the phone for the mic. */
+    private fun askForMic() {
+        micAsking = true
+        showMessage(R.string.mic_needs_ok, ButtonMode.LIVE)
+        micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+    }
+
+    /** Black picture with the effects drawn over it, instead of the camera. */
+    private fun showDark(on: Boolean) {
+        if (on == cameraDark) return
+        cameraDark = on
+        if (on) {
+            ensureProcessor().setCameraOff(true)
+            darkStage.show()
+            showLivePicture()
+        } else {
+            darkStage.hide()
+            processor?.setCameraOff(false)
         }
     }
 
@@ -792,7 +927,15 @@ class MainActivity : AppCompatActivity() {
         const val FALLBACK_EXTRA_MS = 3_000L
 
         /** The words shown while the camera is live, which follow the settings. */
-        val LIVE_MESSAGES = setOf(R.string.shape_ready, R.string.camera_ready, R.string.ghost_on, R.string.effects_failed)
+        val LIVE_MESSAGES = setOf(
+            R.string.shape_ready,
+            R.string.camera_ready,
+            R.string.ghost_on,
+            R.string.effects_failed,
+            R.string.camera_off,
+            R.string.mic_denied,
+            R.string.mic_failed,
+        )
 
         /** Recording errors that still leave a whole video behind. */
         val KEPT_ERRORS = setOf(
