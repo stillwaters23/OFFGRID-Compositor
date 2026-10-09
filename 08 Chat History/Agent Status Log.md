@@ -220,3 +220,11 @@ States: passed, waiting for review, blocked, or waiting for Royalty's phone test
 - **PR / commit:** Pull request #15, draft, targeting `final-build`.
 - **State:** merge resolution and validation in progress
 - **Next:** Finish final review, commit the merge, and keep the PR unmerged for Rex's review.
+
+## 2026-10-09 9:10 AM CT — Lane A merge complete
+
+- **What was done:** Published merge commit `77beeb9` with `final-build` as its second parent. The side panel is removed; full-bleed sizing, insets-aware border geometry, Back navigation, custom scroll thumbs, and sizing/layout tests are retained in the final-build panel.
+- **Validation:** Secret scan and CodeQL reported no findings. The latest `final-build` Actions run passed. No Actions build ran for this PR head because the workflow's pull-request branch filter excludes `final-build`; local Gradle tests could not resolve Android Gradle Plugin 8.13.2.
+- **Requests for other lanes:** Add `final-build` to the build workflow's pull-request branch filter so this PR can receive a CI run.
+- **PR / commit:** Pull request #15, draft, targeting `final-build`.
+- **State:** open and unmerged for Rex's review
