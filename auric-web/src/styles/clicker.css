@@ -113,9 +113,3 @@
   margin: 0;
   white-space: nowrap;
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .tx-clicker-tabs {
-    scroll-behavior: auto;
-  }
-}

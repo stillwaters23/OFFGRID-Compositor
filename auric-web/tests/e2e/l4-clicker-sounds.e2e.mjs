@@ -12,13 +12,19 @@ test("Clicker Sounds lists, selects, previews, and stays within the viewport", a
   page.on("pageerror", (error) => pageErrors.push(error.message));
   await page.addInitScript(() => {
     window.__auricOscillatorStarts = 0;
+    window.__auricFrequencies = [];
     const original = AudioContext.prototype.createOscillator;
     AudioContext.prototype.createOscillator = function (...args) {
       const oscillator = original.apply(this, args);
       const start = oscillator.start.bind(oscillator);
+      const setFrequency = oscillator.frequency.setValueAtTime.bind(oscillator.frequency);
       oscillator.start = (...startArgs) => {
         window.__auricOscillatorStarts += 1;
         return start(...startArgs);
+      };
+      oscillator.frequency.setValueAtTime = (value, ...setArgs) => {
+        window.__auricFrequencies.push(value);
+        return setFrequency(value, ...setArgs);
       };
       return oscillator;
     };
@@ -26,15 +32,19 @@ test("Clicker Sounds lists, selects, previews, and stays within the viewport", a
 
   try {
     await page.goto(baseUrl);
+    await page.waitForFunction(() => localStorage.getItem("auric-crowned-v21") !== null);
     await page.getByRole("button", { name: "OPEN SESSION" }).click();
     await page.getByRole("button", { name: "clicker-sounds unlocked" }).click();
     await page.getByRole("heading", { name: "Clicker Sounds" }).waitFor();
+    assert.equal(await page.evaluate(() => window.__auricFrequencies.includes(1640)), false, "opening the folder must not preview House click");
 
     const tabs = page.getByRole("tab");
     assert.deepEqual(await tabs.allTextContents(), families);
     const defaultRow = page.locator('[data-tick-id="click-01"]');
     assert.equal(await defaultRow.getAttribute("aria-pressed"), "true");
     assert.equal(await defaultRow.getByText("House").count(), 1);
+    assert.equal(await page.locator('[data-tick-id="click-50"]').getByText("Crown cut").count(), 0);
+    assert.equal(await page.locator('[data-tick-id="click-51"]').getByText("Crown cut").count(), 1);
 
     const reachedIds = [];
     for (const family of families) {
@@ -55,7 +65,7 @@ test("Clicker Sounds lists, selects, previews, and stays within the viewport", a
     assert.equal(await secondCut.getAttribute("aria-pressed"), "true");
     assert.equal(await defaultRow.getAttribute("aria-pressed"), "false");
     assert.equal(await page.evaluate(() => window.__auricOscillatorStarts) - startsBefore, 10);
-    assert.deepEqual(pageErrors, []);
+    assert.equal(await page.evaluate(() => window.__auricFrequencies.filter((frequency) => frequency === 1346).length), 10);
 
     for (const mood of ["dark", "light"]) {
       await page.locator(".tx-root").evaluate((root, nextMood) => root.setAttribute("data-mood", nextMood), mood);
@@ -73,6 +83,14 @@ test("Clicker Sounds lists, selects, previews, and stays within the viewport", a
         if (width === 320) assert.ok(dimensions.tabScrollWidth > dimensions.tabWidth, "the 320px tab strip should scroll internally");
       }
     }
+
+    await page.locator(".tx-front-layer").getByRole("button", { name: "HOME" }).click();
+    await page.getByRole("button", { name: "timer unlocked" }).click();
+    const startsBeforeNotch = await page.evaluate(() => window.__auricOscillatorStarts);
+    await page.getByRole("slider", { name: "Seconds" }).press("ArrowUp");
+    assert.equal(await page.evaluate(() => window.__auricOscillatorStarts) - startsBeforeNotch, 1);
+    assert.equal((await page.evaluate(() => window.__auricFrequencies)).at(-1), 1346);
+    assert.deepEqual(pageErrors, []);
   } finally {
     await browser.close();
   }

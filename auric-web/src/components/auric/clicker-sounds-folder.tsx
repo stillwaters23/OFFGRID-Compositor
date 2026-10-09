@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { playReelTick } from "@/lib/audio";
-import { HOUSE_CLICK_ID, TICK_FAMILIES, TICKS } from "@/lib/ticks";
+import { HOUSE_CLICK_ID, TICK_FAMILIES, TICKS, tickById } from "@/lib/ticks";
 import { useAuric } from "@/lib/store";
 import "@/styles/clicker.css";
 
 export function ClickerSoundsFolder() {
   const [family, setFamily] = useState<(typeof TICK_FAMILIES)[number]>(TICK_FAMILIES[0]);
   const reelSound = useAuric((s) => s.reelSound);
-  const selected = TICKS.some((tick) => tick.id === reelSound) ? reelSound : HOUSE_CLICK_ID;
+  const selected = tickById(reelSound).id;
   const cuts = TICKS.filter((tick) => tick.family === family);
 
   return (
