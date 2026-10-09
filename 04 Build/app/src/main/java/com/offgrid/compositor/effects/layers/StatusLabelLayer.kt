@@ -166,7 +166,7 @@ class StatusLabelLayer(face: Typeface? = null) : OverlayLayer {
 
         val hot = mix(color, Color.WHITE, HOT)
         glow.color = EffectMath.withAlpha(color, 0.5f * fade)
-        glow.setShadowLayer(size * WIDE_GLOW, 0f, 0f, EffectMath.withAlpha(color, 0.85f * fade * breath))
+        glow.setShadowLayer(min(size * WIDE_GLOW, h * MAX_GLOW), 0f, 0f, EffectMath.withAlpha(color, 0.85f * fade * breath))
         edge.color = EffectMath.withAlpha(mix(color, Color.WHITE, EDGE_WHITE), 0.9f * fade)
         edge.strokeWidth = size * EDGE_WIDTH
         edge.setShadowLayer(size * NEAR_GLOW, 0f, 0f, EffectMath.withAlpha(color, fade * breath))
@@ -311,6 +311,7 @@ class StatusLabelLayer(face: Typeface? = null) : OverlayLayer {
 
         const val HOT = 0.7f
         const val WIDE_GLOW = 0.3f
+        const val MAX_GLOW = 0.05f
         const val NEAR_GLOW = 0.07f
         const val EDGE_WIDTH = 0.022f
         const val EDGE_WHITE = 0.3f

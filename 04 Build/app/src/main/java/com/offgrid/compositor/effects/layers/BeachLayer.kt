@@ -14,6 +14,7 @@ import com.offgrid.compositor.effects.EffectMath
 import com.offgrid.compositor.effects.FxKeys
 import com.offgrid.compositor.effects.OverlayLayer
 import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.sin
 
@@ -218,7 +219,7 @@ class BeachLayer : OverlayLayer {
             val x = sunX + side * side * side * spread * 1.6f + sin(t * 0.6f + i) * w * 0.004f
             val rate = 0.35f + 0.5f * EffectMath.hash(i, SALT_GLINT_T)
             val pulse = 0.5f + 0.5f * sin(t * TWO_PI * rate + i * 2.3f)
-            val a = shineAmount * pulse * pulse * pulse * (1f - 0.6f * kotlin.math.abs(side))
+            val a = shineAmount * pulse * pulse * pulse * (1f - 0.6f * abs(side))
             if (a < 0.02f) continue
             val half = w * (0.004f + 0.014f * near) * (0.5f + EffectMath.hash(i, SALT_GLINT_S))
             val tall = h * (0.0006f + 0.0008f * near)
@@ -506,7 +507,7 @@ class BeachLayer : OverlayLayer {
         val c = EffectMath.hash(cycle, SALT_SCALLOP_C) * TWO_PI
         val u = x / w * TWO_PI
         // Rounded tongues of water with sharper points between them, like real wash.
-        val tongues = 1f - 2f * kotlin.math.abs(sin(u * 1.7f + b))
+        val tongues = 1f - 2f * abs(sin(u * 1.7f + b))
         return 0.4f * sin(u * 1.1f + a) + 0.42f * tongues + 0.18f * sin(u * 5.3f + c)
     }
 

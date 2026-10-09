@@ -17,7 +17,6 @@ import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.floor
-import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.sin
@@ -64,7 +63,6 @@ class FlyingHeroesLayer : OverlayLayer {
     private val face = Path()
     private val spark = Path()
     private val headBox = RectF(HEAD_X - HEAD_RX, HEAD_Y - HEAD_RY, HEAD_X + HEAD_RX, HEAD_Y + HEAD_RY)
-    private val domeBox = RectF(HEAD_X - DOME_R, HEAD_Y - DOME_R, HEAD_X + DOME_R, HEAD_Y + DOME_R)
     private val shineBox = RectF()
 
     // Paths filled again each frame, and reused.
@@ -83,7 +81,6 @@ class FlyingHeroesLayer : OverlayLayer {
     private val heroSeed = IntArray(MAX_HEROES)
     private val heroU = FloatArray(MAX_HEROES)
     private val heroSize = FloatArray(MAX_HEROES)
-    private val heroLane = FloatArray(MAX_HEROES)
     private val heroIndex = IntArray(MAX_HEROES)
     private val heroLaneShare = FloatArray(MAX_HEROES)
 
@@ -133,7 +130,6 @@ class FlyingHeroesLayer : OverlayLayer {
             heroLaneShare[shown] = (i + LANE_EDGE + (1f - 2f * LANE_EDGE) * EffectMath.hash(seed, 2)) / count
             heroSeed[shown] = seed
             heroU[shown] = u
-            heroLane[shown] = lane
             heroIndex[shown] = i
             heroSize[shown] = size * (DEPTH_MIN + (1f - DEPTH_MIN) * depth)
             order[shown] = shown

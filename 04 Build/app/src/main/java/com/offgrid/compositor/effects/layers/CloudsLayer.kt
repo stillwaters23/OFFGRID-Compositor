@@ -70,14 +70,16 @@ class CloudsLayer : OverlayLayer {
         val calm = if (frame.reducedMotion) CALM else 1f
         val speed = EffectMath.lerp(MIN_SPEED, MAX_SPEED, s.value(FxKeys.CLOUDS_SPEED)) * calm
         look(frame.width, frame.height, s.raw(FxKeys.CLOUDS_HEIGHT))
+        // How far we have flown. Kept as a Double so clouds stay smooth after hours of streaming.
+        val travel = frame.time.toDouble() * speed
         if (s.chose(FxKeys.CLOUDS_PLACE, FxKeys.CLOUDS_AROUND)) {
-            drawAround(canvas, w, h, frame.time * speed, thick, altitude)
+            drawAround(canvas, w, h, travel, thick, altitude)
         } else {
-            drawFull(canvas, w, h, frame.time * speed, thick, altitude)
+            drawFull(canvas, w, h, travel, thick, altitude)
         }
     }
 
-    private fun drawFull(canvas: Canvas, w: Float, h: Float, travel: Float, thick: Float, altitude: Float) {
+    private fun drawFull(canvas: Canvas, w: Float, h: Float, travel: Double, thick: Float, altitude: Float) {
         plain.shader = skyShader
         canvas.drawRect(0f, 0f, w, horizon + 1f, plain)
         plain.shader = sunShader
@@ -94,13 +96,13 @@ class CloudsLayer : OverlayLayer {
         val below = EffectMath.lerp(LOW_FLOOR, HIGH_FLOOR, altitude)
         val range = FLOOR_ROWS * FLOOR_GAP
         // Far rows first, so near rows cover them. The farthest row is the one that started last.
-        val lead = travel / range - floor(travel / range)
+        val lead = frac(travel / range)
         val first = (ceil((1f - lead) * FLOOR_ROWS).toInt()) % FLOOR_ROWS
         for (m in 0 until FLOOR_ROWS) {
             val k = (first + m) % FLOOR_ROWS
             val u = (k * FLOOR_GAP + travel) / range
             val pass = floor(u).toInt()
-            val z = FLOOR_NEAR + range * (1f - (u - pass))
+            val z = FLOOR_NEAR + range * (1f - (u - pass).toFloat())
             val fade = EffectMath.smooth((FLOOR_NEAR + range - z) / (range * 0.25f)) * EffectMath.smooth((z - FLOOR_NEAR) / 0.4f)
             if (fade <= 0.01f) continue
             val y = horizon + below * focal / z
@@ -128,8 +130,7 @@ class CloudsLayer : OverlayLayer {
         val count = MIN_FLYERS + ((MAX_FLYERS - MIN_FLYERS) * thick + 0.5f).toInt()
         val span = FAR - NEAR
         for (i in 0 until count) {
-            val u = (EffectMath.hash(i, SALT_PHASE) * span + travel) / span
-            depth[i] = FAR - span * (u - floor(u))
+            depth[i] = FAR - span * frac((EffectMath.hash(i, SALT_PHASE) * span + travel) / span)
             order[i] = i
         }
         // Far to near, sorted in place without making anything new.
@@ -164,10 +165,11 @@ class CloudsLayer : OverlayLayer {
         }
     }
 
-    private fun drawAround(canvas: Canvas, w: Float, h: Float, travel: Float, thick: Float, altitude: Float) {
+    private fun drawAround(canvas: Canvas, w: Float, h: Float, travel: Double, thick: Float, altitude: Float) {
         val thin = 1f - THIN_HIGH * altitude
         val bank = h * EffectMath.lerp(BANK_LOW, BANK_HIGH, altitude) * (0.7f + 0.6f * thick)
         val drift = travel * w * AROUND_DRIFT
+        val bobTime = frac(travel / BOB_LOOP) * BOB_LOOP.toFloat()
 
         // A soft white mist low down ties the clouds together.
         plain.shader = hazeShader
@@ -184,7 +186,8 @@ class CloudsLayer : OverlayLayer {
             for (i in 0 until sides) {
                 val seed = side * 50 + i
                 val run = h * 1.35f
-                val y = h - ((EffectMath.hash(seed, SALT_PHASE) * run + drift * 0.6f * (0.7f + 0.6f * EffectMath.hash(seed, SALT_SPEED))) % run) + h * 0.15f
+                val rise = (EffectMath.hash(seed, SALT_PHASE) * run + drift * 0.6f * (0.7f + 0.6f * EffectMath.hash(seed, SALT_SPEED))) % run
+                val y = h - rise.toFloat() + h * 0.15f
                 val size = w * (0.42f + 0.2f * EffectMath.hash(seed, SALT_SIZE)) * (0.8f + 0.4f * thick)
                 val tall = size * SPRITE_H / SPRITE_W
                 val inset = size * (0.12f + 0.12f * EffectMath.hash(seed, SALT_OFF))
@@ -202,7 +205,7 @@ class CloudsLayer : OverlayLayer {
             val seed = 200 + i
             val size = w * (0.55f + 0.25f * EffectMath.hash(seed, SALT_SIZE))
             val run = w + size
-            val x = (EffectMath.hash(seed, SALT_PHASE) * run + drift * (0.5f + 0.3f * i)) % run - size / 2f
+            val x = ((EffectMath.hash(seed, SALT_PHASE) * run + drift * (0.5f + 0.3f * i)) % run).toFloat() - size / 2f
             val tall = size * SPRITE_H / SPRITE_W
             val y = h * (0.01f + 0.025f * EffectMath.hash(seed, SALT_OFF))
             spot.set(x - size / 2f, y - tall / 2f, x + size / 2f, y + tall / 2f)
@@ -221,9 +224,9 @@ class CloudsLayer : OverlayLayer {
             val y = h - bank * (0.95f - 0.33f * row)
             for (i in 0 until each) {
                 val seed = 100 + row * 20 + i
-                val x = (i * gap + EffectMath.hash(seed, SALT_PHASE) * gap * 0.6f + drift * speed) % run - size / 2f
+                val x = ((i * gap + EffectMath.hash(seed, SALT_PHASE) * gap * 0.6f + drift * speed) % run).toFloat() - size / 2f
                 val tall = size * SPRITE_H / SPRITE_W
-                val bob = h * 0.006f * sin(travel * 0.4f + i * 1.7f + row)
+                val bob = h * 0.006f * sin(bobTime * 0.4f + i * 1.7f + row)
                 spot.set(x - size / 2f, y - tall / 2f + bob, x + size / 2f, y + tall / 2f + bob)
                 art.alpha = (255 * (0.8f + 0.2f * thick) * (0.75f + 0.25f * thin)).toInt()
                 art.colorFilter = if (back) shade else null
@@ -335,6 +338,9 @@ class CloudsLayer : OverlayLayer {
         const val TOP_WISPS = 2
         const val AROUND_DRIFT = 0.04f
 
+        /** The bank's gentle bob repeats after this much flying, so it stays smooth. */
+        const val BOB_LOOP = 2.0 * PI * 5.0
+
         const val SALT_FLOOR_X = 301
         const val SALT_FLOOR_S = 302
         const val SALT_FLIP = 303
@@ -370,6 +376,8 @@ class CloudsLayer : OverlayLayer {
         const val LIT = 0xFFFFFDF8.toInt()
         const val SHADOW = 0xFFBDCADD.toInt()
         const val BASE = 0xFF8C9CBA.toInt()
+
+        fun frac(x: Double): Float = (x - floor(x)).toFloat()
 
         fun mix(from: Int, to: Int, t: Float): Int {
             val k = EffectMath.clamp01(t)
@@ -421,7 +429,7 @@ class CloudsLayer : OverlayLayer {
             val domes = if (flat) 4 else 6
             for (j in 0 until domes) {
                 val x = bw * (0.22f + 0.56f * EffectMath.hash(j, salt + 2))
-                val middle = 1f - 1.2f * kotlin.math.abs(x / bw - 0.5f)
+                val middle = 1f - 1.2f * abs(x / bw - 0.5f)
                 val r = bw * (if (flat) 0.09f else 0.11f + 0.07f * EffectMath.hash(j, salt + 3)) * middle
                 val lift = if (flat) 0.3f else 0.85f + 0.5f * EffectMath.hash(j, salt + 4)
                 val y = (baseY - r * lift * squash).coerceAtLeast(r * squash + 6f)

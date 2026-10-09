@@ -259,7 +259,7 @@ class PortalLayer : OverlayLayer {
         canvas.drawPath(spirals, pen)
         canvas.restore()
 
-        // Rings sinking into the tunnel. Each ring is three arcs, twisted by depth, so they swirl.
+        // Rings sinking into the tunnel, small and dim far away, big and bright up close.
         for (k in 0 until RINGS) {
             var z = (k.toFloat() / RINGS - spin * RING_FLOW) % 1f
             if (z < 0f) z += 1f
@@ -276,15 +276,18 @@ class PortalLayer : OverlayLayer {
             oval.set(ox - r, oy - r, ox + r, oy + r)
             val turn = spin * 360f + z * RING_TWIST
             val color = mix(RING_FAR, RING_NEAR, z)
-            pen.color = EffectMath.withAlpha(color, alpha * 0.28f)
-            pen.strokeWidth = 0.003f + 0.01f * z
+            // A full ring, soft and then sharp, so the tunnel reads as rings going deep.
+            pen.color = EffectMath.withAlpha(color, alpha * 0.22f)
+            pen.strokeWidth = 0.01f + 0.05f * z
             canvas.drawOval(oval, pen)
-            pen.color = EffectMath.withAlpha(color, alpha * 0.3f)
-            pen.strokeWidth = 0.012f + 0.06f * z
-            for (a in 0 until 3) canvas.drawArc(oval, turn + a * 120f, RING_ARC, false, pen)
-            pen.color = EffectMath.withAlpha(color, alpha)
-            pen.strokeWidth = 0.004f + 0.018f * z
-            for (a in 0 until 3) canvas.drawArc(oval, turn + a * 120f, RING_ARC, false, pen)
+            pen.color = EffectMath.withAlpha(color, alpha * 0.8f)
+            pen.strokeWidth = 0.003f + 0.012f * z
+            canvas.drawOval(oval, pen)
+            // Two bright pieces on each ring, twisted by depth, so the rings swirl.
+            pen.color = EffectMath.withAlpha(towardWhite(color), alpha)
+            pen.strokeWidth = 0.005f + 0.016f * z
+            canvas.drawArc(oval, turn, RING_ARC, false, pen)
+            canvas.drawArc(oval, turn + 180f, RING_ARC, false, pen)
         }
 
         // The light at the far end.
@@ -331,7 +334,7 @@ class PortalLayer : OverlayLayer {
             if (p < 0f) p += 1f
             val r0 = SPECK_FAR_MIN + SPECK_FAR_EXTRA * EffectMath.hash(i, 103)
             val a0 = EffectMath.hash(i, 104) * TWO_PI
-            val alpha = EffectMath.smooth(p / 0.15f) * (1f - EffectMath.smooth((p - 0.88f) / 0.12f))
+            val alpha = (0.35f + 0.65f * p) * EffectMath.smooth(p / 0.2f) * (1f - EffectMath.smooth((p - 0.88f) / 0.12f))
             if (alpha <= 0.01f) continue
             // A short curved streak along its spiral, longer as it speeds up.
             var lastX = 0f
@@ -352,7 +355,7 @@ class PortalLayer : OverlayLayer {
                 lastY = y
             }
             pen.color = EffectMath.withAlpha(mix(SPECK_COOL, SPECK_HOT, p), alpha)
-            pen.strokeWidth = 0.008f + 0.01f * EffectMath.hash(i, 105)
+            pen.strokeWidth = 0.005f + 0.007f * EffectMath.hash(i, 105)
             canvas.drawLines(streak, pen)
         }
 
@@ -548,7 +551,7 @@ class PortalLayer : OverlayLayer {
         const val RING_FLOW = 0.6f
         const val RING_DEPTH = 1.9f
         const val RING_TWIST = 260f
-        const val RING_ARC = 70f
+        const val RING_ARC = 55f
         const val TUNNEL_BEND = 0.12f
         const val FAR_LIGHT = 0.42f
         const val SPIRAL_ARMS = 5
@@ -571,10 +574,10 @@ class PortalLayer : OverlayLayer {
         const val SPECK_LIFE_EXTRA = 2.4f
         const val SPECK_FAR_MIN = 1.15f
         const val SPECK_FAR_EXTRA = 1.1f
-        const val SPECK_STREAK = 0.12f
+        const val SPECK_STREAK = 0.09f
         const val STREAK_STEPS = 5
         const val SWIRL = 2.4f
-        const val SHIMMER = 0.018f
+        const val SHIMMER = 0.01f
         const val SHIMMER_POINTS = 96
         val DISK_STREAK = 0xFFFFC870.toInt()
         val SPECK_COOL = 0xFFE8F0FF.toInt()
@@ -607,6 +610,8 @@ class PortalLayer : OverlayLayer {
             into[i * 2] = cos(a) * r
             into[i * 2 + 1] = sin(a) * r
         }
+
+        fun towardWhite(color: Int): Int = mix(color, Color.WHITE, 0.55f)
 
         fun mix(a: Int, b: Int, f: Float): Int {
             val t = EffectMath.clamp01(f)

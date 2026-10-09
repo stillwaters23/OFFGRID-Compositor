@@ -13,7 +13,6 @@ import com.offgrid.compositor.effects.EffectMath
 import com.offgrid.compositor.effects.FxKeys
 import com.offgrid.compositor.effects.OverlayLayer
 import kotlin.math.PI
-import kotlin.math.abs
 import kotlin.math.atan
 import kotlin.math.atan2
 import kotlin.math.ceil
@@ -331,27 +330,31 @@ class RollerCoasterLayer : OverlayLayer {
         val start = -u * LEAD_IN - carLength
         var x = 0f
         addLine(start, base, x, base, 20)
+        // The hills get narrower so the whole ride fits across the video, down to a limit.
+        val loopWidth = drift * TWO_PI
+        val room = w * FIT_WIDTH - loopWidth - u * (GAP_BEFORE_LOOP + GAP_AFTER_LOOP)
+        val fit = (room / (u * (HILL_WIDTH + CAMEL_ONE_WIDTH + CAMEL_TWO_WIDTH))).coerceIn(FIT_MIN, 1f)
         // The lift hill: a long climb, a steep drop.
-        val hillWidth = u * HILL_WIDTH
+        val hillWidth = u * HILL_WIDTH * fit
         for (i in 1..HILL_STEPS) {
             val t = i.toFloat() / HILL_STEPS
             val bump = sin(PI_F * t.pow(HILL_SKEW))
             addPoint(x + hillWidth * t, base - hill * bump * bump)
         }
         x += hillWidth
-        addLine(x, base, x + u * 0.03f, base, 4)
-        x += u * 0.03f
+        addLine(x, base, x + u * GAP_BEFORE_LOOP, base, 4)
+        x += u * GAP_BEFORE_LOOP
         // The loop: a circle that moves forward a little as it turns, so it comes out ahead.
         for (i in 1..LOOP_STEPS) {
             val a = TWO_PI * i / LOOP_STEPS
             addPoint(x + drift * a + radius * sin(a), base - radius * LOOP_TALL * (1f - cos(a)))
         }
         x += drift * TWO_PI
-        addLine(x, base, x + u * 0.04f, base, 4)
-        x += u * 0.04f
+        addLine(x, base, x + u * GAP_AFTER_LOOP, base, 4)
+        x += u * GAP_AFTER_LOOP
         // Two small hills.
         for (n in 0..1) {
-            val bw = u * if (n == 0) CAMEL_ONE_WIDTH else CAMEL_TWO_WIDTH
+            val bw = u * fit * if (n == 0) CAMEL_ONE_WIDTH else CAMEL_TWO_WIDTH
             val bh = u * k * if (n == 0) CAMEL_ONE else CAMEL_TWO
             for (i in 1..BUMP_STEPS) {
                 val t = i.toFloat() / BUMP_STEPS
@@ -663,6 +666,34 @@ class RollerCoasterLayer : OverlayLayer {
         pen.strokeWidth = w * 0.004f
         canvas.drawPath(rows, pen)
 
+        // Trees beside the track, far ones first, rushing past.
+        val firstTree = floor(camZ / TREE_STEP).toInt() + 1
+        for (n in TREES_AHEAD - 1 downTo 0) {
+            val slot = firstTree + n
+            val z = slot * TREE_STEP
+            for (side in 0..1) {
+                val pick = EffectMath.hash(slot, 61 + side)
+                if (pick < TREE_SKIP) continue
+                val off = TREE_NEAR + TREE_SPREAD * EffectMath.hash(slot, 63 + side)
+                val tx = trackSide(z, swoop) + if (side == 0) -off else off
+                val tall = TREE_TALL * (0.7f + 0.6f * EffectMath.hash(slot, 65 + side))
+                if (!project(tx, 0f, z)) continue
+                val baseX = outX
+                val baseY = outY
+                val depthNow = outZ
+                if (depthNow > FAR * 0.7f) continue
+                if (!project(tx, tall, z)) continue
+                val crown = focal * tall * TREE_CROWN / depthNow
+                pen.color = TRUNK
+                pen.strokeWidth = focal * TREE_TRUNK / depthNow
+                canvas.drawLine(baseX, baseY, outX, outY + crown * 0.5f, pen)
+                fill.color = if (pick < 0.6f) TREE_DARK else TREE_LIGHT
+                canvas.drawCircle(outX, outY, crown, fill)
+                fill.color = TREE_SHADE
+                canvas.drawCircle(outX + crown * 0.25f, outY + crown * 0.3f, crown * 0.7f, fill)
+            }
+        }
+
         // Posts that hold the track up.
         pillars.reset()
         val firstPost = ceil((camZ + 2f) / POST_STEP) * POST_STEP
@@ -865,6 +896,10 @@ class RollerCoasterLayer : OverlayLayer {
         const val CAMEL_ONE_WIDTH = 0.24f
         const val CAMEL_TWO_WIDTH = 0.2f
         const val BUMP_STEPS = 70
+        const val FIT_WIDTH = 1.03f
+        const val FIT_MIN = 0.78f
+        const val GAP_BEFORE_LOOP = 0.03f
+        const val GAP_AFTER_LOOP = 0.04f
         const val DROP_SPEEDUP = 7f
         const val PACE_SLOW = 0.35f
         const val PACE_FAST = 1.6f
@@ -928,14 +963,14 @@ class RollerCoasterLayer : OverlayLayer {
         const val HORIZON = 0.44f
         const val SHAKE = 0.0025f
         const val SHAKE_SPEED = 23f
-        const val NEAR = 1.6f
+        const val NEAR = 0.6f
         const val FAR = 160f
         const val CLIP = 0.3f
-        const val RAIL_POINTS = 48
+        const val RAIL_POINTS = 56
         const val GAUGE = 0.62f
         const val RAIL_HALF = 0.045f
         const val RAIL_SHINE = 0.35f
-        const val RAIL_GLOW_HALF = 0.13f
+        const val RAIL_GLOW_HALF = 0.1f
         const val BEAM_HALF = 0.2f
         const val BEAM_DROP = 0.55f
         const val TIE_STEP = 1.1f
@@ -946,6 +981,18 @@ class RollerCoasterLayer : OverlayLayer {
         const val POST_STEP = 9f
         const val POSTS_AHEAD = 12
         const val POST_HALF = 0.28f
+        const val TREE_STEP = 5f
+        const val TREES_AHEAD = 22
+        const val TREE_SKIP = 0.35f
+        const val TREE_NEAR = 5f
+        const val TREE_SPREAD = 26f
+        const val TREE_TALL = 7f
+        const val TREE_CROWN = 0.32f
+        const val TREE_TRUNK = 0.5f
+        val TRUNK = 0xFF4A3526.toInt()
+        val TREE_DARK = 0xFF2B5A2E.toInt()
+        val TREE_LIGHT = 0xFF3F7A3A.toInt()
+        val TREE_SHADE = 0x33000000
         const val STRIPE = 12f
         const val STRIPES = 14
         const val FIELD_WIDE = 260f
@@ -964,7 +1011,7 @@ class RollerCoasterLayer : OverlayLayer {
         const val HILL_BASE = 0.02f
         const val HILL_A = 0.022f
         const val HILL_B = 0.011f
-        const val RIDE_GLOW_ALPHA = 0.35f
+        const val RIDE_GLOW_ALPHA = 0.28f
         val RIDE_RAIL = 0xFFFFFFFF.toInt()
         val RIDE_STEEL = 0xFF9AA6B8.toInt()
         val BEAM_COLOR = 0xFF20262F.toInt()
