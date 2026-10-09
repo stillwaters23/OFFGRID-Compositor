@@ -6,6 +6,7 @@ import {
   laserBloomComposite,
   laserVariables,
 } from "../src/lib/laser.ts";
+import { contrastRatio } from "../src/lib/color.ts";
 import { reelGeometry } from "../src/lib/reel-geometry.ts";
 
 test("laser defaults are enabled at full intensity with the default red", () => {
@@ -29,6 +30,7 @@ test("laser intensity clamps and all five presets are available", () => {
 test("laser bloom composites to a deterministic color", () => {
   assert.equal(laserBloomComposite("#ff0000", 0.5, "#000000"), "#800000");
   assert.equal(laserBloomComposite("invalid", 1), "#000000");
+  assert.ok(contrastRatio("#ffffff", laserBloomComposite(LASER_DEFAULT, 0.36)) >= 4.5);
 });
 
 test("reel geometry fits available width and centers the selected row", () => {

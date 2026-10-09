@@ -83,7 +83,7 @@ export function DrumReel({
       const angle = (offset - frac) * ANGLE;
       const abs = Math.abs(angle);
       el.textContent = labels?.[n] ?? String(n).padStart(pad, "0");
-      el.style.transform = `rotateX(${-angle}deg) translateZ(${radius}px)`;
+      el.style.transform = `translateX(-50%) rotateX(${-angle}deg) translateZ(${radius}px)`;
       el.style.opacity = abs < 14 ? "1" : abs < 28 ? "0.55" : abs < 42 ? "0.28" : "0.1";
       el.dataset.selected = abs < ANGLE / 2 ? "1" : "0";
     });
@@ -246,7 +246,7 @@ export function DrumReel({
       <div
         className={cn(
           "barrel relative min-w-0 select-none touch-none overflow-hidden",
-          size === "md" ? "shrink-0" : "w-full max-w-full flex-1",
+          size === "md" ? "shrink-0" : "w-full max-w-full flex-none",
           disabled && "pointer-events-none",
         )}
         ref={barrelRef}
@@ -260,7 +260,6 @@ export function DrumReel({
           ["--reel-font" as string]: `${fontSize}px`,
           height: `min(max(96px, calc(${baseH}px * var(--digit-scale, 1))), max(96px, calc(100dvh - 96px)))`,
           width: size === "md" ? `${barrelWpx}px` : undefined,
-          minWidth: trio || size === "sm" ? 64 : undefined,
           maxWidth: "100%",
         }}
       >
@@ -320,6 +319,9 @@ export function DrumReel({
                   fontSize: `${fontSize}px`,
                   backfaceVisibility: "hidden",
                   height: "1.16em",
+                  width: "max-content",
+                  left: "50%",
+                  right: "auto",
                 }}
               />
             ))}

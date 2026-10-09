@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { reelFeel } from "../src/lib/audio.ts";
 import { useAuric } from "../src/lib/store.ts";
-import { HOUSE_CLICK_ID } from "../src/lib/ticks.ts";
+import { HOUSE_CLICK_ID, verifyTicks } from "../src/lib/ticks.ts";
 
 test("reelFeel plays the house click once and sends the existing vibration pattern", () => {
   const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
@@ -40,6 +40,7 @@ test("reelFeel plays the house click once and sends the existing vibration patte
       configurable: true,
       value: { AudioContext: MockAudioContext },
     });
+
     Object.defineProperty(globalThis, "navigator", {
       configurable: true,
       value: { vibrate: (pattern: number | number[]) => vibrations.push(pattern) },
@@ -60,4 +61,8 @@ test("reelFeel plays the house click once and sends the existing vibration patte
     if (originalNavigator) Object.defineProperty(globalThis, "navigator", originalNavigator);
     else Reflect.deleteProperty(globalThis, "navigator");
   }
+});
+
+test("the shipped tick recipes remain valid", () => {
+  assert.deepEqual(verifyTicks(), []);
 });

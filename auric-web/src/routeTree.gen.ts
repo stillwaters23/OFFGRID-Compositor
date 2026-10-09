@@ -17,7 +17,6 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-
 const LaserDemoRoute = LaserDemoRouteImport.update({
   id: '/laser-demo',
   path: '/laser-demo',

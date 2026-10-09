@@ -38,7 +38,6 @@ const MOODS = {
 function LaserDemo() {
   const [scale, setScale] = useState<(typeof INTENSITIES)[number]>(50);
   const [mood, setMood] = useState<keyof typeof MOODS>("dark");
-  const [ticks, setTicks] = useState(0);
   const palette = MOODS[mood];
   const scaleValue = 0.85 + (scale / 100) * 0.45;
 
@@ -64,7 +63,8 @@ function LaserDemo() {
       <header className="mx-auto mb-4 w-full max-w-6xl">
         <h1 className="font-display text-2xl">Laser Strip Lab</h1>
         <p className="mt-2 text-sm text-muted">
-          Real span reels at every laser color and intensity. Choose the wheel scale and mood to inspect the full set.
+          Real span reels at every laser color and intensity. Choose the wheel scale and mood to
+          inspect the full set.
         </p>
         <div className="mt-4 flex flex-wrap gap-2" aria-label="Digit scale">
           {INTENSITIES.map((item) => (
@@ -99,35 +99,53 @@ function LaserDemo() {
       >
         {LASER_PRESETS.flatMap((preset) =>
           INTENSITIES.map((intensity) => (
-            <article
+            <LaserSample
               key={`${preset.id}-${intensity}`}
-              className="l1-demo-sample min-w-0 rounded-xl border border-line p-4"
-              data-laser-color={preset.id}
-              data-laser-intensity={intensity}
-              style={
-                {
-                  ...laserVariables(preset.color, intensity),
-                  "--digit-scale": String(scaleValue),
-                } as CSSProperties
-              }
-            >
-              <h2 className="mb-2 text-sm font-semibold">
-                {preset.label} · {intensity}%
-              </h2>
-              <output className="sr-only" data-l1-ticks>
-                {ticks}
-              </output>
-              <SpanReels
-                value={SAMPLE}
-                onChange={() => undefined}
-                onTick={() => setTicks((count) => count + 1)}
-                readout="03:02:11"
-                className="l1-demo-reels"
-              />
-            </article>
+              preset={preset}
+              intensity={intensity}
+              scaleValue={scaleValue}
+            />
           )),
         )}
       </section>
     </main>
+  );
+}
+
+type LaserSampleProps = {
+  preset: (typeof LASER_PRESETS)[number];
+  intensity: (typeof INTENSITIES)[number];
+  scaleValue: number;
+};
+
+function LaserSample({ preset, intensity, scaleValue }: LaserSampleProps) {
+  const [value, setValue] = useState(SAMPLE);
+  const [ticks, setTicks] = useState(0);
+  return (
+    <article
+      className="l1-demo-sample min-w-0 rounded-2xl border border-line p-4"
+      data-laser-color={preset.id}
+      data-laser-intensity={intensity}
+      style={
+        {
+          ...laserVariables(preset.color, intensity),
+          "--digit-scale": String(scaleValue),
+        } as CSSProperties
+      }
+    >
+      <h2 className="mb-2 text-sm font-semibold">
+        {preset.label} · {intensity}%
+      </h2>
+      <output className="sr-only" data-l1-ticks>
+        {ticks}
+      </output>
+      <SpanReels
+        value={value}
+        onChange={(key, n) => setValue((current) => ({ ...current, [key]: n }))}
+        onTick={() => setTicks((count) => count + 1)}
+        readout="03:02:11"
+        className="l1-demo-reels"
+      />
+    </article>
   );
 }

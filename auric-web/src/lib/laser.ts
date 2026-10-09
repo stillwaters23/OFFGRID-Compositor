@@ -16,10 +16,7 @@ export type LaserVariables = {
   "--laser-on": string;
 };
 
-export function laserVariables(
-  color = LASER_DEFAULT,
-  intensity = 100,
-): LaserVariables {
+export function laserVariables(color = LASER_DEFAULT, intensity = 100): LaserVariables {
   const strength = Math.max(0, Math.min(100, Number.isFinite(intensity) ? intensity : 0)) / 100;
   return {
     "--laser-color": color,
@@ -41,11 +38,7 @@ function parseHexColor(color: string): [number, number, number] {
   ];
 }
 
-export function laserBloomComposite(
-  color: string,
-  alpha: number,
-  background = "#05070e",
-): string {
+export function laserBloomComposite(color: string, alpha: number, background = "#05070e"): string {
   const foreground = parseHexColor(color);
   const backdrop = parseHexColor(background);
   const opacity = Math.max(0, Math.min(1, Number.isFinite(alpha) ? alpha : 0));
