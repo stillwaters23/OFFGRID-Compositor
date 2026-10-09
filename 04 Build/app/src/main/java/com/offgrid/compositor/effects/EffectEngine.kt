@@ -129,6 +129,10 @@ class EffectEngine {
     @Volatile
     var panelColor: Int = 0xFF2BF5E6.toInt()
 
+    /** The ink line being drawn right now, shown live before the finger lifts. */
+    @Volatile
+    var liveStroke: InkStroke? = null
+
     /** When the camera mode last changed, in engine seconds, so the cloak can shimmer in and out. */
     @Volatile
     var modeChangedAt: Float = -100f
@@ -173,9 +177,13 @@ class EffectEngine {
 
     fun clearInk() {
         strokes.clear()
+        liveStroke = null
     }
 
-    fun ink(): List<InkStroke> = strokes.toList()
+    fun ink(): List<InkStroke> {
+        val live = liveStroke ?: return strokes.toList()
+        return strokes.toList() + live
+    }
 
     /** The face, if the phone saw one in the last half second. */
     fun freshFace(time: Float): FaceSpot? = face?.takeIf { time - it.at < FACE_FRESH_SECONDS }
@@ -193,7 +201,7 @@ class EffectEngine {
             settings = shown,
             fired = fired.toList(),
             face = StageMath.faceInVideo(freshFace(time), shown),
-            ink = strokes.toList(),
+            ink = ink(),
             panelColor = panelColor,
             reducedMotion = reducedMotion,
             modeChangedAt = modeChangedAt,

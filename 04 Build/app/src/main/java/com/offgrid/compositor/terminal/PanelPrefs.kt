@@ -23,10 +23,9 @@ internal class PanelPrefs(context: Context) {
     private fun migrate() {
         val was = prefs.getInt(LAYOUT, 0)
         if (was >= LAYOUT_NOW) return
-        val keep = TOGGLE + TEST_PREFIX
         prefs.edit {
             for (key in prefs.all.keys) {
-                if (!key.startsWith(keep) && key != LAYOUT) remove(key)
+                if (!kept(key)) remove(key)
             }
             putInt(LAYOUT, LAYOUT_NOW)
         }
@@ -94,6 +93,44 @@ internal class PanelPrefs(context: Context) {
 
     fun hasToggle(key: String): Boolean = prefs.contains(TOGGLE + key)
 
+    /** Every saved look setting (theme, colors, glow, cursor, toggle style, size), for presets. */
+    fun lookEntries(): Map<String, Any> {
+        val out = HashMap<String, Any>()
+        for ((key, value) in prefs.all) {
+            if (isLook(key) && value != null) out[key] = value
+        }
+        return out
+    }
+
+    /** Swaps the whole saved look for [entries] in one write. Effects, marks, and place stay. */
+    fun replaceLook(entries: Map<String, Any>) {
+        prefs.edit {
+            for (key in prefs.all.keys) {
+                if (isLook(key)) remove(key)
+            }
+            for ((key, value) in entries) {
+                if (!isLook(key)) continue
+                when {
+                    key.startsWith(TOGGLE) -> putBoolean(key, value as? Boolean ?: continue)
+                    key.startsWith(TEXT) -> putString(key, value as? String ?: continue)
+                    else -> putInt(key, (value as? Number)?.toInt() ?: continue)
+                }
+            }
+        }
+    }
+
+    private fun isLook(key: String): Boolean {
+        val name = when {
+            key.startsWith(NUMBER) -> key.removePrefix(NUMBER)
+            key.startsWith(TOGGLE) -> key.removePrefix(TOGGLE)
+            key.startsWith(TEXT) -> key.removePrefix(TEXT)
+            key.startsWith(COLOR) -> key.removePrefix(COLOR)
+            else -> return false
+        }
+        return !name.startsWith(TEST_PREFIX) && !name.startsWith(EFFECT_PREFIX) && name != DIAMOND &&
+            !name.startsWith(FOLDER_PREFIX) && name != SIDE_MODE
+    }
+
     var minimized: Boolean
         get() = prefs.getBoolean(MINIMIZED, false)
         set(value) = prefs.edit { putBoolean(MINIMIZED, value) }
@@ -117,18 +154,36 @@ internal class PanelPrefs(context: Context) {
         }
     }
 
-    /** Puts every setting back to the start. The private test markers stay. */
+    /**
+     * Puts every setting back to the start. The private test markers and results stay, and so
+     * does the camera mode, so a reset never shows Royalty's face by surprise.
+     */
     fun resetAll() {
-        val keep = TOGGLE + TEST_PREFIX
         prefs.edit {
             for (key in prefs.all.keys) {
-                if (!key.startsWith(keep) && key != LAYOUT) remove(key)
+                if (!kept(key)) remove(key)
             }
         }
     }
 
+    /** Settings no reset or settings move ever removes. */
+    private fun kept(key: String): Boolean =
+        key.startsWith(TOGGLE + TEST_PREFIX) || key.startsWith(TEXT + TEST_PREFIX) ||
+            key == TEXT + KEEP_CAMERA_MODE || key == LAYOUT
+
     companion object {
         const val TEST_PREFIX = "test."
+
+        /** Effect settings start with this. They are not part of a look preset. */
+        private const val EFFECT_PREFIX = "fx."
+
+        /** The Step 1 test diamond and the folder view settings are not part of a look either. */
+        private const val DIAMOND = "test_diamond"
+        private const val FOLDER_PREFIX = "folder"
+        private const val SIDE_MODE = "side_mode"
+
+        /** The camera mode's key (FxKeys.CAMERA_MODE). Resets never change it. */
+        const val KEEP_CAMERA_MODE = "fx.camera.mode"
         private const val FILE_NAME = "terminal_panel"
         private const val NUMBER = "number."
         private const val TOGGLE = "toggle."

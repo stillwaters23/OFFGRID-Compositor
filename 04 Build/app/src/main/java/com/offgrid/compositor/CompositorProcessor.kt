@@ -65,6 +65,18 @@ class CompositorProcessor(
     private var stage: StagePainter? = null
     private var effects: OverlayRenderer? = null
     private val plan = StagePlan()
+
+    /** The replay buffer and its drawing target, when it is on. */
+    @Volatile
+    private var replay: ReplayBuffer? = null
+    private var replaySurface = EGL14.EGL_NO_SURFACE
+    private var replayWanted = false
+    private var replaySeconds = 30
+
+    /** The camera stream's size, once the camera starts. The face finder uses its shape. */
+    @Volatile
+    var inputSize: android.util.Size? = null
+        private set
     private var ready = false
     private var released = false
     private val failed = AtomicBoolean(false)
@@ -97,6 +109,7 @@ class CompositorProcessor(
             return
         }
         val textureId = createExternalTexture()
+        inputSize = request.resolution
         val surfaceTexture = SurfaceTexture(textureId)
         surfaceTexture.setDefaultBufferSize(request.resolution.width, request.resolution.height)
         val surface = Surface(surfaceTexture)
@@ -171,6 +184,72 @@ class CompositorProcessor(
             }
             drawSlot(slot, stamp, painted)
         }
+        drawReplay(snapshot, stamp, painted)
+    }
+
+    /** Turns the replay buffer on or off, keeping the last [seconds] seconds. */
+    fun setReplay(on: Boolean, seconds: Int) {
+        executor.execute {
+            replayWanted = on
+            replaySeconds = seconds
+            replay?.keepSeconds = seconds
+            if (!on) stopReplay()
+        }
+    }
+
+    /** Saves the replay buffer's kept moments to [file]. Returns false if there is nothing yet. Any thread. */
+    fun saveReplay(file: java.io.File): Boolean = replay?.save(file) ?: false
+
+    /** Draws the finished picture into the replay buffer too, the same one the video gets. */
+    private fun drawReplay(slots: List<OutputSlot>, stamp: Long, painted: GlTarget?) {
+        if (!replayWanted || released || slots.isEmpty()) return
+        val main = slots.maxBy { it.width * it.height }
+        if (replay == null) startReplay(main.width, main.height)
+        val buffer = replay ?: return
+        if (replaySurface == EGL14.EGL_NO_SURFACE) return
+        if (!EGL14.eglMakeCurrent(display, replaySurface, replaySurface, context)) return
+        GLES20.glViewport(0, 0, buffer.width, buffer.height)
+        val staged = stage
+        if (painted != null && staged != null) {
+            staged.present(painted, buffer.width, buffer.height)
+        } else {
+            val painter = drawer ?: return
+            main.surfaceOutput.updateTransformMatrix(updatedTransform, textureTransform)
+            painter.drawCamera(inputTextureId, updatedTransform)
+        }
+        EGLExt.eglPresentationTimeANDROID(display, replaySurface, stamp)
+        EGL14.eglSwapBuffers(display, replaySurface)
+    }
+
+    private fun startReplay(width: Int, height: Int) {
+        // Video chips want sizes in steps of 16.
+        val w = maxOf(REPLAY_STEP, width / REPLAY_STEP * REPLAY_STEP)
+        val h = maxOf(REPLAY_STEP, height / REPLAY_STEP * REPLAY_STEP)
+        try {
+            val buffer = ReplayBuffer(w, h, replaySeconds)
+            val eglSurface = EGL14.eglCreateWindowSurface(display, config, buffer.surface, intArrayOf(EGL14.EGL_NONE), 0)
+            if (eglSurface == null || eglSurface == EGL14.EGL_NO_SURFACE) {
+                buffer.release()
+                replayWanted = false
+                Log.e(TAG, "The replay buffer could not start")
+                return
+            }
+            replay = buffer
+            replaySurface = eglSurface
+        } catch (error: Exception) {
+            Log.e(TAG, "The replay buffer could not start", error)
+            replayWanted = false
+        }
+    }
+
+    private fun stopReplay() {
+        if (replaySurface != EGL14.EGL_NO_SURFACE) {
+            if (dummy != EGL14.EGL_NO_SURFACE) EGL14.eglMakeCurrent(display, dummy, dummy, context)
+            EGL14.eglDestroySurface(display, replaySurface)
+            replaySurface = EGL14.EGL_NO_SURFACE
+        }
+        replay?.release()
+        replay = null
     }
 
     /**
@@ -365,6 +444,7 @@ class CompositorProcessor(
             stage = null
             effects?.release()
             effects = null
+            stopReplay()
             if (dummy != EGL14.EGL_NO_SURFACE) {
                 EGL14.eglDestroySurface(display, dummy)
                 dummy = EGL14.EGL_NO_SURFACE
@@ -433,6 +513,8 @@ class CompositorProcessor(
 
     private companion object {
         const val TAG = "OffgridCompositor"
+
+        const val REPLAY_STEP = 16
 
         /** The stage picture's longest side, in pixels. The video is 1280 tall, so this keeps it sharp. */
         const val MAX_STAGE_SIDE = 1920f

@@ -435,6 +435,15 @@ internal class ThemeStore(private val context: Context, private val prefs: Panel
 
     fun resetAll() = prefs.resetAll()
 
+    /** Puts these settings back to their start values, by letting go of the saved ones. */
+    fun clear(numbers: Collection<String>, toggles: Collection<String>, texts: Collection<String>) {
+        prefs.write {
+            numbers.forEach { removeNumber(it) }
+            toggles.forEach { removeToggle(it) }
+            texts.forEach { text(it, null) }
+        }
+    }
+
     /** A few colors to preview a theme before it is applied: glass, edge, glow, and text. */
     fun preview(theme: Theme): IntArray {
         val parts = Themes.spec(theme).parts

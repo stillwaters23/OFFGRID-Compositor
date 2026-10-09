@@ -23,6 +23,30 @@
         android:glEsVersion="0x00020000"
         android:required="true" />
 
+    <!-- Final build: lets "Open <app>" in each platform folder find that app on the phone.
+         This is not a permission. Nothing is ever opened without a tap. -->
+    <queries>
+        <package android:name="sg.bigo.live" />
+        <package android:name="com.taggedapp" />
+        <package android:name="com.myyearbook.m" />
+        <package android:name="com.zhiliaoapp.musically" />
+        <package android:name="tv.twitch.android.app" />
+        <package android:name="com.google.android.youtube" />
+        <package android:name="org.telegram.messenger" />
+        <package android:name="com.sgiggle.production" />
+        <package android:name="com.instagram.android" />
+        <package android:name="com.facebook.orca" />
+        <package android:name="com.whatsapp" />
+        <package android:name="us.zoom.videomeetings" />
+        <package android:name="com.google.android.apps.tachyon" />
+        <package android:name="com.discord" />
+        <package android:name="com.microsoft.teams" />
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="market" />
+        </intent>
+    </queries>
+
     <application
         android:allowBackup="false"
         android:icon="@drawable/ic_launcher"

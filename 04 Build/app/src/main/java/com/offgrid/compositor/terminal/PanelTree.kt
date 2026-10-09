@@ -57,10 +57,44 @@ internal class TextItem(
     val maxLength: Int,
 ) : PanelItem()
 
-/** A button that does one thing, like Reset all. */
-internal class ActionItem(val action: PanelAction, val label: String, val help: String) : PanelItem()
+/** A button that does one thing, like Reset all. [arg] says what for, like a platform or an effect. */
+internal class ActionItem(
+    val action: PanelAction,
+    val label: String,
+    val help: String,
+    val arg: String? = null,
+) : PanelItem()
 
-internal enum class PanelAction { RESET_ALL, CENTER_PANEL }
+internal enum class PanelAction {
+    RESET_ALL,
+    CENTER_PANEL,
+
+    /** Final build: puts one folder's settings back to the start. Its argument is the folder id. */
+    RESET_FOLDER,
+
+    /** Fires a one-shot effect. Its argument is the effect's name, like SHATTER. */
+    FIRE,
+    CLEAR_INK,
+    TRY_SOUND,
+    SAVE_TO_GALLERY,
+    SAVE_REPLAY,
+
+    /** Platform tools. Their argument is the platform id. */
+    KICKED,
+    OPEN_PLATFORM,
+    SAFE_START,
+    TEST_CODE,
+
+    /** OFFGRID to OFFGRID handshake codes (feature 14). */
+    HANDSHAKE_SHOW,
+    HANDSHAKE_NEW,
+    HANDSHAKE_ADD,
+    HANDSHAKE_BLOCK,
+    HANDSHAKE_CHECK,
+}
+
+/** Final build: the saved looks (theme, colors, glow, cursor, toggle style, size), with save, load, rename, delete. */
+internal class PresetsItem : PanelItem()
 
 /** One ready-made theme. Tapping it applies it. */
 internal class ThemeItem(val theme: Theme) : PanelItem()
@@ -177,8 +211,13 @@ internal object PanelTree {
     }
 
     fun build(): PanelFolder {
-        val top = listOf(settingsFolder(), offgridFolder()) +
-            PLATFORMS.mapIndexed { index, platform -> platformFolder(index + 1, platform) }
+        val top = listOf(
+            settingsFolder(),
+            EffectFolders.camera(),
+            EffectFolders.effects(),
+            EffectFolders.record(),
+            offgridFolder(),
+        ) + PLATFORMS.mapIndexed { index, platform -> platformFolder(index + 1, platform) }
         return PanelFolder(id = "home", title = "HOME", tag = null, kind = FolderKind.SETTINGS, folders = top)
     }
 
@@ -197,6 +236,7 @@ internal object PanelTree {
             glowFolder(),
             colorsFolder(),
             themesFolder(),
+            presetsFolder(),
             resetFolder(),
         ),
         notes = listOf(
@@ -276,6 +316,20 @@ internal object PanelTree {
         notes = listOf(
             "These change what the panel shows.",
             "The tick follows your phone's own touch feel setting.",
+        ),
+    )
+
+    /** Final build: save the look you have now and bring it back later. */
+    private fun presetsFolder() = PanelFolder(
+        id = "presets",
+        title = "📁 Presets",
+        tag = null,
+        kind = FolderKind.OFFICE,
+        items = listOf(PresetsItem()),
+        notes = listOf(
+            "A preset keeps your look: theme, colors, glow, cursor, toggle style, and size.",
+            "Type a name, then tap Save. Tap a preset to load, rename, or delete it.",
+            "Effects and the camera mode are not in presets.",
         ),
     )
 
@@ -405,16 +459,37 @@ internal object PanelTree {
         title = "OFFGRID to OFFGRID",
         tag = null,
         kind = FolderKind.PREMIUM,
+        folders = listOf(handshakeFolder()),
         guide = Guide(
-            canDo = "The premium lane. Both sides see every effect. Calls come in Step 12.",
-            cantDo = "No calls yet. Nothing in this folder is built.",
+            canDo = "The premium lane. Both sides see every effect. Your handshake code is ready.",
+            cantDo = "No calls yet. Calls need a server, which is not built.",
             where = "The OFFGRID app on both phones.",
             browser = "None needed.",
             vpn = "UNCONFIRMED for this lane. VPN means virtual private network. It hides where you are.",
             order = "UNCONFIRMED for this lane.",
             phone = "Dummy phone 1 and dummy phone 2.",
         ),
-        notes = listOf("Empty for now."),
+        notes = listOf("Calls are not built yet. The handshake codes are."),
+    )
+
+    /** Feature 14: the secret codes two OFFGRID phones swap before a call. Kept in the phone's locked storage. */
+    private fun handshakeFolder() = PanelFolder(
+        id = "offgrid_to_offgrid.handshake",
+        title = "📁 Handshake",
+        tag = null,
+        kind = FolderKind.PREMIUM,
+        items = listOf(
+            ActionItem(PanelAction.HANDSHAKE_SHOW, "Copy my code", "Copies your 300 character code, to send to a trusted person."),
+            ActionItem(PanelAction.HANDSHAKE_NEW, "Make a new code", "Your old code stops working. Do this after every call."),
+            ActionItem(PanelAction.HANDSHAKE_ADD, "Trust a copied code", "Copy a person's code first, then tap here to trust it."),
+            ActionItem(PanelAction.HANDSHAKE_BLOCK, "Block a copied code", "Copy a person's code first, then tap here. It never works again."),
+            ActionItem(PanelAction.HANDSHAKE_CHECK, "Check a copied code", "Says if a copied code is trusted, blocked, or new."),
+        ),
+        notes = listOf(
+            "Codes are kept locked on this phone. They are never saved in the app's files as plain text.",
+            "Only a fingerprint of other people's codes is kept, never the code itself.",
+            "Never paste a code in a chat or a public place.",
+        ),
     )
 
     private fun platformFolder(number: Int, platform: Platform): PanelFolder {
@@ -425,36 +500,16 @@ internal object PanelTree {
             kind = FolderKind.PLATFORM,
             guide = platform.guide,
             folders = listOf(
-                PanelFolder(
-                    id = "${platform.id}.effects",
-                    title = "Effects",
-                    tag = null,
-                    kind = FolderKind.EFFECTS,
-                    notes = listOf(
-                        "Empty for now. Effects come in later steps.",
-                        "Every effect will show in the video viewers see.",
-                    ),
-                ),
-                PanelFolder(
-                    id = "${platform.id}.tests",
-                    title = "Tests",
-                    tag = null,
-                    kind = FolderKind.TESTS,
-                    items = TEST_TOGGLES,
-                    notes = listOf(
-                        "Private test toggles. Viewers never see them.",
-                        "A lit toggle means on. A dim toggle means off.",
-                        TEST_MARKERS_LINE,
-                    ),
-                ),
+                EffectFolders.platformEffects(platform.id, platform.title),
+                EffectFolders.platformTests(platform.id, TEST_TOGGLES),
             ),
         )
     }
 
-    /** Tells Royalty the test toggles don't change anything inside live-stream apps yet. */
-    const val TEST_MARKERS_LINE = "These are test markers for now. Real checks come in a later step."
+    /** Tells Royalty the test toggles are her own markers. The success code is the real check. */
+    const val TEST_MARKERS_LINE = "These toggles are your own markers. 📁 Success code is the real check."
 
-    /** The example tests from feature 15. They hold no checks yet. */
+    /** The example tests from feature 15. Mark each one in 📁 Results. */
     private val TEST_TOGGLES = listOf(
         ToggleItem("burned_in", "Effects show in the video viewers see", "", false, isTest = true),
         ToggleItem("outside_video", "The app takes video from OFFGRID", "", false, isTest = true),
@@ -472,7 +527,7 @@ internal object PanelTree {
     )
 
     private val KEY_NOT_CHECKED = Guide(
-        canDo = "No effects yet. A phone stream key is UNCONFIRMED.",
+        canDo = "Your effects are baked into your video. A phone stream key is UNCONFIRMED.",
         cantDo = "UNCONFIRMED.",
         where = "UNCONFIRMED.",
         browser = "UNCONFIRMED.",
@@ -483,7 +538,7 @@ internal object PanelTree {
             "bigo_live",
             "Bigo Live",
             Guide(
-                canDo = "No effects yet. They come in later steps. A phone stream key is UNCONFIRMED.",
+                canDo = "Your effects are baked into your video. A phone stream key is UNCONFIRMED.",
                 cantDo = "You can't stop a host from kicking you. Never auto rejoin. It can get you banned.",
                 where = "The app on your phone. Website: bigo.tv",
                 browser = "UNCONFIRMED.",
@@ -493,7 +548,7 @@ internal object PanelTree {
             "tagged",
             "Tagged",
             Guide(
-                canDo = "No effects yet. Tagged Live works in the app and on the website.",
+                canDo = "Tagged Live works in the app and on the website.",
                 cantDo = "Hosts and their helpers can kick you. Modified apps break the rules.",
                 where = "App or website. Effects use the website route. Web address: UNCONFIRMED.",
                 browser = "UNCONFIRMED. A safe phone browser is checked in Step 10.",
@@ -503,7 +558,7 @@ internal object PanelTree {
             "meetme",
             "MeetMe",
             Guide(
-                canDo = "No effects yet. Tap plus, then Guest, to ask to join. The streamer must accept.",
+                canDo = "Tap plus, then Guest, to ask to join. The streamer must accept.",
                 cantDo = "If you get kicked, you can't rejoin that stream. Modified apps break the rules.",
                 where = "The app on your phone. meetme.com is the app's company site. " +
                     "meetme.video is a separate browser site. Effects use the website route.",
@@ -515,7 +570,7 @@ internal object PanelTree {
             "tiktok",
             "TikTok",
             Guide(
-                canDo = "No effects yet. You can ask to join a host's live. The host decides.",
+                canDo = "You can ask to join a host's live. The host decides.",
                 cantDo = "TikTok's rules ban apps that tap or join for you.",
                 where = "The app on your phone. Website: tiktok.com",
                 browser = "UNCONFIRMED.",
@@ -526,7 +581,7 @@ internal object PanelTree {
             "kick",
             "Kick",
             Guide(
-                canDo = "No effects yet. Kick's help says phone apps can go live with a stream key.",
+                canDo = "Kick's help says phone apps can go live with a stream key.",
                 cantDo = "Never paste your stream key in chat. Other limits: UNCONFIRMED.",
                 where = "Copy the stream key from the Kick dashboard in a browser. Exact address: UNCONFIRMED.",
                 browser = "UNCONFIRMED.",
@@ -536,7 +591,7 @@ internal object PanelTree {
             "youtube_live",
             "YouTube Live",
             Guide(
-                canDo = "No effects yet. YouTube takes live video from phone streaming apps. " +
+                canDo = "YouTube takes live video from phone streaming apps. " +
                     "A phone stream key is UNCONFIRMED.",
                 cantDo = "The Go Live camera in the YouTube app can't show OFFGRID effects. " +
                     "Going live there needs 50 subscribers and a verified channel.",
@@ -550,7 +605,7 @@ internal object PanelTree {
             "tango",
             "Tango",
             Guide(
-                canDo = "No effects yet. Battles are by invite, up to 4 people.",
+                canDo = "Battles are by invite, up to 4 people.",
                 cantDo = "Bots are not allowed. Host helpers can kick viewers.",
                 where = "The app on your phone. Hosts can also use Tango Web. Website: tango.me",
                 browser = "UNCONFIRMED.",

@@ -38,6 +38,7 @@ import androidx.core.animation.doOnStart
 import androidx.core.view.ViewCompat
 import androidx.core.view.isVisible
 import com.offgrid.compositor.R
+import com.offgrid.compositor.effects.FxKeys
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.hypot
@@ -185,6 +186,29 @@ class TerminalPanel @JvmOverloads constructor(
 
     /** Called when the Test diamond toggle changes. The camera screen passes it to the video painter. */
     var onTestDiamond: ((Boolean) -> Unit)? = null
+
+    /** Called when a button asks the camera screen to do something, like Shatter now or Open TikTok. */
+    internal var onAction: ((PanelAction, String?) -> Unit)? = null
+
+    /** Called when any of Royalty's own toggles flips (not test toggles), so fireworks can burst. */
+    var onToggled: ((String, Boolean) -> Unit)? = null
+
+    /** Final build: the saved looks in 📁 Presets. */
+    private val presets = LookPresets(context, prefs)
+
+    /** Every effect setting right now, for the camera's effects. */
+    fun effectSnapshot(): com.offgrid.compositor.effects.EffectSnapshot = EffectSettings.snapshot(store)
+
+    /** The panel's glow color, for effects that follow the panel's look. */
+    val glowColor: Int get() = look.outerGlow
+
+    /** The title of the folder with [id], like "TikTok", or null. */
+    fun folderTitle(id: String): String? = home.folders.firstOrNull { it.id == id }?.title
+
+    /** Types [message] on the panel's status line, so the camera screen can answer in the same place. */
+    fun announce(message: String) {
+        say(message)
+    }
 
     /** True when the Step 1 test diamond is painted into the video. It starts off. */
     val testDiamondOn: Boolean get() = store.toggle(LookKeys.TEST_DIAMOND)
@@ -1757,6 +1781,16 @@ class TerminalPanel @JvmOverloads constructor(
                 detailContent.addView(itemView(folder, item), LinearLayout.LayoutParams(MATCH, WRAP))
             }
         }
+        // Final build: every folder with settings has its own Reset at the bottom.
+        if (folder.id != RESET_FOLDER_ID && FolderReset.hasSettings(folder)) {
+            val reset = ActionItem(
+                PanelAction.RESET_FOLDER,
+                context.getString(R.string.terminal_folder_reset),
+                context.getString(R.string.terminal_folder_reset_help),
+                folder.id,
+            )
+            detailContent.addView(actionRow(reset), LinearLayout.LayoutParams(MATCH, WRAP))
+        }
         // Paint the new views in the current theme before the typing starts.
         restyle(detailContent, look)
         styleGuidance(typer)
@@ -1789,7 +1823,7 @@ class TerminalPanel @JvmOverloads constructor(
             )
         }
         is ToggleItem -> {
-            val note = if (item.isTest) markText(markOf(folder, item)) else item.help
+            val note = if (item.isTest) markLine(folder, item) else item.help
             val on = if (item.isTest) prefs.toggle(testKey(folder, item), item.default) else store.toggle(item.key)
             ToggleRow(context, item, note, on) { value -> saveToggle(folder, item, value) }
         }
@@ -1807,11 +1841,19 @@ class TerminalPanel @JvmOverloads constructor(
             onSave = { value -> saveText(item, value) },
             onProblem = { say(it) },
         )
+        is PresetsItem -> PresetRows(context, presets, onLoaded = { lookChanged(folderToShow = openFolder) }, say = ::say)
     }
 
     /** A pick-one setting changed. It is saved and used at once. */
     private fun saveChoice(item: ChoiceItem, choice: Choice) {
         store.setChoice(item.key, choice.value)
+        if (item.key.startsWith(TestMarks.MARK)) {
+            // A test result keeps the day it was marked.
+            val day = TestMarks.today()
+            store.setText(TestMarks.DATE + item.key.removePrefix(TestMarks.MARK), day)
+            say(context.getString(R.string.terminal_mark_saved, item.label, choice.label, day))
+            return
+        }
         refreshLook()
         settingChanged(item.key)
         say(context.getString(R.string.terminal_choice_saved, item.label, choice.label))
@@ -1820,8 +1862,80 @@ class TerminalPanel @JvmOverloads constructor(
     /** A typed text setting changed. It is saved and used at once. */
     private fun saveText(item: TextItem, value: String) {
         store.setText(item.key, value)
+        if (item.key.startsWith(TestMarks.SEEN)) {
+            checkTestCode(item.key.removePrefix(TestMarks.SEEN), value)
+            return
+        }
         settingChanged(item.key)
         say(context.getString(R.string.terminal_text_saved, item.label, value))
+    }
+
+    /** Feature 37: checks the code a viewer saw against the code the video showed. */
+    private fun checkTestCode(platform: String, seen: String) {
+        val day = TestMarks.today()
+        val message = when (TestMarks.check(store, platform, seen, day)) {
+            TestMarks.Check.NO_CODE -> context.getString(R.string.terminal_code_none)
+            TestMarks.Check.MATCH -> context.getString(R.string.terminal_code_match, day)
+            TestMarks.Check.MISMATCH -> context.getString(R.string.terminal_code_mismatch, day)
+        }
+        say(message)
+    }
+
+    /** Buttons the panel handles itself. The rest go to the camera screen. */
+    private fun runAction(item: ActionItem) {
+        when (item.action) {
+            PanelAction.TEST_CODE -> {
+                val platform = item.arg ?: return
+                val code = TestMarks.newCode()
+                store.setText(TestMarks.SHOWN + platform, code)
+                onAction?.invoke(PanelAction.TEST_CODE, code)
+                say(context.getString(R.string.terminal_code_shown, code))
+            }
+            PanelAction.SAFE_START -> safeStart(item.arg ?: return)
+            else -> onAction?.invoke(item.action, item.arg)
+        }
+    }
+
+    /** A platform's safe start: the face diamond follows the face, and the red sweep runs on a kick. */
+    private fun safeStart(platform: String) {
+        store.setToggle(FxKeys.DIAMOND_ON, true)
+        store.setToggle(FxKeys.DIAMOND_FOLLOW, true)
+        store.setToggle(FxKeys.SWEEP_GO_PREFIX + platform, true)
+        settingChanged(FxKeys.DIAMOND_ON)
+        openFolder?.let { buildDetail(it) }
+        val title = home.folders.firstOrNull { it.id == platform }?.title ?: platform
+        say(context.getString(R.string.terminal_safe_start, title))
+    }
+
+    /** Puts one folder's settings back to the start. Test marks and the camera mode stay. */
+    private fun resetFolder(id: String?) {
+        val folder = findFolder(home, id ?: return) ?: return
+        hideKeyboard()
+        FolderReset.reset(store, folder)
+        lookChanged(folderToShow = openFolder)
+        say(context.getString(R.string.terminal_folder_reset_done, folder.title))
+    }
+
+    private fun findFolder(from: PanelFolder, id: String): PanelFolder? {
+        if (from.id == id) return from
+        for (child in from.folders) findFolder(child, id)?.let { return it }
+        return null
+    }
+
+    /** After a preset loads or a folder resets, the panel, the size boxes, and the camera follow. */
+    private fun lookChanged(folderToShow: PanelFolder?) {
+        stopCentering()
+        liveSize = null
+        refreshLook()
+        showSizeNumbers(store.number(LookKeys.WIDTH), store.number(LookKeys.HEIGHT))
+        onTestDiamond?.invoke(testDiamondOn)
+        requestLayout()
+        settingChanged(ALL_SETTINGS)
+        folderToShow?.let {
+            val scroll = detailScroll.scrollY
+            buildDetail(it)
+            detailScroll.post { detailScroll.scrollTo(0, scroll) }
+        }
     }
 
     /** Tells the camera screen a setting changed, so effects follow at once. */
@@ -1847,8 +1961,13 @@ class TerminalPanel @JvmOverloads constructor(
             orientation = LinearLayout.VERTICAL
             visibility = GONE
         }
+        val question = if (item.action == PanelAction.RESET_FOLDER) {
+            context.getString(R.string.terminal_folder_reset_question)
+        } else {
+            context.getString(R.string.terminal_reset_question)
+        }
         confirm.addView(TextView(context).apply {
-            text = context.getString(R.string.terminal_reset_question)
+            text = question
             typeface = Hud.monoBold(context)
             setPadding(0, dpi(4f), 0, dpi(6f))
             styled(TextRole.MESSAGE, 11f)
@@ -1862,12 +1981,13 @@ class TerminalPanel @JvmOverloads constructor(
         box.addView(confirm, 1, LinearLayout.LayoutParams(MATCH, WRAP))
         button.setOnClickListener {
             when (item.action) {
-                PanelAction.RESET_ALL -> {
+                PanelAction.RESET_ALL, PanelAction.RESET_FOLDER -> {
                     button.visibility = GONE
                     confirm.visibility = VISIBLE
-                    say(context.getString(R.string.terminal_reset_question))
+                    say(question)
                 }
                 PanelAction.CENTER_PANEL -> centerPanel()
+                else -> runAction(item)
             }
         }
         no.setOnClickListener {
@@ -1875,7 +1995,9 @@ class TerminalPanel @JvmOverloads constructor(
             button.visibility = VISIBLE
             say(context.getString(R.string.terminal_reset_kept))
         }
-        yes.setOnClickListener { resetAll() }
+        yes.setOnClickListener {
+            if (item.action == PanelAction.RESET_FOLDER) resetFolder(item.arg) else resetAll()
+        }
         return box
     }
 
@@ -1911,6 +2033,7 @@ class TerminalPanel @JvmOverloads constructor(
             buildDetail(it)
             detailScroll.scrollTo(0, 0)
         }
+        settingChanged(ALL_SETTINGS)
         say(context.getString(R.string.terminal_reset_done))
     }
 
@@ -2011,6 +2134,7 @@ class TerminalPanel @JvmOverloads constructor(
         store.setToggle(item.key, on)
         refreshLook()
         settingChanged(item.key)
+        onToggled?.invoke(item.key, on)
         if (item.key == LookKeys.TEST_DIAMOND) {
             onTestDiamond?.invoke(on)
             say(context.getString(if (on) R.string.terminal_diamond_on else R.string.terminal_diamond_off))
@@ -2022,9 +2146,19 @@ class TerminalPanel @JvmOverloads constructor(
 
     private fun testKey(folder: PanelFolder, item: ToggleItem): String = "${PanelPrefs.TEST_PREFIX}${folder.id}.${item.key}"
 
-    /** There are no real checks yet, so every test starts as not tested. A later step adds the checks. */
-    @Suppress("UNUSED_PARAMETER")
-    private fun markOf(folder: PanelFolder, item: ToggleItem): TestMark = TestMark.NOT_TESTED
+    /** The mark Royalty gave a test in 📁 Results, or by the success code. */
+    private fun markOf(folder: PanelFolder, item: ToggleItem): TestMark {
+        val platform = TestMarks.platformOf(folder) ?: return TestMark.NOT_TESTED
+        return TestMarks.mark(store, platform, item.key)
+    }
+
+    /** A test toggle's note: its mark, and the day it was marked. */
+    private fun markLine(folder: PanelFolder, item: ToggleItem): String {
+        val mark = markOf(folder, item)
+        val platform = TestMarks.platformOf(folder) ?: return markText(mark)
+        val day = TestMarks.date(store, platform, item.key)
+        return if (mark == TestMark.NOT_TESTED || day.isEmpty()) markText(mark) else "${markText(mark)} ($day)"
+    }
 
     private fun markText(mark: TestMark): String = context.getString(
         when (mark) {
@@ -2047,6 +2181,12 @@ class TerminalPanel @JvmOverloads constructor(
     private fun dpi(value: Float): Int = (value * density + 0.5f).toInt()
 
     private companion object {
+        /** Told to the camera screen when many settings changed at once, like Reset all. */
+        const val ALL_SETTINGS = "*"
+
+        /** 📁 Reset already holds Reset all, so it gets no folder Reset of its own. */
+        const val RESET_FOLDER_ID = "reset"
+
         const val MATCH = ViewGroup.LayoutParams.MATCH_PARENT
         const val WRAP = ViewGroup.LayoutParams.WRAP_CONTENT
         const val GLOW_MARGIN_DP = 18f

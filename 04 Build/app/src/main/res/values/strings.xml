@@ -11,9 +11,9 @@
     <string name="camera_missing">This phone has no front camera.</string>
     <string name="camera_failed">The camera did not start. Close the app and open it again.</string>
     <string name="shape_ready">Look near the top for a bright yellow diamond.</string>
-    <string name="camera_ready">The camera is on. Tap Record 5 seconds to test.</string>
+    <string name="camera_ready">The camera is on. Tap Record to make a video.</string>
     <string name="record_five">Record 5 seconds</string>
-    <string name="recording_now">Recording now. It stops by itself.</string>
+    <string name="recording_now">Recording now. Tap Stop to end it.</string>
     <string name="record_saved">Saved. Tap Play last video.</string>
     <string name="record_failed">The video did not save. Tap Record and try again.</string>
     <string name="play_last">Play last video</string>
@@ -133,4 +133,68 @@
         <item quantity="one">%d item</item>
         <item quantity="other">%d items</item>
     </plurals>
+
+    <!-- Final build M4 and M5: effect folders, test marks, presets, and folder Reset. -->
+    <string name="terminal_folder_reset">Reset this folder</string>
+    <string name="terminal_folder_reset_help">Puts the settings in this folder back to the start. Test marks and the camera mode stay.</string>
+    <string name="terminal_folder_reset_question">Reset this folder to the start?</string>
+    <string name="terminal_folder_reset_done">%1$s is back to the start.</string>
+    <string name="terminal_mark_saved">%1$s is marked %2$s on %3$s.</string>
+    <string name="terminal_code_shown">Test code %1$s is in your video for 30 seconds. Ask a viewer which code they see. Then type it in Code the viewer saw.</string>
+    <string name="terminal_code_none">Tap Show a test code first. Then type the code your viewer saw.</string>
+    <string name="terminal_code_match">It matches. Effects show in the video is marked baked in as success on %1$s.</string>
+    <string name="terminal_code_mismatch">It does not match. The test is marked failed on %1$s and flagged for research.</string>
+    <string name="terminal_safe_start">Safe start is on for %1$s. The face diamond covers your face, and the red sweep runs when you tap I got kicked.</string>
+    <string name="terminal_preset_name">Preset name</string>
+    <string name="terminal_preset_name_help">Type a name, then tap Done. Then tap Save, or tap Rename on a preset.</string>
+    <string name="terminal_preset_save">Save my look as a preset</string>
+    <string name="terminal_preset_default_name">Look %1$d</string>
+    <string name="terminal_preset_saved">Your look is saved as %1$s.</string>
+    <string name="terminal_preset_replaced">%1$s now holds your look.</string>
+    <string name="terminal_preset_full">You have %1$d presets. Delete one first.</string>
+    <string name="terminal_preset_none">No presets yet.</string>
+    <string name="terminal_preset_load">Load</string>
+    <string name="terminal_preset_rename">Rename</string>
+    <string name="terminal_preset_delete">Delete</string>
+    <string name="terminal_preset_load_description">Load the preset %1$s</string>
+    <string name="terminal_preset_rename_description">Rename the preset %1$s</string>
+    <string name="terminal_preset_delete_description">Delete the preset %1$s</string>
+    <string name="terminal_preset_loaded">%1$s is loaded.</string>
+    <string name="terminal_preset_renamed">%1$s is now called %2$s.</string>
+    <string name="terminal_preset_taken">A preset is already called %1$s. Pick another name.</string>
+    <string name="terminal_preset_type_name">Type a new name in Preset name first.</string>
+    <string name="terminal_preset_delete_question">Delete %1$s? This can\'t be undone.</string>
+    <string name="terminal_preset_delete_yes">Yes, delete it</string>
+    <string name="terminal_preset_kept">%1$s is kept.</string>
+    <string name="terminal_preset_deleted">%1$s is deleted.</string>
+
+    <!-- Final build M4: recording, ghost, and the effect buttons' answers. -->
+    <string name="record_seconds">Record %1$d s</string>
+    <string name="record_open">Record</string>
+    <string name="record_stop">Stop</string>
+    <string name="recording_timed">Recording now. It stops after %1$d seconds, or tap Stop.</string>
+    <string name="record_saved_gallery">Saved, and also in your gallery in Movies › OFFGRID. Tap Play last video.</string>
+    <string name="ghost_on">GHOST ON. Viewers see a still picture or a blank box. No sound goes out.</string>
+    <string name="fx_fired">Done. It is in your video now.</string>
+    <string name="fx_ink_cleared">Your drawing is wiped off the video.</string>
+    <string name="fx_kicked">You were kicked from %1$s. Wait a moment. Then tap Open %1$s and ask to join again yourself. Never use auto rejoin. It can get you banned.</string>
+    <string name="fx_opened_app">%1$s is open. Ask to join again with your own tap.</string>
+    <string name="fx_opened_store">%1$s is not on this phone, so the app store is open.</string>
+    <string name="fx_open_failed">%1$s could not open on this phone.</string>
+    <string name="fx_no_video">There is no video yet. Tap Record first.</string>
+    <string name="fx_saving">Saving to your gallery now.</string>
+    <string name="fx_gallery_saved">Saved to your gallery as %1$s.</string>
+    <string name="fx_gallery_failed">The gallery did not take the video. Try again.</string>
+    <string name="fx_replay_off">Turn on Replay buffer first. Then tap Save replay.</string>
+    <string name="fx_replay_empty">Nothing is kept yet. Wait a few seconds, then tap Save replay.</string>
+    <string name="fx_code_label">OFFGRID handshake code</string>
+    <string name="fx_code_copied">Your code is copied. Send it only to someone you trust, never in a public place.</string>
+    <string name="fx_code_new">You have a new code, and it is copied. Your old code stopped working.</string>
+    <string name="fx_code_locked_failed">The phone\'s locked storage did not open. Your code is safe. Try again.</string>
+    <string name="fx_code_copy_first">Copy a person\'s code first. Then tap the button again.</string>
+    <string name="fx_code_trusted">That code is trusted.</string>
+    <string name="fx_code_blocked">That code is blocked. It never works again.</string>
+    <string name="fx_code_unknown">That code is new. Tap Trust a copied code to trust it.</string>
+    <string name="fx_code_not_code">The copied text is not an OFFGRID code.</string>
+    <string name="fx_code_mine">That is your own code.</string>
 </resources>
