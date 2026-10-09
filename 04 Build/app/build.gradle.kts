@@ -13,13 +13,20 @@ android {
         // 33 lets the app install on both phones even if a system update is still waiting.
         minSdk = 33
         targetSdk = 36
-        versionCode = 3
-        versionName = "0.3"
+        versionCode = 6
+        versionName = "0.3.3"
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
+        }
+    }
+
+    testOptions {
+        unitTests {
+            // The settings tests run the real Android settings code on the computer that builds the app.
+            isIncludeAndroidResources = true
         }
     }
 
@@ -45,4 +52,6 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:$cameraX")
     implementation("androidx.camera:camera-video:$cameraX")
     implementation("androidx.camera:camera-view:$cameraX")
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.17")
 }
