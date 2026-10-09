@@ -218,3 +218,16 @@ States: passed, waiting for review, blocked, or waiting for Royalty's phone test
 - **PR / commit:** Lane B pull request into `final-build`, not merged.
 - **State:** waiting for review
 - **Next:** read the CI log, fix anything it finds, then run the phone checks: a 20 second Robot plus Echo clip, camera off and mic off during a recording, and frame times.
+
+## 2026-10-09 — Lane B, Copilot, review round 2
+- **What changed:**
+  - Restored manifest removal of `ACCESS_NETWORK_STATE`; the merged-manifest allowlist now accepts the exact AndroidX receiver permission. Added `lintDebug` to CI; the existing `final-build` pull request trigger and voice guard remain in place.
+  - Mic capture releases on read failure and `stop()` is idempotent. Added an error-path release test.
+  - Mic denial is retained in the capture state so the pipeline stays off. Added a denied-state test.
+  - Added `CompositorProcessor.setExtraOutput` for effects-only encoder outputs, with registry bookkeeping tests.
+  - Split camera startup, status/capture handling, recording, and playback out of `MainActivity.kt`; it is now 355 lines and each new source file is below 400 lines.
+- **Checks and remaining work:**
+  - Pure JVM checks for capture state, output bookkeeping, and mic error cleanup pass. Gradle cannot resolve Android Gradle Plugin 8.13.2 from the configured repositories in this sandbox.
+  - The radar sound already enters recorded audio through `SoundBoard` and `SoundMixer` when Sounds in video is enabled. Replay audio is still not implemented; replay remains picture-only.
+  - `TerminalPanel.setToggleSetting` is absent in this checkout, and the requested Lane B scope excludes `terminal/`, so mic denial cannot update the panel toggle here.
+  - The PR run ([37943138888](https://github.com/stillwaters23/OFFGRID-Compositor/actions/runs/37943138888)) requires action and has no jobs, so it did not provide build or allowlist results. Separate-PR creation, a deliberate failing permission commit/run, and device profiling or the 20-second lip-sync check were not completed in this environment.
