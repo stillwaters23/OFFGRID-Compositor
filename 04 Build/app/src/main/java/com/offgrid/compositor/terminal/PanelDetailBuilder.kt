@@ -17,6 +17,7 @@ internal class PanelDetailBuilder(
     private val onNumber: (NumberItem, Int, Boolean) -> Unit,
     private val onToggle: (PanelFolder, ToggleItem, Boolean) -> Unit,
     private val onChoice: (ChoiceItem, String) -> Unit,
+    private val onColor: (ColorItem, Int) -> Unit,
     private val onAction: (PanelAction) -> Unit,
     private val onFolder: (PanelFolder, View) -> Unit,
     private val onProblem: (String) -> Unit,
@@ -101,6 +102,15 @@ internal class PanelDetailBuilder(
                     ChoiceRow(context, item, prefs.choice(item.key, item.default)) { onChoice(item, it) },
                     LinearLayout.LayoutParams(MATCH, WRAP),
                 )
+            }
+            if (folder.colors.isNotEmpty()) {
+                content.addView(sectionLabel(R.string.terminal_section_colors))
+                folder.colors.forEach { item ->
+                    content.addView(
+                        NeonColorRow(context, item, prefs.color(item.key, item.default)) { onColor(item, it) },
+                        LinearLayout.LayoutParams(MATCH, WRAP),
+                    )
+                }
             }
         }
         if (folder.actions.isNotEmpty()) {

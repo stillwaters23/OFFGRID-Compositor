@@ -3,6 +3,7 @@ package com.offgrid.compositor.terminal
 import android.graphics.Bitmap
 import android.graphics.BitmapShader
 import android.graphics.BlendMode
+import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
 import android.graphics.ColorFilter
 import android.graphics.LinearGradient
@@ -37,18 +38,24 @@ internal class GlassPanelDrawable(
             onBoundsChange(bounds)
             invalidateSelf()
         }
-        var resizeGlow = 0f
-            set(value) {
-                field = value.coerceIn(0f, 1f)
-                invalidateSelf()
-            }
+    var resizeGlow = 0f
+        set(value) {
+            field = value.coerceIn(0f, 1f)
+            invalidateSelf()
+        }
 
-            var solidSkin = false
-                set(value) {
-                    field = value
-                    updateShaders()
-                    invalidateSelf()
-                }
+    var borderColor = NeonPalette.ELECTRIC_PURPLE
+        set(value) {
+            field = value
+            invalidateSelf()
+        }
+
+    var solidSkin = false
+        set(value) {
+            field = value
+            updateShaders()
+            invalidateSelf()
+        }
 
     var lightSkin = false
         set(value) {
@@ -57,11 +64,11 @@ internal class GlassPanelDrawable(
             invalidateSelf()
         }
 
-        var uvTheme = false
-            set(value) {
-                field = value
-                invalidateSelf()
-            }
+    var uvTheme = false
+        set(value) {
+            field = value
+            invalidateSelf()
+        }
 
     var seeThroughAtFullSize = false
         set(value) {
@@ -73,12 +80,14 @@ internal class GlassPanelDrawable(
     var borderThickness = 3f
         set(value) {
             field = value.coerceIn(2f, 6f)
+            onBoundsChange(bounds)
             invalidateSelf()
         }
 
     private var displayCorners = List(4) { DisplayCorner(0f, 0f, 0f) }
 
     fun setDisplayCornerGeometry(corners: List<DisplayCorner>) {
+        if (displayCorners == corners) return
         displayCorners = corners
         onBoundsChange(bounds)
         invalidateSelf()
@@ -95,6 +104,7 @@ internal class GlassPanelDrawable(
         set(value) {
             field = value.coerceIn(0f, 1f)
             bloomLayers = PanelGeometry.glowLayers((field * 100f).toInt())
+            buildBloomMasks(if (fullBleed) border else shape)
             invalidateSelf()
         }
 
@@ -112,6 +122,15 @@ internal class GlassPanelDrawable(
         strokeJoin = Paint.Join.ROUND
         strokeCap = Paint.Cap.ROUND
     }
+    private val maskPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeJoin = Paint.Join.ROUND
+        strokeCap = Paint.Cap.ROUND
+        color = 0xFFFFFFFF.toInt()
+    }
+    private var coreBloom: Bitmap? = null
+    private var midBloom: Bitmap? = null
+    private var wideBloom: Bitmap? = null
 
     private fun dp(value: Float) = value * density
 
@@ -127,6 +146,7 @@ internal class GlassPanelDrawable(
             roundedPath(border, edge, displayCorners, inset)
             buildBrackets(box, 0f)
             updateShaders()
+            buildBloomMasks(border)
             return
         }
         box.inset(dp(1.5f), dp(1.5f))
@@ -139,6 +159,8 @@ internal class GlassPanelDrawable(
         cutCorners(inner, innerBox, cut * 0.75f, dp(4f))
         buildBrackets(box, cut)
         updateShaders()
+        border.set(shape)
+        buildBloomMasks(shape)
     }
 
     private fun roundedPath(path: Path, box: RectF, corners: List<DisplayCorner>, inset: Float) {
@@ -220,18 +242,18 @@ internal class GlassPanelDrawable(
         val bottom = b.bottom.toFloat()
         fill.shader = if (fullBleed || solidSkin) {
             null
-        } else if (holo) {
-            LinearGradient(
-                0f, top, 0f, bottom,
-                Hud.withAlpha(0xFF0B3A44.toInt(), 0.35f + 0.55f * opacity),
-                Hud.withAlpha(Hud.GLASS_BOTTOM, 0.45f + 0.5f * opacity),
-                Shader.TileMode.CLAMP,
-            )
         } else if (lightSkin) {
             LinearGradient(
                 0f, top, 0f, bottom,
                 Hud.withAlpha(0xFFFFFFFF.toInt(), opacity),
                 Hud.withAlpha(0xFFECECF2.toInt(), opacity),
+                Shader.TileMode.CLAMP,
+            )
+        } else if (holo) {
+            LinearGradient(
+                0f, top, 0f, bottom,
+                Hud.withAlpha(0xFF0B3A44.toInt(), 0.35f + 0.55f * opacity),
+                Hud.withAlpha(Hud.GLASS_BOTTOM, 0.45f + 0.5f * opacity),
                 Shader.TileMode.CLAMP,
             )
         } else {
@@ -272,7 +294,8 @@ internal class GlassPanelDrawable(
         canvas.drawPath(shape, fill)
         canvas.drawPath(shape, grain)
         canvas.drawPath(shape, sheen)
-        glowStroke(canvas, shape, Hud.CYAN, dp(1.3f), 0.92f)
+        drawBloomMasks(canvas)
+        glowStroke(canvas, shape, borderColor, dp(1.3f), 0.92f)
         line.strokeWidth = dp(1f)
         line.color = Hud.withAlpha(Hud.CYAN, 0.16f + 0.1f * glow)
         canvas.drawPath(inner, line)
@@ -282,7 +305,7 @@ internal class GlassPanelDrawable(
         glowStroke(canvas, brackets, Hud.GOLD, dp(2.2f), 1f)
         line.blendMode = BlendMode.PLUS
         line.strokeWidth = dp(borderThickness + 4f)
-        line.color = Hud.withAlpha(NeonPalette.ELECTRIC_PURPLE, 0.18f + 0.35f * resizeGlow)
+        line.color = Hud.withAlpha(borderColor, 0.18f + 0.35f * resizeGlow)
         canvas.drawPath(shape, line)
         line.strokeWidth = dp(borderThickness)
         line.color = if (lightSkin) Hud.INK else NeonPalette.BLACKLIGHT_WHITE
@@ -291,32 +314,64 @@ internal class GlassPanelDrawable(
     }
 
     private fun drawFullBleedBorder(canvas: Canvas) {
-        val layers = bloomLayers
-        val edgeColor = if (uvTheme) NeonPalette.HOT_MAGENTA else NeonPalette.ELECTRIC_PURPLE
         val originalAlpha = canvas.save()
         canvas.clipRect(bounds)
-        if (layers.wide > 0f) {
-            line.blendMode = BlendMode.PLUS
-            line.strokeWidth = dp(32f + 32f * glow)
-            val bloomColor = if (uvTheme) NeonPalette.UV_VIOLET else NeonPalette.CYAN_GLOW
-            line.color = Hud.withAlpha(bloomColor, (0.08f + 0.2f * resizeGlow) * layers.wide)
-            canvas.drawPath(border, line)
-        }
-        if (layers.mid > 0f) {
-            line.strokeWidth = dp(12f + 8f * glow)
-            line.color = Hud.withAlpha(edgeColor, (0.24f + 0.25f * resizeGlow) * layers.mid)
-            canvas.drawPath(border, line)
-        }
-        if (layers.core > 0f) {
-            line.strokeWidth = dp(borderThickness + 4f)
-            line.color = Hud.withAlpha(edgeColor, 0.5f * layers.core)
-            canvas.drawPath(border, line)
-        }
+        drawBloomMasks(canvas)
         line.blendMode = BlendMode.SRC_OVER
         line.strokeWidth = dp(borderThickness)
         line.color = if (lightSkin) Hud.INK else NeonPalette.BLACKLIGHT_WHITE
         canvas.drawPath(border, line)
         canvas.restoreToCount(originalAlpha)
+    }
+
+    private fun drawBloomMasks(canvas: Canvas) {
+        val layers = bloomLayers
+        val edgeColor = borderColor
+        line.blendMode = BlendMode.PLUS
+        if (layers.wide > 0f) {
+            val bloomColor = if (uvTheme) NeonPalette.UV_VIOLET else NeonPalette.CYAN_GLOW
+            line.color = Hud.withAlpha(bloomColor, (0.08f + 0.2f * resizeGlow) * layers.wide)
+            wideBloom?.let { canvas.drawBitmap(it, bounds.left.toFloat(), bounds.top.toFloat(), line) }
+        }
+        if (layers.mid > 0f) {
+            line.color = Hud.withAlpha(edgeColor, (0.24f + 0.25f * resizeGlow) * layers.mid)
+            midBloom?.let { canvas.drawBitmap(it, bounds.left.toFloat(), bounds.top.toFloat(), line) }
+        }
+        if (layers.core > 0f) {
+            line.color = Hud.withAlpha(edgeColor, 0.5f * layers.core)
+            coreBloom?.let { canvas.drawBitmap(it, bounds.left.toFloat(), bounds.top.toFloat(), line) }
+        }
+        line.blendMode = BlendMode.SRC_OVER
+    }
+
+    private fun buildBloomMasks(path: Path) {
+        releaseBloomMasks()
+        if (bounds.isEmpty || glow <= 0f) return
+        val width = bounds.width()
+        val height = bounds.height()
+        coreBloom = createBloomMask(width, height, path, borderThickness, dp(1.5f))
+        midBloom = createBloomMask(width, height, path, dp(12f + 8f * glow), dp(4f + 6f * glow))
+        wideBloom = createBloomMask(width, height, path, dp(32f + 32f * glow), dp(8f + 24f * glow))
+    }
+
+    private fun createBloomMask(width: Int, height: Int, path: Path, stroke: Float, blur: Float): Bitmap {
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ALPHA_8)
+        val maskCanvas = Canvas(bitmap)
+        maskCanvas.translate(-bounds.left.toFloat(), -bounds.top.toFloat())
+        maskPaint.strokeWidth = stroke
+        maskPaint.maskFilter = BlurMaskFilter(blur, BlurMaskFilter.Blur.NORMAL)
+        maskCanvas.drawPath(path, maskPaint)
+        maskPaint.maskFilter = null
+        return bitmap
+    }
+
+    private fun releaseBloomMasks() {
+        coreBloom?.recycle()
+        midBloom?.recycle()
+        wideBloom?.recycle()
+        coreBloom = null
+        midBloom = null
+        wideBloom = null
     }
 
     /** A soft glow: wide faint strokes under one bright thin stroke. */

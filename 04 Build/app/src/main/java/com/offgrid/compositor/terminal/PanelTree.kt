@@ -27,6 +27,14 @@ private fun colorsFolder() = PanelFolder(
     title = "Colors",
     tag = null,
     kind = FolderKind.SETTINGS,
+    colors = listOf(
+        ColorItem(
+            PanelTree.BORDER_COLOR,
+            "Border color",
+            "Type a hex color or tap a neon swatch.",
+            NeonPalette.ELECTRIC_PURPLE,
+        ),
+    ),
     notes = listOf(
         "UV Violet #7B02B3",
         "Electric Purple #B026FF",
@@ -62,6 +70,8 @@ internal class ChoiceItem(
     val options: List<String>,
     val default: String,
 )
+
+internal class ColorItem(val key: String, val label: String, val help: String, val default: Int)
 
 enum class PanelAction {
     RESET_ALL,
@@ -105,6 +115,7 @@ internal class PanelFolder(
     val numbers: List<NumberItem> = emptyList(),
     val toggles: List<ToggleItem> = emptyList(),
     val choices: List<ChoiceItem> = emptyList(),
+    val colors: List<ColorItem> = emptyList(),
     val actions: List<PanelActionItem> = emptyList(),
     val guide: Guide? = null,
     val notes: List<String> = emptyList(),
@@ -116,7 +127,7 @@ internal class PanelFolder(
         folders.forEach { it.parent = this }
     }
 
-    val itemCount: Int get() = folders.size + numbers.size + toggles.size + choices.size + actions.size
+    val itemCount: Int get() = folders.size + numbers.size + toggles.size + choices.size + colors.size + actions.size
 
     val label: String get() = if (tag == null) title else "$tag $title"
 
@@ -165,6 +176,7 @@ internal object PanelTree {
     const val BORDER_THICKNESS = "panel.border_thickness"
     const val TICK_ON_SAVE = "panel.tick_on_save"
     const val THEME = "panel.theme"
+    const val BORDER_COLOR = "panel.border_color"
 
     fun build(): PanelFolder {
         val top = listOf(

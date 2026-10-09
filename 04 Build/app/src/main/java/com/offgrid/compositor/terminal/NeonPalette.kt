@@ -9,4 +9,17 @@ internal object NeonPalette {
     const val DEEP_BLUE = 0xFF0032FF.toInt()
     const val TOXIC_LIME = 0xFFB6FF00.toInt()
     const val BLACKLIGHT_WHITE = 0xFFF4ECFF.toInt()
+
+    val swatches = listOf(
+        NeonSwatch("Violet", UV_VIOLET),
+        NeonSwatch("Purple", ELECTRIC_PURPLE),
+        NeonSwatch("Magenta", HOT_MAGENTA),
+        NeonSwatch("Pink", NEON_PINK),
+        NeonSwatch("Cyan", CYAN_GLOW),
+        NeonSwatch("Blue", DEEP_BLUE),
+        NeonSwatch("Lime", TOXIC_LIME),
+        NeonSwatch("White", BLACKLIGHT_WHITE),
+    )
 }
+
+internal data class NeonSwatch(val name: String, val color: Int)

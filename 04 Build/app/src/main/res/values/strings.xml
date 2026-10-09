@@ -52,6 +52,7 @@
     <string name="terminal_section_numbers">TYPED NUMBERS</string>
     <string name="terminal_section_toggles">TOGGLES</string>
     <string name="terminal_section_choices">CHOICES</string>
+    <string name="terminal_section_colors">COLOR SWATCHES</string>
     <string name="terminal_section_actions">ACTIONS</string>
     <string name="terminal_folder_description">%1$s folder. %2$s.</string>
     <plurals name="terminal_items">

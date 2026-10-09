@@ -37,16 +37,7 @@ import com.offgrid.compositor.effects.FxKeys
 import com.offgrid.compositor.R
 import kotlin.math.hypot
 
-/**
- * Step 2. The floating terminal panel (features 3, 4, 5, and 13).
- *
- * Dark glass with a one-column folder list. Folders slide out like holograms. A soft ring turns around the
- * active folder. A soft scan line sweeps the glass. Text is laser typed.
- *
- * Drag the top bar to move it. Opacity is a typed number from 0 to 100.
- * There are no sliders. It is Royalty's private control, so it is not painted
- * into the saved video.
- */
+/** Floating private controls that are not painted into saved video. */
 class TerminalPanel @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
@@ -143,6 +134,7 @@ class TerminalPanel @JvmOverloads constructor(
             onNumber = ::saveNumber,
             onToggle = ::saveToggle,
             onChoice = ::saveChoice,
+            onColor = ::saveColor,
             onAction = ::performAction,
             onFolder = ::showFolder,
             onProblem = ::say,
@@ -666,6 +658,7 @@ class TerminalPanel @JvmOverloads constructor(
         glass.borderThickness = PanelGeometry.borderThickness(borderThickness)
         glass.lightSkin = Hud.isLightTheme
         glass.uvTheme = prefs.choice(PanelTree.THEME, "OLED Bioluminescent") == "UV Black Light"
+        glass.borderColor = prefs.color(PanelTree.BORDER_COLOR, NeonPalette.ELECTRIC_PURPLE)
         for (drawable in listOf(pillGlass, holoGlass)) {
             drawable.opacity = if (fullBleed && !seeThroughAtFullSize && drawable === holoGlass) 1f else share
             drawable.glow = glowLevel / 100f
@@ -863,6 +856,7 @@ class TerminalPanel @JvmOverloads constructor(
                 prefs.setChoice(it.key, it.default)
                 onChoiceChanged?.invoke(it.key, it.default)
             }
+            current.colors.forEach { prefs.setColor(it.key, it.default) }
             current.folders.forEach(::reset)
         }
         reset(folder)
@@ -927,6 +921,12 @@ class TerminalPanel @JvmOverloads constructor(
         onChoiceChanged?.invoke(item.key, value)
         applyLook()
         say("${item.label} is $value.")
+    }
+
+    private fun saveColor(item: ColorItem, value: Int) {
+        prefs.setColor(item.key, value)
+        applyLook()
+        say("${item.label} saved.")
     }
 
     private fun toggleKey(folder: PanelFolder, item: ToggleItem): String {

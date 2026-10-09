@@ -30,6 +30,12 @@ internal class PanelPrefs(context: Context) {
         prefs.edit { putString(CHOICE + key, value) }
     }
 
+    fun color(key: String, default: Int): Int = prefs.getInt(COLOR + key, default)
+
+    fun setColor(key: String, value: Int) {
+        prefs.edit { putInt(COLOR + key, value) }
+    }
+
     var minimized: Boolean
         get() = prefs.getBoolean(MINIMIZED, false)
         set(value) = prefs.edit { putBoolean(MINIMIZED, value) }
@@ -58,6 +64,7 @@ internal class PanelPrefs(context: Context) {
         const val NUMBER = "number."
         const val TOGGLE = "toggle."
         const val CHOICE = "choice."
+        const val COLOR = "color."
         const val MINIMIZED = "minimized"
         const val ACTIVE_FOLDER = "active_folder"
         const val POSITION_X = "position_x"
