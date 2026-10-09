@@ -140,7 +140,10 @@ class MainActivity : AppCompatActivity() {
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
         micAsking = false
-        if (!granted) micProblem = R.string.mic_denied
+        if (!granted) {
+            micProblem = R.string.mic_denied
+            capture.micPermissionDenied()
+        }
         applyCapture()
     }
 

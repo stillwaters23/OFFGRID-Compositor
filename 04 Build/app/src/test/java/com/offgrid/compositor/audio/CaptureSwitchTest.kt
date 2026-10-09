@@ -61,4 +61,14 @@ class CaptureSwitchTest {
         switch.micFailed()
         assertEquals(listOf(CaptureAction.START_MIC), switch.update(true, true, true))
     }
+
+    @Test
+    fun deniedMicStaysOffUntilTheToggleIsTurnedOffAndOnAgain() {
+        switch.update(true, true, true)
+        switch.micPermissionDenied()
+        assertEquals(listOf(CaptureAction.RELEASE_MIC), switch.update(true, true, true))
+        assertTrue(switch.update(true, true, true).isEmpty())
+        assertTrue(switch.update(true, false, true).isEmpty())
+        assertEquals(listOf(CaptureAction.START_MIC), switch.update(true, true, true))
+    }
 }

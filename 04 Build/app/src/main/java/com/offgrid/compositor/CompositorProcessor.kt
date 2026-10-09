@@ -92,6 +92,7 @@ class CompositorProcessor(
     private var recorder: AvRecorder? = null
     private var recorderSurface = EGL14.EGL_NO_SURFACE
     private val stampClock = StampClock()
+    private val extraOutputs = OutputRegistry<ExtraOutputSlot>()
 
     /** True while the camera is off. A timer draws the stage from a black picture instead. */
     private var cameraOff = false
@@ -238,6 +239,7 @@ class CompositorProcessor(
             }
             drawSlot(slot, stamp, painted)
         }
+        drawExtraOutputs(stamp, painted, snapshot.maxByOrNull { it.width * it.height })
         if (snapshot.isNotEmpty()) {
             val main = snapshot.maxBy { it.width * it.height }
             drawRecorders(main.width, main.height, stampClock.next(StampClock.Source.CAMERA, stamp), painted, main)
@@ -326,6 +328,37 @@ class CompositorProcessor(
     /** Stops drawing into the recorder, then lets it finish its file. */
     fun stopRecorder() {
         executor.execute { endRecorder() }
+    }
+
+    /** Draws the finished, effects-baked picture into an additional encoder surface. Any thread. */
+    fun setExtraOutput(id: String, surface: Surface?, width: Int, height: Int) {
+        executor.execute {
+            extraOutputs.remove(id)?.let { destroyExtraOutput(it) }
+            if (surface == null || released || !ready || id.isBlank() || width <= 0 || height <= 0) return@execute
+            val eglSurface = EGL14.eglCreateWindowSurface(
+                display,
+                config,
+                surface,
+                intArrayOf(EGL14.EGL_NONE),
+                0,
+            )
+            if (eglSurface == null || eglSurface == EGL14.EGL_NO_SURFACE) {
+                Log.e(TAG, "Extra output $id could not start")
+                return@execute
+            }
+            extraOutputs.put(id, ExtraOutputSlot(eglSurface, width, height))
+        }
+    }
+
+    private fun drawExtraOutputs(stamp: Long, painted: GlTarget?, camera: OutputSlot?) {
+        for (slot in extraOutputs.values()) {
+            drawFinal(slot.eglSurface, slot.width, slot.height, stamp, painted, camera)
+        }
+    }
+
+    private fun destroyExtraOutput(slot: ExtraOutputSlot) {
+        if (dummy != EGL14.EGL_NO_SURFACE) EGL14.eglMakeCurrent(display, dummy, dummy, context)
+        EGL14.eglDestroySurface(display, slot.eglSurface)
     }
 
     private fun endRecorder() {
@@ -474,6 +507,7 @@ class CompositorProcessor(
         if (darkScreen != EGL14.EGL_NO_SURFACE) {
             drawFinal(darkScreen, darkScreenWidth, darkScreenHeight, stamp, painted, null)
         }
+        drawExtraOutputs(stamp, painted, null)
         drawRecorders(size.width, size.height, stamp, painted, null)
     }
 
@@ -642,6 +676,7 @@ class CompositorProcessor(
             cameraOff = false
             handler.removeCallbacks(darkTick)
             endRecorder()
+            for (slot in extraOutputs.clear()) destroyExtraOutput(slot)
             blackCamera?.release()
             blackCamera = null
             if (darkScreen != EGL14.EGL_NO_SURFACE) {
@@ -710,6 +745,12 @@ class CompositorProcessor(
 
     private class OutputSlot(
         val surfaceOutput: SurfaceOutput,
+        val eglSurface: android.opengl.EGLSurface,
+        val width: Int,
+        val height: Int,
+    )
+
+    private class ExtraOutputSlot(
         val eglSurface: android.opengl.EGLSurface,
         val width: Int,
         val height: Int,
