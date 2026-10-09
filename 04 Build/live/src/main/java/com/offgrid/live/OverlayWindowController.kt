@@ -318,8 +318,9 @@ internal class OverlayWindowController(
     private fun chooseMode() {
         val dialog = AlertDialog.Builder(service)
             .setTitle("Camera mode")
-            .setItems(arrayOf("Front camera", "Back camera")) { _, which ->
-                LiveHostRegistry.host?.writeSetting("fx.cam.mode", if (which == 0) "front" else "back")
+            .setItems(arrayOf("Live", "Blackout", "Cloak", "Status", "Ghost")) { _, which ->
+                val mode = arrayOf("live", "blackout", "cloak", "status", "ghost")[which]
+                LiveHostRegistry.host?.writeSetting("fx.camera.mode", mode)
             }
             .setNegativeButton("Cancel", null)
             .create()

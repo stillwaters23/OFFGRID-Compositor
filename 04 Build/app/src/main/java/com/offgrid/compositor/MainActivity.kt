@@ -58,6 +58,9 @@ import com.offgrid.compositor.effects.EffectLayers
 import com.offgrid.compositor.effects.FxKeys
 import com.offgrid.compositor.terminal.ScreenEdges
 import com.offgrid.compositor.terminal.TerminalPanel
+import com.offgrid.live.LiveHostRegistry
+import com.offgrid.live.LiveOverlayController
+import com.offgrid.live.LiveService
 import java.io.File
 
 /**
@@ -102,6 +105,9 @@ class MainActivity : AppCompatActivity() {
     private var shownMessage = 0
     private var diamondInVideo: Boolean? = null
     private lateinit var effects: EffectsController
+    // Lane C hook
+    private lateinit var liveHost: LiveHost
+    private var cleanOutputActive = false
 
     /** True when the effects could not start on this phone. The camera screen says why it is black. */
     private var effectsBroken = false
@@ -149,6 +155,10 @@ class MainActivity : AppCompatActivity() {
         val engine = EffectEngine()
         faces = FaceTracker(this, engine)
         effects = EffectsController(this, terminalPanel, engine)
+        // Lane C hook
+        liveHost = LiveHost(this, effects) { processor }
+        LiveHostRegistry.host = liveHost
+        effects.onLiveAction = ::onLiveAction
         effects.lastVideo = { recordingFile() }
         effects.onSettings = { onEffectSettings() }
         effects.start()
@@ -170,6 +180,15 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         effects.resume()
+        // Lane C hook
+        if (cleanOutputActive) {
+            cleanOutputActive = false
+            controlBar.visibility = View.VISIBLE
+            terminalPanel.setHiddenForPlayback(false)
+        }
+        if (::liveHost.isInitialized && liveHost.readSetting(LIVE_OVERLAY_KEY) == "true") {
+            LiveOverlayController.openOverlay(this)
+        }
         hideSystemBars()
         if (hasCameraPermission()) {
             startCamera()
@@ -185,6 +204,12 @@ class MainActivity : AppCompatActivity() {
     override fun onPause() {
         effects.pause()
         hidePlayback()
+        // Lane C hook
+        if (::liveHost.isInitialized && liveHost.readSetting(LIVE_OVERLAY_KEY) == "true") {
+            LiveOverlayController.openOverlay(this)
+        } else {
+            stopService(Intent(this, LiveService::class.java))
+        }
         stopRecording()
         unbindCamera()
         super.onPause()
@@ -192,12 +217,31 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         effects.release()
+        // Lane C hook
+        if (::liveHost.isInitialized && LiveHostRegistry.host === liveHost) LiveHostRegistry.host = null
         processor?.onFirstFrame = null
         processor?.onFailed = null
         processor?.onEffectsFailed = null
         processor?.release()
         processor = null
         super.onDestroy()
+    }
+
+    // Lane C hook
+    private fun onLiveAction(action: String) {
+        when (action) {
+            LIVE_OPEN_OVERLAY_SETTINGS -> {
+                liveHost.writeSetting(LIVE_OVERLAY_KEY, "true")
+                LiveOverlayController.askForPermission(this)
+            }
+            LIVE_CLEAN_OUTPUT -> {
+                liveHost.writeSetting(LIVE_OVERLAY_KEY, "true")
+                controlBar.visibility = View.GONE
+                terminalPanel.setHiddenForPlayback(true)
+                cleanOutputActive = true
+                LiveOverlayController.hideOverlay(this)
+            }
+        }
     }
 
     private fun hasCameraPermission(): Boolean {
@@ -793,6 +837,10 @@ class MainActivity : AppCompatActivity() {
 
         /** The words shown while the camera is live, which follow the settings. */
         val LIVE_MESSAGES = setOf(R.string.shape_ready, R.string.camera_ready, R.string.ghost_on, R.string.effects_failed)
+        // Lane C hook
+        const val LIVE_OVERLAY_KEY = "fx.live.overlay"
+        const val LIVE_OPEN_OVERLAY_SETTINGS = "LIVE_OPEN_OVERLAY_SETTINGS"
+        const val LIVE_CLEAN_OUTPUT = "LIVE_CLEAN_OUTPUT"
 
         /** Recording errors that still leave a whole video behind. */
         val KEPT_ERRORS = setOf(

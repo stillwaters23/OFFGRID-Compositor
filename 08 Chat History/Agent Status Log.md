@@ -228,3 +228,11 @@ States: passed, waiting for review, blocked, or waiting for Royalty's phone test
 - **PR / commit:** Pull request #13. Merge commit is being finalized.
 - **State:** blocked
 - **Next:** Add the available app-side C9 host and compositor hooks; request the missing Lane A action rows, then run build and device checks.
+
+## 2026-10-09 8:26 AM CT — Lane C integration
+
+- **Bootloader step:** Lane C. Live and Remote
+- **What was done:** Added the app host adapter, Live action hooks, and a 24 fps compositor surface for the finished remote preview. The overlay service can collapse the overlay for clean screen-share output, and its Open notification action can recover after process recreation. Requested the missing Lane A Live and Remote actions/settings and Lane B camera/mic settings wiring.
+- **PR / commit:** Pull request #13. C9 integration changes are pending validation.
+- **State:** blocked
+- **Next:** Validate the app changes, retry the Android build, then publish the hooks and record any remaining device checks.

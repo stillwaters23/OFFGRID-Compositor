@@ -51,6 +51,9 @@ internal class EffectsController(
     /** Called after settings change, so the camera screen can update its words, like GHOST ON. */
     var onSettings: (() -> Unit)? = null
 
+    // Lane C hook
+    var onLiveAction: ((String) -> Unit)? = null
+
     private var chained: Runnable? = null
     private val radarPing = object : Runnable {
         override fun run() {
@@ -183,7 +186,8 @@ internal class EffectsController(
             PanelAction.HANDSHAKE_ADD -> withCopiedCode { code -> inBackground({ handshake.trust(code) }) { say(handshakeLine(it)) } }
             PanelAction.HANDSHAKE_BLOCK -> withCopiedCode { code -> inBackground({ handshake.block(code) }) { say(handshakeLine(it)) } }
             PanelAction.HANDSHAKE_CHECK -> withCopiedCode { code -> inBackground({ handshake.check(code) }) { say(handshakeLine(it)) } }
-            else -> Unit
+            // Lane C hook
+            else -> onLiveAction?.invoke(action.name)
         }
     }
 

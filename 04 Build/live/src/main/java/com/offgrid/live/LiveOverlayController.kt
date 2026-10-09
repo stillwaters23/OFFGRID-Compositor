@@ -36,4 +36,12 @@ object LiveOverlayController {
             Intent(context, LiveService::class.java).setAction(LiveService.ACTION_SHOW),
         )
     }
+
+    fun hideOverlay(context: Context) {
+        if (!Settings.canDrawOverlays(context)) return
+        ContextCompat.startForegroundService(
+            context,
+            Intent(context, LiveService::class.java).setAction(LiveService.ACTION_HIDE),
+        )
+    }
 }

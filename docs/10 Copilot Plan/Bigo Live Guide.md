@@ -63,8 +63,10 @@ Add these plain notes to the Bigo platform folder:
 ## Requests for other lanes
 
 - Lane A: Add the three notes above to the Bigo platform folder in 📁 Live and Remote.
-- Lane A and Lane B: Merge into `final-build` before app-side C9 wiring. The current branch has no Lane A actions or Lane B host/pipeline hooks.
+- Lane A: Add `LIVE_OPEN_OVERLAY_SETTINGS`, `LIVE_CLEAN_OUTPUT`, and `REMOTE_OPEN_PAIRING` to `PanelAction`, and add the Live and Remote rows/settings for `fx.live.overlay` and `fx.remote.role`. These actions and settings are not in the merged `final-build` base, so the app hooks cannot be reached until Lane A adds them.
+- Lane A: Add the three notes above to the Bigo platform folder in 📁 Live and Remote.
 - Lane B: When integrating, keep camera and microphone foreground-service types off for overlay-only use. Start them only while the OFFGRID activity is visible and OFFGRID itself is recording or streaming. The current app manifest removes `RECORD_AUDIO`; review that removal before wiring OFFGRID microphone recording.
+- Lane B: Wire `fx.cam.on` and `fx.mic.on` through the app's settings/effect snapshot path so overlay and remote controls can affect the camera phone.
 
 ## Test record
 
