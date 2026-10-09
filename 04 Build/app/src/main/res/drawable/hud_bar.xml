@@ -1,19 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Dark glass bar with a cyan line on top and a short gold mark. -->
+<!-- Black glass bar with a soft white line on top and a short brighter mark.
+     The terminal panel repaints it in the theme colors. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <shape android:shape="rectangle">
             <gradient
                 android:angle="270"
-                android:endColor="#F2020508"
-                android:startColor="#D9071419" />
+                android:endColor="#F2000000"
+                android:startColor="#D9000000" />
         </shape>
     </item>
     <item
         android:gravity="top|fill_horizontal"
         android:height="1dp">
         <shape android:shape="rectangle">
-            <solid android:color="#9946F0FF" />
+            <solid android:color="#99FFFFFF" />
         </shape>
     </item>
     <item
@@ -22,7 +23,7 @@
         android:gravity="top|start"
         android:left="16dp">
         <shape android:shape="rectangle">
-            <solid android:color="@color/hud_gold" />
+            <solid android:color="@color/hud_mark" />
         </shape>
     </item>
 </layer-list>
