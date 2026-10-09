@@ -6,6 +6,8 @@ import android.media.AudioTrack
 import android.os.Handler
 import android.os.HandlerThread
 import android.util.Log
+import com.offgrid.compositor.audio.MicKeys
+import com.offgrid.compositor.audio.SoundMixer
 import com.offgrid.compositor.effects.EffectMath
 import com.offgrid.compositor.effects.EffectSnapshot
 import com.offgrid.compositor.effects.FxKeys
@@ -17,13 +19,16 @@ import kotlin.math.sin
  * The soundboard (feature 6, final build M4). Each effect can play its own short sound on
  * Royalty's phone speaker. The sounds are made by the app itself, so there are no sound files.
  *
- * It only plays sound out. It never listens: this app has no mic permission and no mic code,
- * so these sounds are not added to the video either.
+ * It only plays sound out. It never listens. While a recording runs, and Sounds in video is on,
+ * the same sounds are also handed to [videoMix], so they are heard in the video.
  */
 internal class SoundBoard {
     private val thread = HandlerThread("OffgridSounds").apply { start() }
     private val handler = Handler(thread.looper)
     private val made = HashMap<String, ShortArray>()
+
+    /** Collects the sounds for the recorded audio. It only keeps them while a recording listens. */
+    val videoMix = SoundMixer()
 
     /** Sounds still playing. All of them are let go when the soundboard closes. */
     private val playing = HashSet<AudioTrack>()
@@ -35,7 +40,8 @@ internal class SoundBoard {
         if (sound.isEmpty() || sound == OFF) return
         val volume = settings.value(FxKeys.SOUND_VOLUME)
         if (volume <= 0f) return
-        handler.post { playNow(sound, volume) }
+        val intoVideo = settings.on(MicKeys.SOUNDS_IN_VIDEO, true)
+        handler.post { playNow(sound, volume, intoVideo) }
     }
 
     fun release() {
@@ -46,9 +52,10 @@ internal class SoundBoard {
         }
     }
 
-    private fun playNow(sound: String, volume: Float) {
+    private fun playNow(sound: String, volume: Float, intoVideo: Boolean) {
         val samples = made.getOrPut(sound) { SoundShapes.make(sound) }
         if (samples.isEmpty()) return
+        if (intoVideo) videoMix.add(samples, SoundShapes.RATE, volume)
         var track: AudioTrack? = null
         try {
             track = AudioTrack.Builder()

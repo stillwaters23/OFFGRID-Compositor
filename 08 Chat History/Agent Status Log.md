@@ -204,3 +204,17 @@ States: passed, waiting for review, blocked, or waiting for Royalty's phone test
 - **PR / commit:** Pull request #8 (`final-build`), not merged.
 - **State:** waiting for review
 - **Next:** Milestone 5: final polish, lint, the final report in pull request #8, and the phone test list.
+
+## 2026-10-09 8:05 AM CT — Lane B, Copilot
+- **Bootloader step:** Lane B: Camera, Mic and Recording.
+- **What was done:**
+  - B0: CI runs on pull requests into `final-build`, checks the merged manifest against the permission allowlist, and bans only voice code.
+  - B1: RECORD_AUDIO is in the manifest. The mic is asked for only when the mic toggle goes on.
+  - B2: the camera and mic toggles bind and release the camera and the mic. Black with effects shows while the camera is off.
+  - B3: a new `audio/` package has the mic, the voice effects, the beat finder, and the recorder that writes MP4 with video and audio.
+  - B4: the glow border pulses with the mic beat, at most 3 times a second.
+  - B5: the replay buffer uses one 64 MB block, and the recording function was renamed.
+  - The local sandbox cannot reach Google's Maven, so Gradle, lint, Robolectric tests, and on-device checks were not run there. CI must confirm them.
+- **PR / commit:** Lane B pull request into `final-build`, not merged.
+- **State:** waiting for review
+- **Next:** read the CI log, fix anything it finds, then run the phone checks: a 20 second Robot plus Echo clip, camera off and mic off during a recording, and frame times.
