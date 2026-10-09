@@ -22,6 +22,12 @@
     <string name="back_to_camera">Back to camera</string>
     <string name="try_again">Try again</string>
     <string name="open_settings">Open Settings</string>
+    <string name="mic_toggle_on">Microphone on. Tap to turn it off.</string>
+    <string name="mic_toggle_off">Microphone off. Tap to turn it on.</string>
+    <string name="mic_toggle_blocked">Microphone blocked. Open Microphone Effects to unblock it.</string>
+    <string name="mic_permission_rationale">Turn on the microphone? Audio is processed on this phone and stays muted if processing fails.</string>
+    <string name="mic_permission_denied">The microphone is still off. Allow it in app settings, then turn it on again.</string>
+    <string name="mic_processing_failed">The microphone was released because voice processing failed.</string>
 
     <!-- Step 2. The terminal panel. Plain words, per the Terminal Plain Language Rule. -->
     <string name="terminal_title">OFFGRID TERMINAL</string>

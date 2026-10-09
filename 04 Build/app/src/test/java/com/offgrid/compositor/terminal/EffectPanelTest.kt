@@ -2,6 +2,7 @@ package com.offgrid.compositor.terminal
 
 import android.content.Context
 import com.offgrid.compositor.effects.FxKeys
+import com.offgrid.compositor.audio.voice.MicKeys
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -102,7 +103,8 @@ class EffectPanelTest {
         }
         walk(home)
         for (id in listOf("camera", "camera.diamond", "camera.cloak", "camera.status", "camera.ghost", "camera.takeover",
-            "camera.mirror", "effects", "effects.emoji", "effects.ink", "effects.border", "effects.fireworks", "effects.portal",
+            "microphone", "effects",
+            "camera.mirror", "effects.emoji", "effects.ink", "effects.border", "effects.fireworks", "effects.portal",
             "effects.heroes", "effects.coaster", "effects.clouds", "effects.beach", "effects.freeze", "effects.illusion",
             "effects.sweep", "effects.depth", "effects.write", "effects.radar", "effects.echo", "effects.quiet", "effects.shatter",
             "effects.sound", "record", "presets", "offgrid_to_offgrid.handshake", "tiktok.effects", "tiktok.tests.code",
@@ -111,6 +113,30 @@ class EffectPanelTest {
         }
         assertEquals("folder ids are unique", ids.size, ids.toSet().size)
         assertEquals(18, home.folders.count { it.kind == FolderKind.PLATFORM })
+    }
+
+    @Test
+    fun microphoneSettingsStartOffAndExposeTheRexTuningControls() {
+        val defaults = PanelTree.defaults
+        val mic = PanelTree.build().folders.first { it.id == "microphone" }
+        val keys = mic.items.mapNotNull {
+            when (it) {
+                is NumberItem -> it.key
+                is ToggleItem -> it.key
+                else -> null
+            }
+        }
+
+        assertTrue(MicKeys.ON in keys)
+        assertTrue(MicKeys.BLOCKED in keys)
+        assertTrue(MicKeys.VOICE_SWAP in keys)
+        assertTrue(MicKeys.BYPASS in keys)
+        assertTrue(listOf(MicKeys.WET, MicKeys.PITCH, MicKeys.FORMANT, MicKeys.LOW_EQ, MicKeys.MID_EQ, MicKeys.HIGH_EQ)
+            .all { it in defaults.numbers })
+        assertEquals(false, defaults.toggles[MicKeys.ON])
+        assertEquals(false, defaults.toggles[MicKeys.BLOCKED])
+        assertEquals(false, defaults.toggles[MicKeys.VOICE_SWAP])
+        assertEquals(false, defaults.toggles[MicKeys.BYPASS])
     }
 
     @Test

@@ -214,6 +214,7 @@ internal object PanelTree {
         val top = listOf(
             settingsFolder(),
             EffectFolders.camera(),
+            EffectFolders.microphone(),
             EffectFolders.effects(),
             EffectFolders.record(),
             offgridFolder(),

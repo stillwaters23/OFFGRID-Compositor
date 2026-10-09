@@ -2,6 +2,7 @@ package com.offgrid.compositor.terminal
 
 import com.offgrid.compositor.effects.Fire
 import com.offgrid.compositor.effects.FxKeys
+import com.offgrid.compositor.audio.voice.MicKeys
 
 /**
  * The folders for the camera, the effects, recording, and each platform's kick tools and test
@@ -131,7 +132,7 @@ internal object EffectFolders {
         ),
         notes = listOf(
             "Pick Ghost in Camera mode to turn it on. GHOST ON shows on your screen.",
-            "This app has no mic, so no sound ever goes out.",
+            "The mic stays off unless you turn it on in Microphone Effects.",
             "If ghost was already on when the app opened, the box stays blank.",
         ),
     )
@@ -202,6 +203,31 @@ internal object EffectFolders {
             "Every effect is baked into the video viewers see.",
             "The panel is never in the video.",
             "Nothing flashes more than 3 times a second.",
+        ),
+    )
+
+    fun microphone() = PanelFolder(
+        id = "microphone",
+        title = "📁 Microphone Effects",
+        tag = null,
+        kind = FolderKind.EFFECTS,
+        items = listOf(
+            ToggleItem(MicKeys.ON, "Microphone", "The top-bar mic switch uses this same setting.", false, isTest = false),
+            ToggleItem(MicKeys.BLOCKED, "Hard block", "Stops capture and prevents anything from reopening the mic.", false, isTest = false),
+            ToggleItem(MicKeys.VOICE_SWAP, "Rex voice swap", "On-device pitch, formant color, and timbre EQ. No model or upload.", false, isTest = false),
+            ToggleItem(MicKeys.BYPASS, "Bypass", "Passes clean, unprocessed voice through the safe output path.", false, isTest = false),
+            NumberItem(MicKeys.WET, "Wet / dry", "0 is clean voice. 100 is the full Rex effect.", 68),
+            NumberItem(MicKeys.PITCH, "Pitch shift", "50 is unchanged. 0 is lower. 100 is higher.", 58),
+            NumberItem(MicKeys.FORMANT, "Formant shift", "50 is unchanged. Move the voice color lower or higher.", 44),
+            NumberItem(MicKeys.LOW_EQ, "Low EQ", "50 is unchanged. 0 cuts lows. 100 boosts lows.", 56),
+            NumberItem(MicKeys.MID_EQ, "Mid EQ", "50 is unchanged. 0 cuts mids. 100 boosts mids.", 58),
+            NumberItem(MicKeys.HIGH_EQ, "High EQ", "50 is unchanged. 0 cuts highs. 100 boosts highs.", 46),
+        ),
+        notes = listOf(
+            "The Rex preset is a tunable placeholder. Adjust pitch, formants, EQ, and wet mix below.",
+            "Capture begins only after you turn the mic on and allow microphone access.",
+            "Hard block releases the recorder. Unblock does not turn the mic back on.",
+            "Audio processing stays on this phone. No audio is uploaded.",
         ),
     )
 
@@ -345,7 +371,7 @@ internal object EffectFolders {
         fire(Fire.TIME_FREEZE, "Freeze now", "Holds your video still, then picks back up like a glitch."),
         notes = listOf(
             "Viewers see a paused picture, not a dropped stream.",
-            "This app has no mic, so no sound goes out during the freeze.",
+            "Mic audio follows the Microphone Effects settings.",
         ),
     )
 
@@ -491,7 +517,7 @@ internal object EffectFolders {
         ),
         notes = listOf(
             "Sounds play from your phone's speaker only.",
-            "This app has no mic, so the sounds are not added to the video.",
+            "Voice audio follows the Microphone Effects settings.",
         ),
     )
 
@@ -512,8 +538,8 @@ internal object EffectFolders {
         ),
         notes = listOf(
             "Videos have your effects in them. The panel is never in them.",
-            "There is no sound, because this app never uses the mic.",
-            "Videos stay on your phone. Nothing uploads.",
+            "Camera recordings in this build stay silent. Processed mic audio is exposed through the voice output hook.",
+            "Videos and voice processing stay on your phone. Nothing uploads.",
         ),
     )
 

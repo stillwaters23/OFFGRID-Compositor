@@ -56,13 +56,21 @@ import androidx.core.view.WindowInsetsControllerCompat
 import com.offgrid.compositor.effects.EffectEngine
 import com.offgrid.compositor.effects.EffectLayers
 import com.offgrid.compositor.effects.FxKeys
+import com.offgrid.compositor.audio.voice.AndroidMicSource
+import com.offgrid.compositor.audio.voice.MicCaptureController
+import com.offgrid.compositor.audio.voice.MicKeys
+import com.offgrid.compositor.audio.voice.MicState
+import com.offgrid.compositor.audio.voice.VoiceAudioRouter
+import com.offgrid.compositor.audio.voice.VoiceSwapDsp
+import com.offgrid.compositor.audio.voice.VoiceSwapSettings
+import com.offgrid.compositor.audio.voice.VoiceAudioOutput
 import com.offgrid.compositor.terminal.ScreenEdges
 import com.offgrid.compositor.terminal.TerminalPanel
 import java.io.File
 
 /**
  * Step 1. Shows the painted camera picture, records a few seconds, and plays it back.
- * The mic stays off.
+ * The mic stays off until explicitly enabled in Microphone Effects.
  * Step 2. The floating terminal panel sits on top. It is not painted into the video.
  * Step 2.1. The yellow test diamond is off unless Panel settings turns it on.
  * Final build. The effects, the no-face camera modes, and the face finder are baked into the
@@ -102,6 +110,11 @@ class MainActivity : AppCompatActivity() {
     private var shownMessage = 0
     private var diamondInVideo: Boolean? = null
     private lateinit var effects: EffectsController
+    private lateinit var voiceDsp: VoiceSwapDsp
+    private lateinit var micCapture: MicCaptureController
+    private val voiceAudio = VoiceAudioRouter()
+    private var micPermissionPending = false
+    private var micPermissionDenied = false
 
     /** True when the effects could not start on this phone. The camera screen says why it is black. */
     private var effectsBroken = false
@@ -117,6 +130,19 @@ class MainActivity : AppCompatActivity() {
             startCamera()
         } else {
             showPermissionHelp()
+        }
+    }
+
+    private val micPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        micPermissionPending = false
+        if (granted && terminalPanel.micEnabledSetting() && !terminalPanel.micBlockedSetting()) {
+            micCapture.setEnabled(true)
+        } else if (!granted) {
+            micPermissionDenied = true
+            terminalPanel.setMicSettings(false, terminalPanel.micBlockedSetting(), notify = false)
+            terminalPanel.announce(getString(R.string.mic_permission_denied))
         }
     }
 
@@ -138,6 +164,17 @@ class MainActivity : AppCompatActivity() {
         playbackHint = findViewById(R.id.playback_hint)
         backButton = findViewById(R.id.back_button)
         terminalPanel = findViewById(R.id.terminal_panel)
+        terminalPanel.onMicControl = { toggleMicFromTopBar() }
+        voiceDsp = VoiceSwapDsp()
+        micCapture = MicCaptureController(
+            source = AndroidMicSource(this),
+            dsp = voiceDsp,
+            output = voiceAudio,
+            onState = ::onMicStateChanged,
+        )
+        terminalPanel.setMicSettings(false, terminalPanel.micBlockedSetting(), notify = false)
+        if (terminalPanel.micBlockedSetting()) micCapture.setBlocked(true)
+        terminalPanel.setMicVisualState(micCapture.state)
 
         onBackPressedDispatcher.addCallback(this, terminalPanel.backCallback)
         terminalPanel.matchLook(
@@ -150,7 +187,10 @@ class MainActivity : AppCompatActivity() {
         faces = FaceTracker(this, engine)
         effects = EffectsController(this, terminalPanel, engine)
         effects.lastVideo = { recordingFile() }
-        effects.onSettings = { onEffectSettings() }
+        effects.onSettings = {
+            onEffectSettings()
+            syncMicSettings()
+        }
         effects.start()
         effects.attachInk(previewView)
         terminalPanel.useGuides(findViewById(R.id.snap_guides))
@@ -184,6 +224,13 @@ class MainActivity : AppCompatActivity() {
 
     override fun onPause() {
         effects.pause()
+        if (::micCapture.isInitialized) {
+            if (::terminalPanel.isInitialized) {
+                terminalPanel.setMicSettings(false, terminalPanel.micBlockedSetting(), notify = false)
+            }
+            micCapture.setEnabled(false)
+            if (::terminalPanel.isInitialized) terminalPanel.setMicVisualState(micCapture.state)
+        }
         hidePlayback()
         stopRecording()
         unbindCamera()
@@ -191,6 +238,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        if (::micCapture.isInitialized) micCapture.setEnabled(false)
         effects.release()
         processor?.onFirstFrame = null
         processor?.onFailed = null
@@ -199,6 +247,68 @@ class MainActivity : AppCompatActivity() {
         processor = null
         super.onDestroy()
     }
+
+    private fun toggleMicFromTopBar() {
+        if (terminalPanel.micBlockedSetting()) {
+            terminalPanel.announce(getString(R.string.mic_toggle_blocked))
+            return
+        }
+        if (terminalPanel.micEnabledSetting()) {
+            micPermissionDenied = false
+            terminalPanel.setMicSettings(false, false)
+        } else {
+            micPermissionDenied = false
+            terminalPanel.setMicSettings(true, false)
+        }
+    }
+
+    private fun syncMicSettings() {
+        if (!::micCapture.isInitialized) return
+        val blocked = terminalPanel.micBlockedSetting()
+        val wanted = terminalPanel.micEnabledSetting()
+        voiceDsp.settings = VoiceSwapSettings.fromPercent(
+            wet = terminalPanel.micNumberSetting(MicKeys.WET),
+            pitch = terminalPanel.micNumberSetting(MicKeys.PITCH),
+            formant = terminalPanel.micNumberSetting(MicKeys.FORMANT),
+            lowEq = terminalPanel.micNumberSetting(MicKeys.LOW_EQ),
+            midEq = terminalPanel.micNumberSetting(MicKeys.MID_EQ),
+            highEq = terminalPanel.micNumberSetting(MicKeys.HIGH_EQ),
+            enabled = terminalPanel.micToggleSetting(MicKeys.VOICE_SWAP),
+            bypass = terminalPanel.micToggleSetting(MicKeys.BYPASS),
+        )
+        if (blocked) {
+            if (wanted) terminalPanel.setMicSettings(false, true, notify = false)
+            micCapture.setBlocked(true)
+            return
+        }
+        if (micCapture.state == MicState.BLOCKED) micCapture.setBlocked(false)
+        if (!wanted) {
+            micPermissionDenied = false
+            micCapture.setEnabled(false)
+            return
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            micCapture.setEnabled(true)
+        } else if (!micPermissionPending && !micPermissionDenied) {
+            micPermissionPending = true
+            micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+        terminalPanel.setMicVisualState(micCapture.state)
+    }
+
+    private fun onMicStateChanged(state: MicState) {
+        runOnUiThread {
+            if (!::terminalPanel.isInitialized) return@runOnUiThread
+            if (state == MicState.OFF && terminalPanel.micEnabledSetting() && !terminalPanel.micBlockedSetting()) {
+                terminalPanel.setMicSettings(false, false, notify = false)
+                terminalPanel.announce(getString(R.string.mic_processing_failed))
+            }
+            terminalPanel.setMicVisualState(state)
+        }
+    }
+
+    /** Lane adapters attach processed audio here for recording or Send-to-PC output. */
+    fun addVoiceAudioOutput(output: VoiceAudioOutput): AutoCloseable = voiceAudio.addOutput(output)
 
     private fun hasCameraPermission(): Boolean {
         return ContextCompat.checkSelfPermission(

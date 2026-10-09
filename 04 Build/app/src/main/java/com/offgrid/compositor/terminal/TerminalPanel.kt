@@ -38,7 +38,9 @@ import androidx.core.animation.doOnStart
 import androidx.core.view.ViewCompat
 import androidx.core.view.isVisible
 import com.offgrid.compositor.R
+import com.offgrid.compositor.audio.voice.MicState
 import com.offgrid.compositor.effects.FxKeys
+import com.offgrid.compositor.audio.voice.MicKeys
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.hypot
@@ -78,6 +80,15 @@ class TerminalPanel @JvmOverloads constructor(
     private val focusSink = View(context)
     private val expanded = LinearLayout(context)
     private val header = LinearLayout(context)
+    private val micControl = MicControlView(context).apply {
+        setMicState(
+            when {
+                store.toggle(MicKeys.BLOCKED) -> MicState.BLOCKED
+                store.toggle(MicKeys.ON) -> MicState.ON
+                else -> MicState.OFF
+            },
+        )
+    }
     private val statusLine = LaserTypeView(context)
     private val sideList = ScrollView(context)
     private val sideRule = GlowRule(context, vertical = true, decor = false)
@@ -184,6 +195,9 @@ class TerminalPanel @JvmOverloads constructor(
     /** Called with a setting's key whenever any setting is saved, so the camera screen can follow it. */
     var onSettingChanged: ((String) -> Unit)? = null
 
+    /** Top-bar mic control. Capture permission and source state remain owned by the activity. */
+    var onMicControl: (() -> Unit)? = null
+
     /** Called when the Test diamond toggle changes. The camera screen passes it to the video painter. */
     var onTestDiamond: ((Boolean) -> Unit)? = null
 
@@ -198,6 +212,36 @@ class TerminalPanel @JvmOverloads constructor(
 
     /** Every effect setting right now, for the camera's effects. */
     fun effectSnapshot(): com.offgrid.compositor.effects.EffectSnapshot = EffectSettings.snapshot(store)
+
+    fun micEnabledSetting(): Boolean = store.toggle(MicKeys.ON)
+
+    fun micBlockedSetting(): Boolean = store.toggle(MicKeys.BLOCKED)
+
+    fun micToggleSetting(key: String): Boolean = store.toggle(key)
+
+    fun micNumberSetting(key: String): Int = store.number(key)
+
+    fun setMicVisualState(state: MicState) {
+        micControl.setMicState(state)
+    }
+
+    fun setMicSettings(enabled: Boolean, blocked: Boolean, notify: Boolean = true) {
+        val safeEnabled = enabled && !blocked
+        store.setToggle(MicKeys.ON, safeEnabled)
+        store.setToggle(MicKeys.BLOCKED, blocked)
+        micControl.setMicState(
+            when {
+                blocked -> MicState.BLOCKED
+                safeEnabled -> MicState.ON
+                else -> MicState.OFF
+            },
+        )
+        if (openFolder?.id == MIC_FOLDER_ID) openFolder?.let(::buildDetail)
+        if (notify) {
+            settingChanged(MicKeys.ON)
+            settingChanged(MicKeys.BLOCKED)
+        }
+    }
 
     /** The panel's glow color, for effects that follow the panel's look. */
     val glowColor: Int get() = look.outerGlow
@@ -797,6 +841,11 @@ class TerminalPanel @JvmOverloads constructor(
             styled(TextRole.TITLE, 12.5f)
         }
         header.addView(title, LinearLayout.LayoutParams(0, WRAP, 1f))
+        micControl.contentDescription = context.getString(R.string.mic_toggle_off)
+        micControl.setOnClickListener { onMicControl?.invoke() }
+        header.addView(micControl, LinearLayout.LayoutParams(dpi(TARGET_DP), dpi(TARGET_DP)).apply {
+            marginStart = dpi(2f)
+        })
         header.addView(widthBox, LinearLayout.LayoutParams(WRAP, WRAP).apply { marginStart = dpi(4f) })
         header.addView(heightBox, LinearLayout.LayoutParams(WRAP, WRAP).apply { marginStart = dpi(4f) })
         moreButton.contentDescription = context.getString(R.string.terminal_menu_button)
@@ -2208,6 +2257,7 @@ class TerminalPanel @JvmOverloads constructor(
         const val CORNER_SHARE = 0.3f
 
         /** The smallest comfortable touch target, for the ⋮ and − buttons. */
+        const val MIC_FOLDER_ID = "microphone"
         const val TARGET_DP = 48f
         const val DETAIL_BOTTOM_DP = 30f
         const val SIDE_SHARE = 0.29f
