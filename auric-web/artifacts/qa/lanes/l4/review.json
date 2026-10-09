@@ -1,0 +1,42 @@
+{
+  "reviewed_pr": 33,
+  "issue": 32,
+  "head": "e3720da1",
+  "required_base": "auric-base",
+  "verdict": "CHANGES-NEEDED",
+  "criteria": [
+    {"id":"L4-1","status":"PASS","evidence":"Unit confirms free clicker-sounds/pulses registration and unchanged module order; E2E opens the folder."},
+    {"id":"L4-2","status":"PASS","evidence":"Unit/E2E verify seven families, 77 cuts each, 539 unique IDs, and first/last IDs."},
+    {"id":"L4-3","status":"PASS","evidence":"E2E verifies ten row selections/previews and a timer notch with selected sound."},
+    {"id":"L4-4","status":"PASS","evidence":"Unit/E2E verify click-01 House default and legacy tick id resolution."},
+    {"id":"L4-5","status":"PASS","evidence":"E2E verifies opening is silent; ten rapid taps create ten oscillator starts with no page errors."},
+    {"id":"L4-6","status":"PASS","evidence":"E2E checks both moods at 320/390/768/1280, no page overflow, rows >=44px, and 320px tab scrolling."},
+    {"id":"L4-7","status":"FAIL","evidence":"PR #33 does not contain L3 fields/controls; L3 size, icon style, and rename are unavailable on this branch."},
+    {"id":"L4-8","status":"NOT-VERIFIED","evidence":"Timer notch is tested; timer-sounds and Pavilion The Wheel were not browser-tested."},
+    {"id":"L4-9","status":"FAIL","evidence":"npm ci/full npm test fail; src/styles/clicker.css adds off-grid font-size:12px. Typecheck/lint/build/focused tests/e2e pass."}
+  ],
+  "write_target_audit": [
+    {"path":"auric-web/src/components/auric/clicker-sounds-folder.tsx","status":"OK"},
+    {"path":"auric-web/src/components/auric/folder-stage.tsx","status":"OK","note":"Add-only import and case."},
+    {"path":"auric-web/src/lib/modules.ts","status":"OK","note":"Add-only module registration."},
+    {"path":"auric-web/src/styles/clicker.css","status":"OK"},
+    {"path":"auric-web/tests/e2e/l4-clicker-sounds.e2e.mjs","status":"OK"},
+    {"path":"auric-web/tests/l4-clicker-sounds.test.ts","status":"OK"}
+  ],
+  "global_audit": {
+    "clean_install":"FAIL on baseline and lane heads: package-lock.json omits lru-cache@11.5.3.",
+    "typecheck":"PASS",
+    "lint":"PASS with existing warning at src/components/auric/termux-chrome.tsx:169",
+    "full_test":"FAIL: 184 passed, 11 failed; same failures on auric-base.",
+    "build":"PASS",
+    "focused_tests":"PASS: 3/3",
+    "e2e":"PASS: 1/1 focused Playwright test.",
+    "browser_smoke":"NOT-VERIFIED: HTTP 200/no page errors/no overflow; external DNS errors cause exit 2 and reproduce on baseline.",
+    "eight_dp":"FAIL: clicker.css adds font-size 12px.",
+    "dependencies_and_costs":"PASS: no new dependencies, paid APIs, or cloud services.",
+    "acceptance_reporting":"FAIL: PR description omits full criterion verdict/evidence and retains a stale claim that the base is main.",
+    "baseline_behavior":"NOT-VERIFIED for timer-sounds and Pavilion The Wheel.",
+    "reduced_motion":"PASS by inspection: this lane adds no animation."
+  },
+  "shots": ["shots/l4-clicker-folder.png"]
+}
