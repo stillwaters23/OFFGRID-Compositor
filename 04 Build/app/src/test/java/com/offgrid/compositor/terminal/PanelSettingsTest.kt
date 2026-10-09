@@ -73,7 +73,7 @@ class PanelSettingsTest {
             .putInt(PanelPrefs.LAYOUT, 2)
             .putInt("number.opacity", 85)
             .putInt("number.height", 32)
-            .putString("text.base_theme", Theme.TITANIUM.key)
+            .putString("text.base_theme", ArchivedTheme.TITANIUM.key)
             .putBoolean("toggle.titanium_frame", true)
             .putBoolean("toggle.test.bigo_live.tests.burned_in", true)
             .commit()
