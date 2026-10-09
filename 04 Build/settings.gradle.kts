@@ -16,3 +16,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "OFFGRID Compositor"
 include(":app")
+include(":live")
