@@ -350,6 +350,7 @@ internal data class PanelLook(
     val toggleGlow: Boolean = false,
     val borderThickness: Int = 50,
     val glowBloom: Float = 0f,
+    val glowValue: Int = 50,
 ) {
     /** Holo Classic keeps the Step 2 cut corners, gold brackets, and tinted glass. */
     val holo: Boolean get() = base == Theme.HOLO
@@ -509,6 +510,7 @@ internal class ThemeStore(private val context: Context, private val prefs: Panel
             glowBoost = if (glowOn) PanelGeometry.glowBoost(number(LookKeys.GLOW)) else 0f,
             borderThickness = number(LookKeys.BORDER_THICKNESS),
             glowBloom = if (glowOn) PanelGeometry.glowBloom(number(LookKeys.GLOW)) else 0f,
+            glowValue = number(LookKeys.GLOW),
             edgeGlow = toggle(LookKeys.EDGE_GLOW),
             outerGlowOn = toggle(LookKeys.OUTER_GLOW),
             pulse = toggle(LookKeys.PULSE),

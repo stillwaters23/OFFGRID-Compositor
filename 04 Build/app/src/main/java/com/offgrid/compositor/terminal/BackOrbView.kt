@@ -36,11 +36,11 @@ internal class BackOrbView(context: Context) : View(context) {
         isFocusable = true
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES
         contentDescription = context.getString(R.string.terminal_back_label)
-        arrowPath.moveTo(Hud.dp(context, 27f), Hud.dp(context, 24f))
-        arrowPath.lineTo(Hud.dp(context, 19f), Hud.dp(context, 16f))
-        arrowPath.lineTo(Hud.dp(context, 27f), Hud.dp(context, 8f))
-        arrowPath.moveTo(Hud.dp(context, 19f), Hud.dp(context, 16f))
-        arrowPath.lineTo(Hud.dp(context, 33f), Hud.dp(context, 16f))
+        arrowPath.moveTo(Hud.dp(context, 16f), Hud.dp(context, 24f))
+        arrowPath.lineTo(Hud.dp(context, 24f), Hud.dp(context, 16f))
+        arrowPath.moveTo(Hud.dp(context, 16f), Hud.dp(context, 24f))
+        arrowPath.lineTo(Hud.dp(context, 32f), Hud.dp(context, 24f))
+        arrowPath.lineTo(Hud.dp(context, 24f), Hud.dp(context, 32f))
     }
 
     override fun onDraw(canvas: Canvas) {

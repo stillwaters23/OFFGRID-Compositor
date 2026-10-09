@@ -115,19 +115,6 @@ internal fun TerminalPanel.pathBar(folder: PanelFolder): View {
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
     }
-    val back = TextView(context).apply {
-        text = context.getString(R.string.terminal_back)
-        typeface = Hud.monoBold(context)
-        setPadding(dpi(6f), dpi(9f), dpi(10f), dpi(9f))
-        isClickable = true
-        isFocusable = true
-        foreground = pressGlow(context, look.edge)
-        contentDescription = context.getString(R.string.terminal_back_label)
-        setOnClickListener { goUp() }
-        styled(TextRole.BACK, 11f)
-    }
-    bar.addView(back)
-    // The whole path shows. A long one wraps between words instead of being cut.
     val path = FitTextView(context).apply {
         text = (listOf(context.getString(R.string.terminal_home)) + folder.trail().map { it.label })
             .joinToString(" › ")

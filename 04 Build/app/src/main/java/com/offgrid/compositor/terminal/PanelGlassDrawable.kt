@@ -2,6 +2,7 @@ package com.offgrid.compositor.terminal
 
 import android.graphics.Bitmap
 import android.graphics.BitmapShader
+import android.graphics.BlendMode
 import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
 import android.graphics.ColorFilter
@@ -52,6 +53,66 @@ internal class PanelGlassDrawable(
             invalidateSelf()
         }
 
+        private fun drawResizeBar(canvas: Canvas, glow: Masks, current: PanelLook) {
+            val top = resizeBarTop(current)
+            resizeMaskTarget.set(
+                bounds.left.toFloat(),
+                bounds.top + top / MASK_SCALE,
+                bounds.right.toFloat(),
+                bounds.top + top / MASK_SCALE + glow.resizeBar.height / MASK_SCALE,
+            )
+            maskPaint.blendMode = null
+            maskPaint.color = Hud.lighten(current.edge, 0.6f)
+            maskPaint.alpha = 255
+            canvas.drawBitmap(glow.resizeBar, null, resizeMaskTarget, maskPaint)
+            val level = current.glowValue
+            if (level <= 0) return
+            val pulse = resizeBarPulse
+            drawAdditiveMask(
+                canvas,
+                glow.resizeCore,
+                top,
+                Hud.lighten(current.edge, 0.6f),
+                PanelGeometry.resizeBarLayerAlpha(level, 0) * pulse,
+            )
+            drawAdditiveMask(
+                canvas,
+                glow.resizeMid,
+                top,
+                current.edge,
+                PanelGeometry.resizeBarLayerAlpha(level, 1) * pulse,
+            )
+            drawAdditiveMask(
+                canvas,
+                glow.resizeOuter,
+                top,
+                current.outerGlow,
+                PanelGeometry.resizeBarLayerAlpha(level, 2) * pulse,
+            )
+        }
+
+        private fun resizeBarTop(current: PanelLook): Float {
+            val radius = dp(PanelGeometry.resizeBarGlowRadiusDp(current.glowValue).coerceAtLeast(1f))
+            val halfRange = radius + dp(PanelGeometry.RESIZE_BAR_HEIGHT_DP) / 2f + dp(2f)
+            return ((glass.bottom - dp(PanelGeometry.borderInsetDp(current.borderThickness)) -
+                halfRange - bounds.top) * MASK_SCALE).coerceAtLeast(0f)
+        }
+
+        private fun drawAdditiveMask(canvas: Canvas, mask: Bitmap, top: Float, color: Int, alpha: Float) {
+            if (alpha <= 0f) return
+            maskPaint.blendMode = BlendMode.PLUS
+            maskPaint.color = color
+            maskPaint.alpha = (alpha.coerceIn(0f, 1f) * 255f).toInt()
+            resizeMaskTarget.set(
+                bounds.left.toFloat(),
+                bounds.top + top / MASK_SCALE,
+                bounds.right.toFloat(),
+                bounds.top + top / MASK_SCALE + mask.height / MASK_SCALE,
+            )
+            canvas.drawBitmap(mask, null, resizeMaskTarget, maskPaint)
+            maskPaint.blendMode = null
+        }
+
     var fullBleed = false
         set(value) {
             if (field == value) return
@@ -73,7 +134,7 @@ internal class PanelGlassDrawable(
     var look: PanelLook? = null
         set(value) {
             val reshape = field?.roundness != value?.roundness || field?.holo != value?.holo ||
-                field?.titanium != value?.titanium
+                field?.titanium != value?.titanium || field?.borderThickness != value?.borderThickness
             field = value
             if (reshape) rebuildShape()
             updateFill()
@@ -82,6 +143,20 @@ internal class PanelGlassDrawable(
 
     /** 0 to 1. How bright the breathing glow is right now. */
     var breath = 0.8f
+
+    var resizeBarPulse = 1f
+        set(value) {
+            if (field == value) return
+            field = value
+            invalidateSelf()
+        }
+
+    var resizeBarVisible = true
+        set(value) {
+            if (field == value) return
+            field = value
+            invalidateSelf()
+        }
 
     /** While the panel is being resized, keep the old glow masks stretched instead of redrawing them. */
     var holdMasks = false
@@ -131,6 +206,7 @@ internal class PanelGlassDrawable(
     }
     private val maskPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val maskTarget = RectF()
+    private val resizeMaskTarget = RectF()
     private val masks = LinkedHashMap<String, Masks>()
     private var displayCornerRadii: FloatArray? = null
 
@@ -141,7 +217,23 @@ internal class PanelGlassDrawable(
     private var glassSheen: LinearGradient? = null
     private var titleShadow: LinearGradient? = null
 
-    private class Masks(val outer: Bitmap, val bloom: Bitmap, val edge: Bitmap, val wash: Bitmap)
+    private class Masks(
+        val outer: Bitmap,
+        val bloom: Bitmap,
+        val edge: Bitmap,
+        val wash: Bitmap,
+        val resizeBar: Bitmap,
+        val resizeCore: Bitmap,
+        val resizeMid: Bitmap,
+        val resizeOuter: Bitmap,
+    )
+
+    private class ResizeMasks(
+        val bar: Bitmap,
+        val core: Bitmap,
+        val mid: Bitmap,
+        val outer: Bitmap,
+    )
 
     private fun dp(value: Float) = value * density
 
@@ -377,7 +469,7 @@ internal class PanelGlassDrawable(
     private fun masksFor(): Masks? {
         val b = bounds
         if (b.isEmpty || glass.isEmpty || pane) return null
-        val key = "${b.width()}x${b.height()}:$margin:${look?.roundness}:${look?.holo}"
+        val key = "${b.width()}x${b.height()}:$margin:${look?.roundness}:${look?.holo}:${look?.borderThickness}:${look?.glowValue}"
         masks[key]?.let { return it }
         if (holdMasks) return masks.values.lastOrNull()
         // The masks are soft, so half size looks the same and uses a quarter of the memory.
@@ -409,13 +501,68 @@ internal class PanelGlassDrawable(
         paint.strokeWidth = dp(2.5f) * MASK_SCALE
         paint.maskFilter = BlurMaskFilter(dp(5f) * MASK_SCALE, BlurMaskFilter.Blur.NORMAL)
         Canvas(edge).drawPath(local, paint)
-        val made = Masks(outer, bloom, edge, wash)
+        val resize = buildResizeBarMasks(b, maskWidth)
+        val made = Masks(
+            outer,
+            bloom,
+            edge,
+            wash,
+            resize.bar,
+            resize.core,
+            resize.mid,
+            resize.outer,
+        )
         masks[key] = made
         while (masks.size > 2) {
             val oldest = masks.keys.first()
             masks.remove(oldest)
         }
         return made
+    }
+
+    private fun buildResizeBarMasks(bounds: Rect, maskWidth: Int): ResizeMasks {
+        val panelLook = look ?: return ResizeMasks(
+            Bitmap.createBitmap(1, 1, Bitmap.Config.ALPHA_8),
+            Bitmap.createBitmap(1, 1, Bitmap.Config.ALPHA_8),
+            Bitmap.createBitmap(1, 1, Bitmap.Config.ALPHA_8),
+            Bitmap.createBitmap(1, 1, Bitmap.Config.ALPHA_8),
+        )
+        val path = Path()
+        val radiusPx = dp(PanelGeometry.resizeBarGlowRadiusDp(panelLook.glowValue).coerceAtLeast(1f))
+        val strokePx = dp(PanelGeometry.RESIZE_BAR_HEIGHT_DP)
+        val halfRange = radiusPx + strokePx / 2f + dp(2f)
+        val top = ((glass.bottom - dp(PanelGeometry.borderInsetDp(panelLook.borderThickness)) - halfRange - bounds.top) *
+            MASK_SCALE).coerceAtLeast(0f)
+        val maskHeight = (minOf(halfRange * 2f * MASK_SCALE, bounds.height() * MASK_SCALE - top))
+            .roundToInt()
+            .coerceAtLeast(1)
+        val left = (glass.left + dp(PanelGeometry.RESIZE_BAR_INSET_DP) - bounds.left) * MASK_SCALE
+        val right = (glass.right - dp(PanelGeometry.RESIZE_BAR_INSET_DP) - bounds.left) * MASK_SCALE
+        val bar = Bitmap.createBitmap(maskWidth, maskHeight, Bitmap.Config.ALPHA_8)
+        val core = Bitmap.createBitmap(maskWidth, maskHeight, Bitmap.Config.ALPHA_8)
+        val mid = Bitmap.createBitmap(maskWidth, maskHeight, Bitmap.Config.ALPHA_8)
+        val outer = Bitmap.createBitmap(maskWidth, maskHeight, Bitmap.Config.ALPHA_8)
+        if (right <= left) return ResizeMasks(bar, core, mid, outer)
+        val centerY = (glass.bottom - dp(PanelGeometry.borderInsetDp(panelLook.borderThickness)) - bounds.top) *
+            MASK_SCALE - top
+        val stroke = strokePx * MASK_SCALE
+        val radius = dp(PanelGeometry.RESIZE_BAR_CAP_RADIUS_DP) * MASK_SCALE
+        path.addRoundRect(left, centerY - stroke / 2f, right, centerY + stroke / 2f, radius, radius, Path.Direction.CW)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Hud.WHITE }
+        Canvas(bar).drawPath(path, paint)
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = stroke
+        paint.strokeCap = Paint.Cap.ROUND
+        paint.maskFilter = BlurMaskFilter(dp(3f) * MASK_SCALE, BlurMaskFilter.Blur.NORMAL)
+        Canvas(core).drawPath(path, paint)
+        paint.maskFilter = BlurMaskFilter(dp(12f) * MASK_SCALE, BlurMaskFilter.Blur.NORMAL)
+        Canvas(mid).drawPath(path, paint)
+        paint.maskFilter = BlurMaskFilter(
+            dp(PanelGeometry.resizeBarGlowRadiusDp(panelLook.glowValue).coerceAtLeast(1f)) * MASK_SCALE,
+            BlurMaskFilter.Blur.NORMAL,
+        )
+        Canvas(outer).drawPath(path, paint)
+        return ResizeMasks(bar, core, mid, outer)
     }
 
     private fun drawMask(canvas: Canvas, mask: Bitmap, color: Int, alpha: Float) {
@@ -431,6 +578,7 @@ internal class PanelGlassDrawable(
         if (bounds.isEmpty || glass.isEmpty) return
         if (sapphireOn()) {
             drawSapphire(canvas, current)
+            if (resizeBarVisible) masksFor()?.let { drawResizeBar(canvas, it, current) }
             return
         }
         val strength = current.glowStrength
@@ -477,6 +625,7 @@ internal class PanelGlassDrawable(
             canvas.drawPath(ticks, line)
             holoStroke(canvas, brackets, current.decor, strength)
         }
+        if (resizeBarVisible && glow != null) drawResizeBar(canvas, glow, current)
     }
 
     /** The titanium band: metal, brushed streaks, a light bevel outside, and a dark bevel inside. */

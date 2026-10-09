@@ -6,6 +6,10 @@ import kotlin.math.roundToInt
 internal enum class PanelResizeZone { NONE, BOTTOM_EDGE, BOTTOM_LEFT, BOTTOM_RIGHT }
 
 internal object PanelGeometry {
+    const val RESIZE_BAR_HEIGHT_DP = 6f
+    const val RESIZE_BAR_INSET_DP = 16f
+    const val RESIZE_BAR_CAP_RADIUS_DP = 3f
+
     fun isFullBleed(width: Int, height: Int, fullScreen: Boolean): Boolean =
         fullScreen || (width == 100 && height == 100)
 
@@ -35,6 +39,34 @@ internal object PanelGeometry {
     fun borderInsetDp(value: Int): Float = borderStrokeDp(value) / 2f + 1f
 
     fun borderCornerRadius(radius: Float, inset: Float): Float = (radius - inset).coerceAtLeast(0f)
+
+    fun resizeHeight(start: Float, dy: Float, minimum: Float, maximum: Float): Float =
+        (start + dy).coerceIn(minimum.coerceAtLeast(0f), maximum.coerceAtLeast(minimum))
+
+    fun resizeWidth(start: Float, dx: Float, minimum: Float, maximum: Float): Float =
+        (start + dx).coerceIn(minimum.coerceAtLeast(0f), maximum.coerceAtLeast(minimum))
+
+    fun resizeWidthDelta(zone: PanelResizeZone, dx: Float): Float =
+        if (zone == PanelResizeZone.BOTTOM_EDGE) 0f else dx
+
+    fun resizeBarGlowRadiusDp(value: Int): Float {
+        val amount = value.coerceIn(0, 100)
+        return if (amount <= 50) 24f * amount / 50f else 24f + 8f * (amount - 50) / 50f
+    }
+
+    fun resizeBarLayerAlpha(value: Int, layer: Int): Float {
+        val base = when (layer) {
+            0 -> 0.2f
+            1 -> 0.16f
+            else -> 0.12f
+        }
+        val amount = value.coerceIn(0, 100)
+        val scale = if (amount <= 50) amount / 50f else 1f + 1.5f * (amount - 50) / 50f
+        return base * scale
+    }
+
+    fun resizeBarLayerAlphaSum(value: Int): Float =
+        resizeBarLayerAlpha(value, 0) + resizeBarLayerAlpha(value, 1) + resizeBarLayerAlpha(value, 2)
 
     fun glowStrength(value: Int): Float {
         val amount = value.coerceIn(0, 100) / 100f

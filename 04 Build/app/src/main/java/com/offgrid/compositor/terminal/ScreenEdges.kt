@@ -9,7 +9,7 @@ package com.offgrid.compositor.terminal
  *
  * [top], [bottom], [left], and [right] are the bars and the camera hole, measured the same
  * whether the bars show or hide, so pulling down the status bar never moves the panel.
- * The gesture values are where a swipe means Back or Home. Dragging the resize corner
+ * The gesture values are where a swipe means Back or Home. Dragging the resize edge
  * there would fight the phone, so the corner stays out. [cornerRadius] is how round the
  * screen's own corners are.
  */

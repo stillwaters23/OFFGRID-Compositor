@@ -61,41 +61,81 @@ class PanelUiTest {
 
     @Test
     fun topBarControlsShareCenterLineAtPhoneWidths() {
+        val panel = TerminalPanel(context)
+        val orb = BackOrbView(context)
         val bar = TopBar(
             context,
-            PanelPrefs(context),
+            panel.prefs,
             width = 100,
             height = 100,
+            backOrb = orb,
             onShrink = {},
             onToggle = { _, _, _ -> },
             onDimensionChanged = { _, _ -> },
             onViewModeChanged = {},
         )
         val density = context.resources.displayMetrics.density
-        val barHeight = Hud.dpi(context, 48f)
 
         listOf(360, 412, 480).forEach { widthDp ->
             val width = (widthDp * density).roundToInt()
-            repeat(2) {
-                bar.measure(
+            listOf(0, Hud.dpi(context, 24f)).forEach { insetTop ->
+                val parent = FrameLayout(context)
+                (bar.parent as? ViewGroup)?.removeView(bar)
+                val params = FrameLayout.LayoutParams(width, Hud.dpi(context, 56f)).apply {
+                    topMargin = insetTop
+                }
+                parent.addView(bar, params)
+                parent.measure(
                     MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY),
-                    MeasureSpec.makeMeasureSpec(barHeight, MeasureSpec.EXACTLY),
+                    MeasureSpec.makeMeasureSpec(insetTop + Hud.dpi(context, 80f), MeasureSpec.EXACTLY),
                 )
-                bar.layout(0, 0, width, barHeight)
-            }
+                parent.layout(0, 0, width, insetTop + Hud.dpi(context, 80f))
 
-            val title = bar.getChildAt(0)
-            assertTrue("$widthDp dp title remains visible", title.measuredWidth > 0)
-            for (index in 0 until bar.childCount) {
-                val child = bar.getChildAt(index)
-                if (child.visibility != View.VISIBLE) continue
-                val center = child.top + child.height / 2
-                assertTrue("$widthDp dp child $index is centered", abs(center - barHeight / 2) <= 1)
+                val title = bar.getChildAt(1)
+                assertTrue("$widthDp dp title has layout width", title.measuredWidth > 0)
+                val visible = (0 until bar.childCount).map(bar::getChildAt).filter { it.visibility == View.VISIBLE }
+                val controlCenter = visible.first().top + visible.first().height / 2 + insetTop
+                visible.forEachIndexed { index, child ->
+                    assertEquals("$widthDp dp control $index height", Hud.dpi(context, 48f), child.height)
+                    assertTrue(
+                        "$widthDp dp control $index center",
+                        abs(child.top + child.height / 2 + insetTop - controlCenter) <= 1,
+                    )
+                }
+                visible.zipWithNext().forEachIndexed { index, (first, second) ->
+                    if (index > 1) {
+                        assertEquals("$widthDp dp control gap $index", Hud.dpi(context, 8f), second.left - first.right)
+                    }
+                }
+                assertEquals(orb, bar.getChildAt(0))
+                assertEquals(bar.width - bar.paddingRight, visible.last().right)
+                val boxesVisible = (bar.widthInput.parent as View).visibility == View.VISIBLE &&
+                    (bar.heightInput.parent as View).visibility == View.VISIBLE
+                assertEquals(widthDp >= 400, boxesVisible)
             }
-            val boxesVisible = (bar.widthInput.parent as View).visibility == View.VISIBLE &&
-                (bar.heightInput.parent as View).visibility == View.VISIBLE
-            assertEquals(widthDp >= 480, boxesVisible)
         }
+    }
+
+    @Test
+    fun homeHasNoDockedFolderListAndBackOrbReplacesTheTextRow() {
+        val panel = TerminalPanel(context)
+        assertEquals(1, panel.body.childCount)
+        assertTrue(panel.body.getChildAt(0) is FrameLayout)
+        assertEquals(panel.backOrb, panel.topBar.getChildAt(0))
+        panel.refreshBack()
+        assertFalse(panel.backOrb.isEnabled)
+
+        val folder = panel.home.folders.single { it.id == "microphone" }
+        panel.openFolder = folder
+        panel.buildDetail(folder)
+        panel.refreshBack()
+        assertTrue(panel.backOrb.isEnabled)
+        val words = findViews(panel.detailContent).filterIsInstance<TextView>().map { it.text.toString() }
+        assertFalse(words.contains(context.getString(com.offgrid.compositor.R.string.terminal_back)))
+        assertFalse(words.contains("‹ BACK"))
+        panel.backOrb.performClick()
+        assertEquals(null, panel.openFolder)
+        assertFalse(panel.backOrb.isEnabled)
     }
 
     @Test

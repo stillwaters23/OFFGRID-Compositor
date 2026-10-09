@@ -6,6 +6,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.animation.DecelerateInterpolator
+import android.view.animation.PathInterpolator
 import androidx.core.animation.doOnEnd
 import com.offgrid.compositor.R
 import kotlin.math.hypot
@@ -51,7 +52,7 @@ internal fun TerminalPanel.areaHeight(): Int {
 }
 
 internal fun TerminalPanel.resizeZoneAt(x: Float, y: Float): PanelResizeZone {
-    if (minimized || fullBleed) return PanelResizeZone.NONE
+    if (minimized) return PanelResizeZone.NONE
     val screen = visibleWindowEdges ?: edges
     val glassLeft = (translationX + margin).roundToInt()
     val glassRight = glassLeft + width - margin * 2
@@ -81,6 +82,7 @@ internal fun TerminalPanel.startBottomResize(zone: PanelResizeZone, event: Motio
     resizeStartHeight = (height - margin * 2).toFloat()
     resizeMoved = false
     stopCentering()
+    startResizeBarPulse()
     parent?.requestDisallowInterceptTouchEvent(true)
 }
 
@@ -94,14 +96,63 @@ internal fun TerminalPanel.handleBottomResize(event: MotionEvent) {
             hideKeyboard()
             glass.holdMasks = true
             val zone = resizeZone ?: return
-            val widthChange = if (zone == PanelResizeZone.BOTTOM_EDGE) 0f else dx
+            val widthChange = PanelGeometry.resizeWidthDelta(zone, dx)
             resizeGlassTo(resizeStartWidth + widthChange, resizeStartHeight + dy)
         }
         MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
             if (resizeMoved) finishLiveSize() else glass.holdMasks = false
+            stopResizeBarPulse()
             resizeZone = null
             resizeMoved = false
         }
+    }
+}
+
+internal fun TerminalPanel.startResizeBarPulse() {
+    val previous = resizePulseAnimator
+    resizePulseAnimator = null
+    previous?.cancel()
+    if (!ValueAnimator.areAnimatorsEnabled()) {
+        glass.resizeBarPulse = 1.6f
+        return
+    }
+    resizePulseAnimator = ValueAnimator.ofFloat(1f, 1.6f).apply {
+        duration = 180L
+        interpolator = PathInterpolator(0.2f, 0f, 0f, 1f)
+        addUpdateListener { glass.resizeBarPulse = it.animatedValue as Float }
+        doOnEnd {
+            if (resizePulseAnimator === this && resizeZone != null) {
+                resizePulseAnimator = ValueAnimator.ofFloat(1.2f, 1.6f).apply {
+                    duration = 1_200L
+                    repeatMode = ValueAnimator.REVERSE
+                    repeatCount = ValueAnimator.INFINITE
+                    addUpdateListener { glass.resizeBarPulse = it.animatedValue as Float }
+                    start()
+                }
+            }
+        }
+        start()
+    }
+}
+
+internal fun TerminalPanel.stopResizeBarPulse() {
+    val pulse = glass.resizeBarPulse
+    val previous = resizePulseAnimator
+    resizePulseAnimator = null
+    previous?.cancel()
+    if (!ValueAnimator.areAnimatorsEnabled()) {
+        glass.resizeBarPulse = 1f
+        return
+    }
+    resizePulseAnimator = ValueAnimator.ofFloat(pulse, 1f).apply {
+        duration = 220L
+        interpolator = PathInterpolator(0.2f, 0f, 0f, 1f)
+        addUpdateListener { glass.resizeBarPulse = it.animatedValue as Float }
+        doOnEnd {
+            glass.resizeBarPulse = 1f
+            resizePulseAnimator = null
+        }
+        start()
     }
 }
 
@@ -112,8 +163,8 @@ internal fun TerminalPanel.resizeGlassTo(newWidth: Float, newHeight: Float) {
     val heights = heightRange(areaHeight())
     val roomWidth = (areaWidth() - (translationX + margin)).coerceIn(widths.first.toFloat(), widths.second.toFloat())
     val roomHeight = (areaHeight() - (userY + margin)).coerceIn(heights.first.toFloat(), heights.second.toFloat())
-    val glassWidth = newWidth.coerceIn(widths.first.toFloat(), roomWidth)
-    val glassHeight = newHeight.coerceIn(heights.first.toFloat(), roomHeight)
+    val glassWidth = PanelGeometry.resizeWidth(0f, newWidth, widths.first.toFloat(), roomWidth)
+    val glassHeight = PanelGeometry.resizeHeight(0f, newHeight, heights.first.toFloat(), roomHeight)
     liveSize = glassWidth to glassHeight
     showSizeNumbers(percentFor(glassWidth, widths), percentFor(glassHeight, heights))
     requestLayout()
@@ -133,11 +184,11 @@ internal fun TerminalPanel.finishLiveSize() {
         requestLayout()
         post { savePosition() }
         say(context.getString(R.string.terminal_size_saved, widthPercent, heightPercent))
-        if (look.tick) performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+        if (look.tick) performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
     }
 }
 
-/** For screen readers: the Bigger and Smaller actions on the resize corner. */
+/** For screen readers: the Bigger and Smaller actions on the panel. */
 internal fun TerminalPanel.resizeBy(step: Float) {
     if (minimized) return
     resizeGlassTo((width - margin * 2) + step, (height - margin * 2) + step)
@@ -220,7 +271,7 @@ internal fun TerminalPanel.moveGlassTo(x: Float, y: Float) {
 
 /**
  * Where the glass reaches an edge of the screen, its words and buttons move in, out of
- * the bars, the camera hole, and the round corners. The resize corner also stays out of
+ * the bars, the camera hole, and the round corners. The resize edge also stays out of
  * the Back swipe area. The glass itself still fills the screen.
  */
 internal fun TerminalPanel.refreshEdgeRoom() {

@@ -22,6 +22,7 @@ internal class TopBar(
     prefs: PanelPrefs,
     width: Int,
     height: Int,
+    private val backOrb: BackOrbView,
     onShrink: () -> Unit,
     onToggle: (String, Boolean, String) -> Unit,
     onDimensionChanged: (String, Int) -> Unit,
@@ -31,51 +32,85 @@ internal class TopBar(
     val heightInput: EditText
     private val widthControl: FrameLayout
     private val heightControl: FrameLayout
-    private lateinit var titleView: TextView
+    private val titleView: TextView
     private val camera = QuickToggleView(context, false, prefs.toggle(FxKeys.CAMERA_ON, true))
     private val microphone = QuickToggleView(context, true, prefs.toggle(FxKeys.MIC_ON, false))
+    private val moreButton: View
+    private val shrinkButton: View
     private var currentWidth = width
     private var currentHeight = height
+    private var boxesVisible = false
+    private var laidOutWidth = 0
+    private val sideGap = Hud.dpi(context, 8f)
+    private val narrowIconWidth = Hud.dpi(context, 40f)
+    private val boxWidth = Hud.dpi(context, 48f)
 
     init {
         orientation = HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
-        setPadding(Hud.dpi(context, 64f), Hud.dpi(context, 4f), 0, Hud.dpi(context, 4f))
+        setPadding(Hud.dpi(context, 16f), 0, Hud.dpi(context, 16f), 0)
         contentDescription = context.getString(R.string.terminal_drag)
+
+        backOrb.layoutParams = LayoutParams(Hud.dpi(context, 48f), Hud.dpi(context, 48f))
+        addView(backOrb)
         titleView = TextView(context).apply {
             text = context.getString(R.string.terminal_title)
             typeface = Hud.monoBold(context)
-            textSize = 12.5f
-            letterSpacing = 0.12f
+            textSize = 12f
+            includeFontPadding = false
+            letterSpacing = 0.08f
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
             setShadowLayer(Hud.dp(context, 6f), 0f, 0f, NeonPalette.ELECTRIC_PURPLE)
+            gravity = Gravity.CENTER_VERTICAL
             setPadding(Hud.dpi(context, 8f), 0, Hud.dpi(context, 8f), 0)
         }
-        addView(titleView, LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        addView(titleView, LayoutParams(0, Hud.dpi(context, CONTROL_HEIGHT_DP), 1f))
+
         camera.onChanged = { onToggle(FxKeys.CAMERA_ON, it, "Camera") }
-        addView(camera, LayoutParams(Hud.dpi(context, 48f), Hud.dpi(context, 48f)).withStartGap(context))
+        addControl(camera, narrowIconWidth, gap = false)
         microphone.onChanged = { onToggle(FxKeys.MIC_ON, it, "Mic") }
-        addView(microphone, LayoutParams(Hud.dpi(context, 48f), Hud.dpi(context, 48f)).withStartGap(context))
+        addControl(microphone, narrowIconWidth)
+
         widthInput = dimensionInput(context, "Width", width) { onDimensionChanged(LookKeys.WIDTH, it) }
         widthControl = dimensionControl(context, "W", widthInput)
-        addView(widthControl, LayoutParams(Hud.dpi(context, 56f), Hud.dpi(context, 48f)).withStartGap(context))
+        addControl(widthControl, boxWidth)
         heightInput = dimensionInput(context, "Height", height) { onDimensionChanged(LookKeys.HEIGHT, it) }
         heightControl = dimensionControl(context, "H", heightInput)
-        addView(heightControl, LayoutParams(Hud.dpi(context, 56f), Hud.dpi(context, 48f)).withStartGap(context))
-        addView(MoreButton(context).apply {
+        addControl(heightControl, boxWidth)
+
+        moreButton = MoreButton(context).apply {
             contentDescription = context.getString(R.string.terminal_view_options)
             setOnClickListener { showViewMenu(this, onViewModeChanged) }
-        }, LayoutParams(Hud.dpi(context, 48f), Hud.dpi(context, 48f)).withStartGap(context))
-        addView(ShrinkButton(context).apply {
+        }
+        addControl(moreButton, narrowIconWidth)
+        shrinkButton = ShrinkButton(context).apply {
             contentDescription = context.getString(R.string.terminal_shrink)
             setOnClickListener { onShrink() }
-        }, LayoutParams(Hud.dpi(context, 48f), Hud.dpi(context, 48f)).withStartGap(context))
-        addOnLayoutChangeListener { view, _, _, _, _, _, _, _, _ ->
-            val showBoxes = view.width >= Hud.dpi(context, 480f)
-            widthControl.visibility = if (showBoxes) VISIBLE else GONE
-            heightControl.visibility = if (showBoxes) VISIBLE else GONE
         }
+        addControl(shrinkButton, narrowIconWidth)
+    }
+
+    private fun addControl(view: View, width: Int, gap: Boolean = true) {
+        addView(view, LayoutParams(width, Hud.dpi(context, CONTROL_HEIGHT_DP)).apply {
+            if (gap) marginStart = sideGap
+        })
+    }
+
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        val available = MeasureSpec.getSize(widthMeasureSpec)
+        val needed = Hud.dpi(context, BOXES_MIN_WIDTH_DP)
+        boxesVisible = available >= needed
+        widthControl.visibility = if (boxesVisible) VISIBLE else GONE
+        heightControl.visibility = if (boxesVisible) VISIBLE else GONE
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+        laidOutWidth = available
+    }
+
+    override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+        super.onLayout(changed, left, top, right, bottom)
+        laidOutWidth = right - left
+        titleView.textSize = if (laidOutWidth < Hud.dpi(context, 480f)) 9f else 12f
     }
 
     fun setDimensions(width: Int, height: Int) {
@@ -85,17 +120,17 @@ internal class TopBar(
         if (!heightInput.hasFocus()) heightInput.setText(height.toString())
     }
 
-    override fun applyLook(look: PanelLook) {
-        titleView.setTextColor(look.text)
-        widthInput.setTextColor(look.text)
-        heightInput.setTextColor(look.text)
-    }
-
     fun setQuickToggle(key: String, on: Boolean) {
         when (key) {
             FxKeys.CAMERA_ON -> camera.setOn(on)
             FxKeys.MIC_ON -> microphone.setOn(on)
         }
+    }
+
+    override fun applyLook(look: PanelLook) {
+        titleView.setTextColor(look.text)
+        widthInput.setTextColor(look.text)
+        heightInput.setTextColor(look.text)
     }
 
     private fun showViewMenu(anchor: View, onViewModeChanged: (Int) -> Unit) {
@@ -116,7 +151,9 @@ internal class TopBar(
     ) = EditText(context).apply {
         setText(value.toString())
         typeface = Hud.monoBold(context)
-        textSize = 12f
+        fontFeatureSettings = "tnum"
+        includeFontPadding = false
+        textSize = 11f
         setTextColor(NeonPalette.BLACKLIGHT_WHITE)
         gravity = Gravity.CENTER
         inputType = InputType.TYPE_CLASS_NUMBER
@@ -124,7 +161,7 @@ internal class TopBar(
         maxLines = 1
         contentDescription = label
         background = null
-        setPadding(0, 0, Hud.dpi(context, 3f), 0)
+        setPadding(Hud.dpi(context, 2f), 0, Hud.dpi(context, 2f), 0)
         addTextChangedListener(object : android.text.TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
@@ -145,26 +182,27 @@ internal class TopBar(
 
     private fun dimensionControl(context: Context, caption: String, field: EditText) =
         FrameLayout(context).apply {
-            background = null
             foreground = InsetDrawable(GradientDrawable().apply {
                 setColor(Hud.INK)
                 cornerRadius = Hud.dp(context, 4f)
                 setStroke(Hud.dpi(context, 1f), NeonPalette.UV_VIOLET)
-            }, 0, Hud.dpi(context, 4f), 0, Hud.dpi(context, 4f))
+            }, Hud.dpi(context, 4f), Hud.dpi(context, 4f), Hud.dpi(context, 4f), Hud.dpi(context, 4f))
             addView(TextView(context).apply {
                 text = caption
                 typeface = Hud.monoBold(context)
                 textSize = 9f
+                includeFontPadding = false
                 setTextColor(NeonPalette.CYAN_GLOW)
                 gravity = Gravity.CENTER
                 importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
-            }, FrameLayout.LayoutParams(Hud.dpi(context, 16f), ViewGroup.LayoutParams.MATCH_PARENT, Gravity.START))
+            }, FrameLayout.LayoutParams(Hud.dpi(context, 12f), ViewGroup.LayoutParams.MATCH_PARENT, Gravity.START))
             addView(field, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT).apply {
-                marginStart = Hud.dpi(context, 16f)
+                marginStart = Hud.dpi(context, 12f)
             })
         }
 
-    private fun LayoutParams.withStartGap(context: Context) = apply {
-        marginStart = Hud.dpi(context, 8f)
+    private companion object {
+        const val CONTROL_HEIGHT_DP = 48f
+        const val BOXES_MIN_WIDTH_DP = 400f
     }
 }

@@ -42,7 +42,7 @@ import kotlin.math.roundToInt
  *
  * Drag the top bar to move it. A soft cross shows the middle while you drag.
  * Type Width and Height at the top, from 0 to 100, pinch with two fingers, or drag the
- * bottom right corner to resize. All three stay in step and are saved.
+ * bottom edge or lower corners to resize. All three stay in step and are saved.
  * Every setting is a typed number from 0 to 100 or a toggle. There are no sliders.
  * It is Royalty's private control, so it is never painted into the saved video.
  */
@@ -132,6 +132,7 @@ class TerminalPanel @JvmOverloads constructor(
     internal var resizeStartWidth = 0f
     internal var resizeStartHeight = 0f
     internal var resizeMoved = false
+    internal var resizePulseAnimator: ValueAnimator? = null
     internal var lastLoggedGlassWidth = -1
     internal var lastLoggedGlassHeight = -1
     internal var lastLoggedDisplayWidth = -1
@@ -266,7 +267,7 @@ class TerminalPanel @JvmOverloads constructor(
         backOrb.setOnClickListener { goUp() }
 
         expanded.orientation = LinearLayout.VERTICAL
-        expanded.addView(buildHeader(), LinearLayout.LayoutParams(MATCH, WRAP))
+        expanded.addView(buildHeader(), LinearLayout.LayoutParams(MATCH, dpi(TOP_BAR_HEIGHT_DP)))
         statusLine.minLines = 2
         statusLine.setPadding(dpi(14f), dpi(4f), dpi(12f), dpi(6f))
         expanded.addView(statusLine, LinearLayout.LayoutParams(MATCH, WRAP))
@@ -281,10 +282,6 @@ class TerminalPanel @JvmOverloads constructor(
         body.addView(buildMainArea(), LinearLayout.LayoutParams(0, MATCH, 1f))
         expanded.addView(body, LinearLayout.LayoutParams(MATCH, 0, 1f))
         addView(expanded, LayoutParams(MATCH, MATCH))
-        addView(backOrb, LayoutParams(dpi(48f), dpi(48f), Gravity.TOP or Gravity.START).apply {
-            leftMargin = dpi(8f)
-            topMargin = dpi(4f)
-        })
 
         addView(scanLine, LayoutParams(MATCH, dpi(22f), Gravity.TOP).apply {
             leftMargin = dpi(18f)
@@ -432,24 +429,6 @@ class TerminalPanel @JvmOverloads constructor(
         backOrb.enabledState = visibility == VISIBLE && !minimized && openFolder != null
     }
 
-    internal fun positionBackOrb() {
-        val params = backOrb.layoutParams as? LayoutParams ?: return
-        val left = dpi(8f)
-        val top = dpi(4f)
-        if (params.leftMargin != left || params.topMargin != top) {
-            params.leftMargin = left
-            params.topMargin = top
-            backOrb.layoutParams = params
-        }
-    }
-
-
-
-
-
-
-
-
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         if (minimized) {
             super.onMeasure(widthMeasureSpec, heightMeasureSpec)
@@ -477,7 +456,6 @@ class TerminalPanel @JvmOverloads constructor(
             }
             applyContentPadding()
             refreshEdgeRoom()
-            positionBackOrb()
         }
         var areaWidth = MeasureSpec.getSize(widthMeasureSpec)
         var areaHeight = MeasureSpec.getSize(heightMeasureSpec)
@@ -494,12 +472,12 @@ class TerminalPanel @JvmOverloads constructor(
         val live = liveSize
         val glassWidth: Int
         val glassHeight: Int
-        if (fullBleed) {
-            glassWidth = areaWidth
-            glassHeight = areaHeight
-        } else if (live != null) {
+        if (live != null) {
             glassWidth = live.first.roundToInt().coerceIn(widths.first, widths.second)
             glassHeight = live.second.roundToInt().coerceIn(heights.first, heights.second)
+        } else if (fullBleed) {
+            glassWidth = areaWidth
+            glassHeight = areaHeight
         } else {
             glassWidth = sizeFor(store.number(LookKeys.WIDTH), widths)
             glassHeight = sizeFor(store.number(LookKeys.HEIGHT), heights)
@@ -649,6 +627,9 @@ class TerminalPanel @JvmOverloads constructor(
         shownOnScreen = false
         refreshClock()
         stopCentering()
+        resizePulseAnimator?.cancel()
+        resizePulseAnimator = null
+        glass.resizeBarPulse = 1f
         super.onDetachedFromWindow()
     }
 
@@ -664,6 +645,7 @@ class TerminalPanel @JvmOverloads constructor(
             prefs = prefs,
             width = store.number(LookKeys.WIDTH),
             height = store.number(LookKeys.HEIGHT),
+            backOrb = backOrb,
             onShrink = { showMinimized(true, animate = true) },
             onToggle = { key, on, label ->
                 setToggleSetting(key, on)
@@ -820,13 +802,6 @@ class TerminalPanel @JvmOverloads constructor(
 
 
 
-        when (mark) {
-            TestMark.NOT_TESTED -> R.string.terminal_not_tested
-            TestMark.SUCCESS -> R.string.terminal_success
-            TestMark.FAILED -> R.string.terminal_failed
-        },
-    )
-
     internal fun hideKeyboard() {
         val focused = findFocus() ?: return
         if (focused is EditText) {
@@ -874,6 +849,7 @@ class TerminalPanel @JvmOverloads constructor(
         const val CLOSE_MS = 220L
         const val SWEEP_MS = 520L
         const val GRID_FADE_MS = 220L
+        const val TOP_BAR_HEIGHT_DP = 56f
 
         /** A bar counts as covered when the glass hides all of it but this much. */
         const val COVER_SLACK_DP = 2f

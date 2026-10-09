@@ -184,10 +184,10 @@ internal fun TerminalPanel.showMinimized(value: Boolean, animate: Boolean, save:
         margin = glowMargin
         glass.margin = margin.toFloat()
         glass.fullBleed = false
-        positionBackOrb()
         applyContentPadding()
     }
     minimized = value
+    glass.resizeBarVisible = !value
     if (save) prefs.minimized = value
     // Royalty's own tap decides from now on.
     if (save) steppedAside = false

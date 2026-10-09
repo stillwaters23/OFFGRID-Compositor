@@ -285,7 +285,7 @@ internal object PanelTree {
         ),
         notes = listOf(
             "Width and Height are also at the top of the panel.",
-            "Pinch with two fingers, or drag the corner lines, to resize.",
+            "Pinch with two fingers, or drag the bottom edge or a lower corner, to resize.",
         ),
     )
 

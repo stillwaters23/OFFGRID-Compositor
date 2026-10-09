@@ -79,6 +79,37 @@ class PanelGeometryTest {
     }
 
     @Test
+    fun bottomResizeDragClampsAndMapsHeightToPercent() {
+        val minimum = 260f
+        val maximum = 800f
+        assertEquals(minimum, PanelGeometry.resizeHeight(300f, -100f, minimum, maximum), 0f)
+        assertEquals(800f, PanelGeometry.resizeHeight(700f, 500f, minimum, maximum), 0f)
+        val range = PanelGeometry.sizeRange(800, minimum = 260)
+        for (percent in 0..100) {
+            val height = PanelGeometry.sizeFor(percent, range)
+            assertEquals(percent, PanelGeometry.percentFor(height.toFloat(), range))
+        }
+        assertEquals(0f, PanelGeometry.resizeWidthDelta(PanelResizeZone.BOTTOM_EDGE, 24f), 0f)
+        assertEquals(24f, PanelGeometry.resizeWidthDelta(PanelResizeZone.BOTTOM_LEFT, 24f), 0f)
+        assertEquals(-24f, PanelGeometry.resizeWidthDelta(PanelResizeZone.BOTTOM_RIGHT, -24f), 0f)
+        assertEquals(320f, PanelGeometry.resizeWidth(300f, 20f, minimum, maximum), 0f)
+    }
+
+    @Test
+    fun resizeBarGeometryAndGlowScaleWithTheSetting() {
+        assertEquals(6f, PanelGeometry.RESIZE_BAR_HEIGHT_DP, 0f)
+        assertEquals(16f, PanelGeometry.RESIZE_BAR_INSET_DP, 0f)
+        assertEquals(3f, PanelGeometry.RESIZE_BAR_CAP_RADIUS_DP, 0f)
+        assertEquals(24f, PanelGeometry.resizeBarGlowRadiusDp(50), 0f)
+        assertEquals(32f, PanelGeometry.resizeBarGlowRadiusDp(100), 0f)
+        assertEquals(0f, PanelGeometry.resizeBarLayerAlphaSum(0), 0f)
+        assertTrue(
+            PanelGeometry.resizeBarLayerAlphaSum(100) >=
+                PanelGeometry.resizeBarLayerAlphaSum(50) * 2.5f,
+        )
+    }
+
+    @Test
     fun scrollThumbTracksTheScrollableRangeAndHasAMinimumHeight() {
         val smallThumb = PanelGeometry.scrollThumbHeight(100, 1000, 32)
         assertEquals(32f, smallThumb, 0f)

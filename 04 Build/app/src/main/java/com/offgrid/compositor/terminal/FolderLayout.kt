@@ -187,8 +187,8 @@ internal class FolderRow(
         look?.let { applyLook(it) }
     }
 
-    /** Extra room at the right end for the grip handle while folders can move. */
-    fun setGripRoom(room: Int) {
+    /** Extra room at the right end for the drag handle while folders can move. */
+    fun setHandleRoom(room: Int) {
         val wanted = endPad + room
         if (paddingRight != wanted) setPadding(paddingLeft, paddingTop, wanted, paddingBottom)
     }
@@ -219,7 +219,7 @@ internal class FolderRow(
 /**
  * Folders laid out as a list, a big list, or a grid of 2 or 3 across (Step 2.4).
  *
- * With [dragOn], a folder moves after a long press, or right away from its grip handle
+ * With [dragOn], a folder moves after a long press, or right away from its drag handle
  * (the three short lines). Anywhere else, a swipe still scrolls the list (final build,
  * Rex's review). The other folders slide out of the way, the phone ticks softly as the
  * folder lands on each new spot, and the new order is handed to [onMoved] when the finger
@@ -243,7 +243,7 @@ internal class FolderLayout(context: Context, private val sub: Boolean) : ViewGr
         set(value) {
             if (field == value) return
             field = value
-            gripRoom()
+            dragHandleRoom()
             invalidate()
         }
 
@@ -269,7 +269,7 @@ internal class FolderLayout(context: Context, private val sub: Boolean) : ViewGr
     private var slideNext = false
     private var grabbedByHandle = false
     private var orderBefore: List<PanelFolder> = emptyList()
-    private val grip = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+    private val dragHandle = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
         strokeCap = android.graphics.Paint.Cap.ROUND
     }
     private val longPress = Runnable {
@@ -323,7 +323,7 @@ internal class FolderLayout(context: Context, private val sub: Boolean) : ViewGr
                 styler?.invoke(cell)
             }
             setActive(activeId)
-            gripRoom()
+            dragHandleRoom()
             if (ValueAnimator.areAnimatorsEnabled() && isAttachedToWindow) {
                 alpha = 0f
                 animate().alpha(1f).setDuration(FADE_MS).start()
@@ -425,10 +425,10 @@ internal class FolderLayout(context: Context, private val sub: Boolean) : ViewGr
                 downY = event.y
                 val cell = cellAt(event.x, event.y)
                 candidate = cell
-                grabbedByHandle = cell != null && onGrip(cell, event.x, event.y)
+                grabbedByHandle = cell != null && onDragHandle(cell, event.x, event.y)
                 if (cell != null) {
                     if (grabbedByHandle) {
-                        // The grip moves the folder right away. The list doesn't scroll from it.
+                        // The drag handle moves the folder right away. The list doesn't scroll from it.
                         parent?.requestDisallowInterceptTouchEvent(true)
                     } else {
                         postDelayed(longPress, ViewConfiguration.getLongPressTimeout().toLong())
@@ -475,9 +475,9 @@ internal class FolderLayout(context: Context, private val sub: Boolean) : ViewGr
         }
     }
 
-    /** The grip handle: the right end of a row, or the top right corner of a tile. */
-    private fun onGrip(cell: View, x: Float, y: Float): Boolean {
-        val reach = Hud.dp(context, GRIP_TOUCH_DP)
+    /** The drag handle: the right end of a row, or the top right corner of a tile. */
+    private fun onDragHandle(cell: View, x: Float, y: Float): Boolean {
+        val reach = Hud.dp(context, DRAG_HANDLE_TOUCH_DP)
         return if (cell is FolderRow) {
             x >= cell.right - reach
         } else {
@@ -485,18 +485,18 @@ internal class FolderLayout(context: Context, private val sub: Boolean) : ViewGr
         }
     }
 
-    /** Rows leave room at their right end for the grip while folders can move. */
-    private fun gripRoom() {
-        val room = if (dragOn) Hud.dpi(context, GRIP_ROOM_DP) else 0
-        for (cell in cells.values) if (cell is FolderRow) cell.setGripRoom(room)
+    /** Rows leave room at their right end for the drag handle while folders can move. */
+    private fun dragHandleRoom() {
+        val room = if (dragOn) Hud.dpi(context, DRAG_HANDLE_ROOM_DP) else 0
+        for (cell in cells.values) if (cell is FolderRow) cell.setHandleRoom(room)
     }
 
     override fun dispatchDraw(canvas: android.graphics.Canvas) {
         super.dispatchDraw(canvas)
         if (!dragOn) return
         val look = PanelLook.current ?: return
-        grip.color = Hud.withAlpha(look.decor, 0.85f)
-        grip.strokeWidth = Hud.dp(context, 2f)
+        dragHandle.color = Hud.withAlpha(look.decor, 0.85f)
+        dragHandle.strokeWidth = Hud.dp(context, 2f)
         val half = Hud.dp(context, 7f)
         val gap = Hud.dp(context, 4.5f)
         for (cell in cells.values) {
@@ -504,13 +504,13 @@ internal class FolderLayout(context: Context, private val sub: Boolean) : ViewGr
             val cx: Float
             val cy: Float
             if (cell is FolderRow) {
-                cx = cell.right - Hud.dp(context, GRIP_ROOM_DP) / 2f + cell.translationX
+                cx = cell.right - Hud.dp(context, DRAG_HANDLE_ROOM_DP) / 2f + cell.translationX
                 cy = (cell.top + cell.bottom) / 2f + cell.translationY
             } else {
                 cx = cell.right - Hud.dp(context, 16f) + cell.translationX
                 cy = cell.top + Hud.dp(context, 16f) + cell.translationY
             }
-            for (step in -1..1) canvas.drawLine(cx - half, cy + step * gap, cx + half, cy + step * gap, grip)
+            for (step in -1..1) canvas.drawLine(cx - half, cy + step * gap, cx + half, cy + step * gap, dragHandle)
         }
     }
 
@@ -635,9 +635,9 @@ internal class FolderLayout(context: Context, private val sub: Boolean) : ViewGr
         const val LIFT_ALPHA = 0.92f
         const val EDGE_ZONE_DP = 48f
 
-        /** The grip's touch area and the room rows leave for it. */
-        const val GRIP_TOUCH_DP = 48f
-        const val GRIP_ROOM_DP = 40f
+        /** The drag handle's touch area and the room rows leave for it. */
+        const val DRAG_HANDLE_TOUCH_DP = 48f
+        const val DRAG_HANDLE_ROOM_DP = 40f
         const val SCROLL_STEP_DP = 6f
     }
 }
