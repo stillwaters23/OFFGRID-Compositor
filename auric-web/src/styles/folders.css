@@ -23,8 +23,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 44px;
-  min-height: 44px;
+  min-width: 48px;
+  min-height: 48px;
   border: 1px solid color-mix(in oklab, var(--tx-cyan) 48%, transparent);
   border-radius: 16px;
   background: color-mix(in oklab, var(--tx-bg) 86%, transparent);
@@ -47,11 +47,11 @@
   container-type: inline-size;
   display: grid;
   grid-template-columns: repeat(var(--tx-folder-columns, 1), minmax(0, 1fr));
-  gap: 14px;
+  gap: 16px;
   width: 100%;
   min-width: 0;
   max-width: 100%;
-  margin: 10px 0 16px;
+  margin: 8px 0 16px;
   /* Keep the existing 4px list inset for the legacy folder-list baseline. */
   padding: 8px 0 4px;
   list-style: none;
@@ -65,8 +65,7 @@
   position: relative;
   min-width: 0;
   max-width: 100%;
-  /* The existing folder artwork used a 10px top offset for its tab. */
-  padding-top: 10px;
+  padding-top: 8px;
 }
 .tx-folder-grid[data-layout="single"] > li { min-height: 100%; }
 .tx-folder-tile {
@@ -74,7 +73,7 @@
   width: 100%;
   min-width: 0;
   max-width: 100%;
-  min-height: max(44px, var(--tx-folder-row-height, 72px));
+  min-height: max(48px, var(--tx-folder-row-height, 72px));
   padding: 0;
   overflow: visible;
   touch-action: pan-y;
@@ -82,12 +81,12 @@
 }
 .tx-folder-row {
   grid-template-columns: minmax(24px, var(--tx-folder-icon-size, 56px)) minmax(0, 1fr) auto auto;
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
   max-width: 100%;
-  min-height: max(44px, var(--tx-folder-row-height, 72px));
+  min-height: max(48px, var(--tx-folder-row-height, 72px));
   margin-top: 0;
-  padding: 10px 12px 10px 10px;
+  padding: 8px 16px 8px 8px;
 }
 .tx-folder-icon {
   display: block;
@@ -242,7 +241,7 @@
   left: 8px;
   right: 8px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 44px;
+  grid-template-columns: minmax(0, 1fr) 48px;
   align-items: center;
   gap: 8px;
 }
@@ -258,7 +257,7 @@
 .tx-folder-all-size > span { display: flex; justify-content: space-between; gap: 8px; }
 .tx-folder-control-close { grid-column: 2; grid-row: 1; }
 .tx-folder-size-popover input,
-.tx-folder-all-size input { width: 100%; min-height: 44px; accent-color: var(--tx-cyan); }
+.tx-folder-all-size input { width: 100%; min-height: 48px; accent-color: var(--tx-cyan); }
 .tx-folder-rename {
   z-index: 7;
   display: grid;
@@ -270,7 +269,7 @@
 .tx-folder-rename input {
   width: 100%;
   min-width: 0;
-  min-height: 44px;
+  min-height: 48px;
   padding: 8px;
   border: 1px solid color-mix(in oklab, var(--tx-cyan) 72%, transparent);
   border-radius: 8px;
@@ -343,7 +342,7 @@
 .tx-folder-style-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 12px var(--font-type); }
 .tx-folder-style-row select {
   width: 100%;
-  min-height: 44px;
+  min-height: 48px;
   border: 1px solid color-mix(in oklab, var(--tx-cyan) 42%, transparent);
   border-radius: 8px;
   background: var(--tx-bg);

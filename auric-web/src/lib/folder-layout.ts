@@ -92,7 +92,7 @@ export function folderMetrics(size: number, containerWidth: number, layout: Fold
   return {
     iconPx,
     titlePx: 12 + safeSize * 0.04 + (layout === "single" ? 2 : 0),
-    rowHeight: layout === "single" ? Math.max(96, 80 + safeSize * 0.32) : Math.max(44, 56 + safeSize * 0.32),
+    rowHeight: layout === "single" ? Math.max(96, 80 + safeSize * 0.32) : Math.max(48, 56 + safeSize * 0.32),
     columns,
     tileWidth,
   };
@@ -110,7 +110,7 @@ function clampRect(rect: Rect, bounds: Rect): Rect {
 export function paddedLabelRect(tileRect: Rect, labelRect: Rect): Rect {
   const left = Math.max(tileRect.x, labelRect.x - 8);
   const right = Math.min(tileRect.x + tileRect.width, labelRect.x + labelRect.width + 8);
-  const height = Math.max(44, labelRect.height);
+  const height = Math.max(48, labelRect.height);
   const top = labelRect.y - (height - labelRect.height) / 2;
   return clampRect(
     { x: left, y: top, width: Math.max(0, right - left), height },

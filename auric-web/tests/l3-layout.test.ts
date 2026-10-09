@@ -29,13 +29,13 @@ test("folder metrics clamp size and choose layout columns by available width", (
   assert.ok(folderMetrics(100, 320, "grid").iconPx < folderMetrics(100, 320, "big").iconPx);
 });
 
-test("label hit zone expands to 44px and stays within tile bounds", () => {
+test("label hit zone expands to 48px and stays within tile bounds", () => {
   const tile = { x: 0, y: 0, width: 160, height: 72 };
   const title = { x: 50, y: 28, width: 42, height: 14 };
   const label = paddedLabelRect(tile, title);
   assert.equal(label.x, 42);
   assert.equal(label.width, 58);
-  assert.equal(label.height, 44);
+  assert.equal(label.height, 48);
   assert.equal(hitZone({ x: 42, y: 50 }, tile, title), "label");
   assert.equal(hitZone({ x: 41, y: 50 }, tile, title), "body");
   assert.equal(hitZone({ x: 159, y: 50 }, tile, title), "body");

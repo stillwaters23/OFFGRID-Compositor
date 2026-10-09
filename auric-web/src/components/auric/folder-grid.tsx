@@ -115,7 +115,7 @@ export function FolderGrid({ preferences, beforeRects, onChangePreferences }: Fo
   const [sizeId, setSizeId] = useState<string | null>(null);
   const [renameId, setRenameId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
-  const [renamePlacement, setRenamePlacement] = useState({ left: 0, top: 0, width: 120, height: 44 });
+  const [renamePlacement, setRenamePlacement] = useState({ left: 0, top: 0, width: 120, height: 48 });
   const [singleIndex, setSingleIndex] = useState(0);
 
   const updatePreferences = onChangePreferences;
@@ -174,8 +174,8 @@ export function FolderGrid({ preferences, beforeRects, onChangePreferences }: Fo
     const label = button.querySelector<HTMLElement>(".tx-folder-name")?.getBoundingClientRect();
     if (!label) return;
     const left = Math.max(8, Math.min(tile.width - 56, label.left - tile.left - 8));
-    const top = Math.max(0, label.top - tile.top - Math.max(0, (44 - label.height) / 2));
-    setRenamePlacement({ left, top, width: Math.max(48, Math.min(tile.width - left - 8, Math.max(120, label.width + 16))), height: 44 });
+    const top = Math.max(0, label.top - tile.top - Math.max(0, (48 - label.height) / 2));
+    setRenamePlacement({ left, top, width: Math.max(48, Math.min(tile.width - left - 8, Math.max(120, label.width + 16))), height: 48 });
     setRenameValue(preferences.folderNames[spec.id] ?? spec.pkg);
     setRenameId(spec.id);
     setSizeId(null);
@@ -271,11 +271,18 @@ export function FolderGrid({ preferences, beforeRects, onChangePreferences }: Fo
       const delta = event.clientX - interaction.startX;
       if (Math.abs(delta) >= 48) setSingleIndex((index) => Math.max(0, Math.min(rows.length - 1, index + (delta < 0 ? 1 : -1))));
     } else if (interaction.moved && !interaction.longPressed) {
-      const hovered = [...tileRefs.current].find(([id, item]) => {
-        if (id === interaction.id) return false;
-        const rect = item.getBoundingClientRect();
-        return event.clientX >= rect.left && event.clientX <= rect.right && event.clientY >= rect.top && event.clientY <= rect.bottom;
-      });
+      const insideViewport =
+        event.clientX >= 0 &&
+        event.clientX <= window.innerWidth &&
+        event.clientY >= 0 &&
+        event.clientY <= window.innerHeight;
+      const hovered = insideViewport
+        ? [...tileRefs.current].find(([id, item]) => {
+            if (id === interaction.id) return false;
+            const rect = item.getBoundingClientRect();
+            return event.clientX >= rect.left && event.clientX <= rect.right && event.clientY >= rect.top && event.clientY <= rect.bottom;
+          })
+        : undefined;
       const targetId = hovered?.[0];
       const targetButton = hovered?.[1].querySelector<HTMLButtonElement>(".tx-folder-tile") ?? null;
       const targetRect = targetButton?.getBoundingClientRect();

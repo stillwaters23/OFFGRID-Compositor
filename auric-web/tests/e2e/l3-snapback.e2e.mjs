@@ -23,6 +23,7 @@ test("L3 drag snap-back stays in the viewport at every sampled frame", { skip: !
       await tile.scrollIntoViewIfNeeded();
       const start = await tile.boundingBox();
       assert.ok(start);
+      const savedOrder = await page.evaluate(() => JSON.parse(localStorage.getItem("auric-folder-settings-v1") ?? "{}").folderOrder ?? []);
       const origin = { x: start.x + start.width / 2, y: start.y + start.height / 2 };
       const end = {
         x: edge === "left" ? -40 : edge === "right" ? width + 40 : origin.x,
@@ -58,7 +59,15 @@ test("L3 drag snap-back stays in the viewport at every sampled frame", { skip: !
       assert.ok(samples.length > 0, `${width}px ${edge}: no animation frames sampled`);
       assert.ok(samples.every(([left, top, right, bottom]) => left >= 0 && top >= 0 && right <= width && bottom <= 800), `${width}px ${edge}: escaped viewport during spring`);
       assert.ok(finalBox);
-      assert.ok(finalBox.x >= 0 && finalBox.y >= 0 && finalBox.x + finalBox.width <= width && finalBox.y + finalBox.height <= 800);
+      assert.ok(
+        finalBox.x >= 0 && finalBox.y >= 0 && finalBox.x + finalBox.width <= width && finalBox.y + finalBox.height <= 800,
+        `${width}px ${edge}: final folder box escaped viewport (${JSON.stringify(finalBox)})`,
+      );
+      assert.deepEqual(
+        await page.evaluate(() => JSON.parse(localStorage.getItem("auric-folder-settings-v1") ?? "{}").folderOrder ?? []),
+        savedOrder,
+        `${width}px ${edge}: edge release must not reorder folders`,
+      );
     }
   }
 });
