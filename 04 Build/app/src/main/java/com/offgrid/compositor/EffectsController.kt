@@ -117,7 +117,13 @@ internal class EffectsController(
     /** Fires a one-shot effect with its sound. Quiet mode can chain the next effect. */
     fun fire(kind: Fire, arg: String? = null) {
         val s = engine.settings
-        val word = if (kind == Fire.LASER_WRITE) (arg ?: s.text(FxKeys.WRITE_TEXT)).ifEmpty { DEFAULT_WORDS } else arg
+        val word = when {
+            kind == Fire.LASER_WRITE -> (arg ?: s.text(FxKeys.WRITE_TEXT)).ifEmpty { DEFAULT_WORDS }
+            // Shatter cracks out from the face when one is seen, or from the middle.
+            kind == Fire.SHATTER && arg == null ->
+                StageMath.faceInVideo(engine.freshFace(engine.now()), s)?.let { "${it.x},${it.y}" }
+            else -> arg
+        }
         engine.fire(kind, word)
         FIRE_SOUNDS[kind]?.let { sounds.play(it, s) }
         if (kind == Fire.QUIET) chainAfterQuiet()

@@ -144,68 +144,38 @@ jobs:
         run: |
           set -euo pipefail
           cat > /tmp/release-notes.txt << 'EOF'
-          This is the Step 2.4 test build of OFFGRID.
-          The panel now starts plain and simple: true black, a solid white laser cursor, full screen.
-          The ⋮ menu changes how folders look, like the three dots in Samsung My Files.
-          The mic stays off.
+          This is the FINAL build test version of OFFGRID: everything except voice.
+          It is not merged yet. Rex reviews it first.
+          The camera is the only permission. The mic stays off.
 
           Sign in to GitHub in your phone browser first. This project is private.
 
           How to put it on your phone
-          1. If OFFGRID is already on your phone, remove it first.
-             Press and hold the OFFGRID icon. Tap Uninstall.
-             Each test build is new, so the phone may refuse the update.
+          1. Remove the old OFFGRID first. Press and hold its icon. Tap Uninstall.
+             This build is new, so the phone may refuse to update over the old one.
           2. Tap OFFGRID.Preview.apk below.
           3. If your phone asks, allow this browser to install apps.
           4. Tap Install. If Play Protect warns you, tap More details, then Install anyway.
           5. Open OFFGRID. Tap Allow so the front camera can turn on.
 
-          What to look for first
-          1. The panel fills the screen, like a terminal window. Width 100 and Height 100.
-          2. True black glass, half see-through. No titanium frame. No sapphire glass.
-          3. The laser cursor is one solid white block. It types slowly, at Typing speed 1.
-          4. The glow is steady. It does not breathe. Pulse is off until you turn it on.
-          5. The Record bar hides behind the full panel, so its words never show through.
-             Tap − at the top right to shrink the panel. The Record bar comes back.
+          What to check
+          1. Toggles: every toggle is a circle with a power symbol. Lit means on, dim means off.
+             Panel settings > 📁 Themes > 📁 Toggle style picks Pure White or Pure Black.
+          2. Size 100: the panel fills the whole screen, edge to edge, with nothing cut off.
+          3. Side list: with Swipe to open, swipe from the left edge. Tap a row's left edge. It opens.
+          4. Camera denied: deny the camera once. The panel steps aside so Try again can be tapped.
+          5. Move folders: in the ⋮ menu, turn it on. Long press a folder to move it.
+             A swipe still scrolls. Undo last move puts it back.
+          6. No-face modes: open 📁 Camera. The face diamond covers your face and follows it.
+             Try each Camera mode: Blackout, Cloak void, Status label, Ghost.
+          7. Effects: open 📁 Effects. Turn on Emoji rain. Tap Shatter now in 📁 Shatter.
+             Tap − to shrink the panel to see your video.
+          8. Record and play: tap Record, then Stop. Tap Play last video. The panel is not in it.
+             The video is also in your gallery, in Movies > OFFGRID.
+          9. Presets: Panel settings > 📁 Presets. Type a name, tap Done, then Save.
+             Change a color, then tap Load. Your saved look comes back.
 
-          How to test the panel
-          1. Tap Panel settings. The folders are in this order:
-             Size, Display, Glow effects, Colors, Themes, Reset.
-          2. Tap 📁 Size. Type 0 in Width and 0 in Height. Tap Done.
-             The panel is now the smallest size. Type 100 in both to fill the screen again.
-          3. Type 100 in Font size. Every word stays whole. Nothing is cut off.
-             Type 50 to go back.
-          4. Tap BACK. Tap 📁 Glow effects. Type 100 in Glow strength.
-             The glow gets big and bright. 50 is normal. 0 is no glow.
-             The Glow toggle at the top turns all the glow off and on.
-             Turn on Pulse to make the glow breathe. Pulse speed sets how fast.
-          5. Tap BACK. Tap 📁 Colors, then 📁 Laser cursor color.
-             There are nine colors now: Red, Orange, Yellow, Green, Blue, Indigo, Violet, White, Black.
-             Type #FF8000 in HEX CODE. Tap Done. Orange shows 100.
-
-          How to test the ⋮ menu
-          1. Tap ⋮ at the top. Tap Big list, then Grid 2, then Grid 3, then List.
-             The folders change at once. Tap outside the menu, or press Back, to close it.
-          2. Tap ⋮. Tap A to Z. The folders sort by name.
-          3. Turn on Move folders. Press a folder and drag it to a new spot.
-             The other folders slide out of the way, and your phone ticks.
-             Close the app and open it again. Your order is kept.
-             Turn Move folders off when you are done.
-          4. Type 100 in Folder size. The folders get bigger. 50 is normal.
-          5. Tap Swipe to open. The side list tucks away.
-             Swipe right from the glowing line in the middle of the left edge. The side list slides out.
-             Swipe it left, tap outside it, or press Back to close it.
-          6. Tap Hidden. The side list is gone. Tap Show to bring it back.
-          7. Tap BACK until you are home. Tap Panel settings, then 📁 Reset.
-             Tap Reset all to default. Tap Yes, reset all.
-             Everything goes back to the start, the ⋮ menu choices too.
-
-          How to check the video
-          1. Tap − to shrink the panel.
-          2. Tap Record 5 seconds.
-          3. Tap Play last video.
-          4. The panel is not in the video. That is on purpose.
-          5. To see the diamond in a video, turn on Test diamond in 📁 Display first.
+          The README in the project lists every feature and how to use it.
           EOF
           if gh release view step-2-preview >/dev/null 2>&1; then
             gh release delete step-2-preview --yes --cleanup-tag
