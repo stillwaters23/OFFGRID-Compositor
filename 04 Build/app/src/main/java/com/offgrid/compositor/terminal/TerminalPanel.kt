@@ -1798,7 +1798,7 @@ class TerminalPanel @JvmOverloads constructor(
     }
 
     private fun sectionFor(folder: PanelFolder): Int = when {
-        folder.kind == FolderKind.TESTS -> R.string.terminal_section_toggles
+        folder.kind == FolderKind.TESTS && folder.items.all { it is ToggleItem } -> R.string.terminal_section_toggles
         folder.items.all { it is ThemeItem } -> R.string.terminal_section_themes
         folder.items.all { it is ColorItem } -> R.string.terminal_section_color
         else -> R.string.terminal_section_settings

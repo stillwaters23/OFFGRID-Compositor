@@ -26,8 +26,10 @@ import android.widget.FrameLayout
 import android.view.RoundedCorner
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.OptIn
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ExperimentalMirrorMode
 import androidx.camera.core.MirrorMode
 import androidx.camera.core.Preview
 import androidx.camera.core.UseCaseGroup
@@ -232,6 +234,7 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
+    @OptIn(ExperimentalMirrorMode::class)
     private fun bindCamera(provider: ProcessCameraProvider, withFrameRate: Boolean) {
         val painter = processor ?: CompositorProcessor(effects.engine, EffectLayers.all()).also { created ->
             created.onFirstFrame = {
