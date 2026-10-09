@@ -172,3 +172,35 @@ States: passed, waiting for review, blocked, or waiting for Royalty's phone test
 - **PR / commit:** Branch `final-build`, not merged.
 - **State:** blocked on session limit, then continuing
 - **Next:** finish the missing drawn effects, the effect folders, and the camera screen wiring, then M5.
+
+## 2026-10-09 2:55 AM CT — Agent 05, Claude Code
+
+- **Bootloader step:** FINAL full build. Milestone 4 of 5: effects and the rest of the roadmap. Done.
+- **What was done:**
+  - The panel has folders for every effect:
+    - 📁 Camera: camera mode, face diamond, cloak void, status label, ghost, takeover, mirror plus scan.
+    - 📁 Effects: 19 folders, each with toggles, typed 0 to 100 numbers, Fire now buttons, and a soundboard.
+    - 📁 Record: record length with Stop, save to gallery, and a replay buffer.
+  - All 17 drawn effects are on in the app, and each was checked in rendered pictures:
+    - emoji rain, drawing, glow border, fireworks
+    - portal, flying heroes, roller coaster, clouds, beach
+    - red sweep, laser writing, radar, optical illusions
+    - quiet light, test code, status label, face diamond
+  - The camera stage adds the cloak void, ghost, blackout, time freeze, quiet mode, echo trail, takeover, depth shift, and shatter.
+  - Each of the 18 platform folders has:
+    - Red sweep on kick, and I got kicked (it never rejoins)
+    - Open the app, and Use safe start
+    - a Success code check, and Results with notes and dates
+  - Panel settings has look presets: save, load, rename, delete.
+  - OFFGRID to OFFGRID has handshake codes, locked by the phone's key store.
+  - Every folder has its own Reset. No reset changes the camera mode or the test marks.
+  - The face diamond starts on and follows the face, using the phone's own face finder. The screen now shows what viewers get, not a mirror.
+  - Safety:
+    - If the effects can't run, the video stays black while a no-face mode or the diamond is on.
+    - The video stays black until the diamond is drawn.
+  - An independent review found 8 real problems, and all 8 are fixed.
+  - 39 unit tests pass. They include a check that no effect flashes more than 3 times a second.
+  - CAMERA is still the only permission.
+- **PR / commit:** Pull request #8 (`final-build`), not merged.
+- **State:** waiting for review
+- **Next:** Milestone 5: final polish, lint, the final report in pull request #8, and the phone test list.

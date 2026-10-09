@@ -66,7 +66,7 @@ internal object EffectFolders {
                 default = FxKeys.DIAMOND_CLASSIC,
             ),
             ToggleItem(FxKeys.DIAMOND_FOLLOW, "Follow my face", "The diamond moves with your face. Off keeps it in one place.", true, isTest = false),
-            NumberItem(FxKeys.DIAMOND_SIZE, "Size", "How big the diamond is when it stays in one place. 0 is small. 100 is huge.", 45),
+            NumberItem(FxKeys.DIAMOND_SIZE, "Size", "How big the diamond is when it stays in one place. 0 is small. 100 is huge.", 60),
             NumberItem(FxKeys.DIAMOND_X, "Across", "Where it sits when it stays in one place. 0 is the left edge. 100 is the right edge.", 50),
             NumberItem(FxKeys.DIAMOND_Y, "Down", "Where it sits when it stays in one place. 0 is the top. 100 is the bottom.", 38),
             ToggleItem(

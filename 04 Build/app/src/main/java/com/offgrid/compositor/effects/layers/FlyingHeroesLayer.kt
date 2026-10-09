@@ -768,8 +768,8 @@ class FlyingHeroesLayer : OverlayLayer {
         const val PIXEL = 3
 
         const val MAX_HEROES = 6
-        const val SIZE_MIN = 0.08f
-        const val SIZE_MAX = 0.35f
+        const val SIZE_MIN = 0.14f
+        const val SIZE_MAX = 0.6f
         const val CROSS_SLOW = 7f
         const val CROSS_FAST = 1.5f
         const val CALM_SLOWER = 2f
