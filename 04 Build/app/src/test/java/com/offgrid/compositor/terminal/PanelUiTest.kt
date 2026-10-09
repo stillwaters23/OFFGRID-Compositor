@@ -119,9 +119,11 @@ class PanelUiTest {
         val panel = TerminalPanel(context)
         assertEquals(1, panel.body.childCount)
         assertTrue(panel.body.getChildAt(0) is FrameLayout)
+        assertTrue("the glowing bottom resize edge is visible", panel.glass.resizeBarVisible)
         assertEquals(panel.backOrb, panel.topBar.getChildAt(0))
         panel.refreshBack()
         assertFalse(panel.backOrb.isEnabled)
+        assertFalse(findViews(panel).any { it.javaClass.simpleName.contains("ResizeGrip") })
 
         val folder = panel.home.folders.single { it.id == "microphone" }
         panel.openFolder = folder
