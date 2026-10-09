@@ -14,14 +14,25 @@ import androidx.camera.core.CameraEffect
 import androidx.camera.core.SurfaceOutput
 import androidx.camera.core.SurfaceProcessor
 import androidx.camera.core.SurfaceRequest
+import com.offgrid.compositor.effects.EffectEngine
+import com.offgrid.compositor.effects.FxKeys
+import com.offgrid.compositor.effects.OverlayLayer
+import com.offgrid.compositor.effects.StagePlan
 import java.util.concurrent.Executor
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Takes the front camera, paints the layer stack, and hands the
  * finished picture to the preview and to the video recorder.
+ *
+ * Final build, M4: the camera stage changes the picture for the camera effects, and the
+ * drawn effects from [layers] go on top. Both follow [engine]. The same finished picture
+ * goes to the screen and the video, so what Royalty sees is what viewers get.
  */
-class CompositorProcessor : SurfaceProcessor, SurfaceTexture.OnFrameAvailableListener {
+class CompositorProcessor(
+    private val engine: EffectEngine = EffectEngine(),
+    private val layers: List<OverlayLayer> = emptyList(),
+) : SurfaceProcessor, SurfaceTexture.OnFrameAvailableListener {
     val effectList = EffectList()
 
     @Volatile
@@ -29,6 +40,29 @@ class CompositorProcessor : SurfaceProcessor, SurfaceTexture.OnFrameAvailableLis
 
     @Volatile
     var onFailed: (() -> Unit)? = null
+
+    /** Called once if the effects can't run on this phone. The picture then stays black when the face must be hidden. */
+    @Volatile
+    var onEffectsFailed: (() -> Unit)? = null
+    private var toldEffectsFailed = false
+
+    /**
+     * True when this picture must not show the plain camera: a no-face mode or the face diamond
+     * is on, but the effects that hide the face are not drawn (yet). The picture stays black.
+     */
+    private var coverFace = false
+
+    /** The Step 1 yellow test diamond. Off by default, so nothing extra is painted. */
+    @Volatile
+    var testShapeOn = false
+
+    /** True when the phone asks for less motion. Effects stay, but calmer. */
+    @Volatile
+    var reducedMotion = false
+        set(value) {
+            field = value
+            effects?.reducedMotion = value
+        }
 
     private val thread = HandlerThread("OffgridCompositor")
     private val handler: Handler
@@ -40,6 +74,21 @@ class CompositorProcessor : SurfaceProcessor, SurfaceTexture.OnFrameAvailableLis
     private var dummy = EGL14.EGL_NO_SURFACE
     private var config: android.opengl.EGLConfig? = null
     private var drawer: CompositorDrawer? = null
+    private var stage: StagePainter? = null
+    private var effects: OverlayRenderer? = null
+    private val plan = StagePlan()
+
+    /** The replay buffer and its drawing target, when it is on. */
+    @Volatile
+    private var replay: ReplayBuffer? = null
+    private var replaySurface = EGL14.EGL_NO_SURFACE
+    private var replayWanted = false
+    private var replaySeconds = 30
+
+    /** The camera stream's size, once the camera starts. The face finder uses its shape. */
+    @Volatile
+    var inputSize: android.util.Size? = null
+        private set
     private var ready = false
     private var released = false
     private val failed = AtomicBoolean(false)
@@ -72,6 +121,7 @@ class CompositorProcessor : SurfaceProcessor, SurfaceTexture.OnFrameAvailableLis
             return
         }
         val textureId = createExternalTexture()
+        inputSize = request.resolution
         val surfaceTexture = SurfaceTexture(textureId)
         surfaceTexture.setDefaultBufferSize(request.resolution.width, request.resolution.height)
         val surface = Surface(surfaceTexture)
@@ -139,19 +189,155 @@ class CompositorProcessor : SurfaceProcessor, SurfaceTexture.OnFrameAvailableLis
         }
         val stamp = surfaceTexture.timestamp
         val snapshot = outputs.toList()
+        val painted = paintStage(snapshot)
         for (slot in snapshot) {
             if (!outputs.contains(slot)) {
                 continue
             }
-            drawSlot(slot, stamp)
+            drawSlot(slot, stamp, painted)
         }
+        drawReplay(snapshot, stamp, painted)
+    }
+
+    /** Turns the replay buffer on or off, keeping the last [seconds] seconds. */
+    fun setReplay(on: Boolean, seconds: Int) {
+        executor.execute {
+            replayWanted = on
+            replaySeconds = seconds
+            replay?.keepSeconds = seconds
+            if (!on) stopReplay()
+        }
+    }
+
+    /** Saves the replay buffer's kept moments to [file]. Returns false if there is nothing yet. Any thread. */
+    fun saveReplay(file: java.io.File): Boolean = replay?.save(file) ?: false
+
+    /** Draws the finished picture into the replay buffer too, the same one the video gets. */
+    private fun drawReplay(slots: List<OutputSlot>, stamp: Long, painted: GlTarget?) {
+        if (!replayWanted || released || slots.isEmpty()) return
+        val main = slots.maxBy { it.width * it.height }
+        if (replay == null) startReplay(main.width, main.height)
+        val buffer = replay ?: return
+        if (replaySurface == EGL14.EGL_NO_SURFACE) return
+        if (!EGL14.eglMakeCurrent(display, replaySurface, replaySurface, context)) return
+        GLES20.glViewport(0, 0, buffer.width, buffer.height)
+        val staged = stage
+        GLES20.glClearColor(0f, 0f, 0f, 1f)
+        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
+        if (painted != null && staged != null) {
+            staged.present(painted, buffer.width, buffer.height)
+        } else if (!coverFace) {
+            val painter = drawer ?: return
+            main.surfaceOutput.updateTransformMatrix(updatedTransform, textureTransform)
+            painter.drawCamera(inputTextureId, updatedTransform)
+        }
+        EGLExt.eglPresentationTimeANDROID(display, replaySurface, stamp)
+        EGL14.eglSwapBuffers(display, replaySurface)
+    }
+
+    private fun startReplay(width: Int, height: Int) {
+        // Video chips want sizes in steps of 16.
+        val w = maxOf(REPLAY_STEP, width / REPLAY_STEP * REPLAY_STEP)
+        val h = maxOf(REPLAY_STEP, height / REPLAY_STEP * REPLAY_STEP)
+        try {
+            val buffer = ReplayBuffer(w, h, replaySeconds)
+            val eglSurface = EGL14.eglCreateWindowSurface(display, config, buffer.surface, intArrayOf(EGL14.EGL_NONE), 0)
+            if (eglSurface == null || eglSurface == EGL14.EGL_NO_SURFACE) {
+                buffer.release()
+                replayWanted = false
+                Log.e(TAG, "The replay buffer could not start")
+                return
+            }
+            replay = buffer
+            replaySurface = eglSurface
+        } catch (error: Exception) {
+            Log.e(TAG, "The replay buffer could not start", error)
+            replayWanted = false
+        }
+    }
+
+    private fun stopReplay() {
+        if (replaySurface != EGL14.EGL_NO_SURFACE) {
+            if (dummy != EGL14.EGL_NO_SURFACE) EGL14.eglMakeCurrent(display, dummy, dummy, context)
+            EGL14.eglDestroySurface(display, replaySurface)
+            replaySurface = EGL14.EGL_NO_SURFACE
+        }
+        replay?.release()
+        replay = null
+    }
+
+    /**
+     * Paints the camera stage once for every output, when any effect is on.
+     * Returns the stage picture, or null when the camera goes out untouched.
+     */
+    private fun paintStage(slots: List<OutputSlot>): GlTarget? {
+        val settings = engine.settings
+        val diamondOn = settings.on(FxKeys.DIAMOND_ON)
+        val hideFace = diamondOn || settings.choice(FxKeys.CAMERA_MODE).ifEmpty { FxKeys.MODE_LIVE } != FxKeys.MODE_LIVE
+        coverFace = hideFace
+        val painter = stage ?: return null
+        val textureId = inputTextureId
+        if (textureId == 0 || slots.isEmpty()) return null
+        val overlay = effects
+        val time = engine.now()
+        plan.update(
+            time = time,
+            settings = engine.settings,
+            fired = engine.firedNow(),
+            face = engine.freshFace(time),
+            modeChangedAt = engine.modeChangedAt,
+            previousMode = engine.previousMode,
+        )
+        // The biggest output sets the stage size. The others get the same picture, scaled.
+        val main = slots.maxBy { it.width * it.height }
+        val scale = minOf(1f, MAX_STAGE_SIDE / maxOf(main.width, main.height).toFloat())
+        val stageWidth = maxOf(2, (main.width * scale).toInt())
+        val stageHeight = maxOf(2, (main.height * scale).toInt())
+        overlay?.latch()
+        overlay?.request(stageWidth, stageHeight)
+        val drawn = overlay != null && overlay.hasPicture
+        // The face diamond is drawn with the other effects. Until that drawing arrives, the
+        // picture stays black, so the face never shows for even a moment.
+        coverFace = diamondOn && !drawn
+        if (coverFace || (plan.plain && !drawn)) return null
+        if (!EGL14.eglMakeCurrent(display, main.eglSurface, main.eglSurface, context)) {
+            fail("Could not draw a frame")
+            coverFace = hideFace
+            return null
+        }
+        main.surfaceOutput.updateTransformMatrix(updatedTransform, textureTransform)
+        return try {
+            painter.paint(
+                cameraTexture = textureId,
+                cameraMatrix = updatedTransform,
+                w = stageWidth,
+                h = stageHeight,
+                plan = plan,
+                time = time,
+                overlayTexture = if (drawn) overlay?.texture ?: 0 else 0,
+                overlayMatrix = overlay?.matrix ?: updatedTransform,
+            )
+        } catch (error: RuntimeException) {
+            Log.e(TAG, "Effects stage failed", error)
+            stage?.release()
+            stage = null
+            effectsFailed()
+            coverFace = hideFace
+            null
+        }
+    }
+
+    private fun effectsFailed() {
+        if (toldEffectsFailed) return
+        toldEffectsFailed = true
+        mainHandler.post { onEffectsFailed?.invoke() }
     }
 
     fun release() {
         executor.execute { releaseOnThread() }
     }
 
-    private fun drawSlot(slot: OutputSlot, stamp: Long) {
+    private fun drawSlot(slot: OutputSlot, stamp: Long, painted: GlTarget?) {
         if (slot.width == 0 || slot.height == 0) {
             return
         }
@@ -168,11 +354,18 @@ class CompositorProcessor : SurfaceProcessor, SurfaceTexture.OnFrameAvailableLis
         if (textureId == 0 || painter == null) {
             return
         }
-        painter.drawCamera(textureId, updatedTransform)
+        val staged = stage
+        if (painted != null && staged != null) {
+            staged.present(painted, slot.width, slot.height)
+        } else if (!coverFace) {
+            painter.drawCamera(textureId, updatedTransform)
+        }
         GLES20.glEnable(GLES20.GL_BLEND)
         GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
         effectList.drawAll(slot.width, slot.height)
-        painter.drawTopLayer()
+        if (testShapeOn) {
+            painter.drawTopLayer()
+        }
         EGLExt.eglPresentationTimeANDROID(display, slot.eglSurface, stamp)
         EGL14.eglSwapBuffers(display, slot.eglSurface)
         if (!toldFirstFrame && slot.surfaceOutput.targets and CameraEffect.PREVIEW != 0) {
@@ -247,6 +440,16 @@ class CompositorProcessor : SurfaceProcessor, SurfaceTexture.OnFrameAvailableLis
             fail("Picture setup failed")
             return
         }
+        // The effects are extra. If the phone can't build them, the plain camera still works.
+        try {
+            stage = StagePainter()
+            effects = OverlayRenderer(engine, layers, handler).also { it.reducedMotion = reducedMotion }
+        } catch (error: RuntimeException) {
+            Log.e(TAG, "Effects setup failed. The camera works without them.", error)
+            stage?.release()
+            stage = null
+            effectsFailed()
+        }
         ready = true
     }
 
@@ -268,6 +471,11 @@ class CompositorProcessor : SurfaceProcessor, SurfaceTexture.OnFrameAvailableLis
             }
             drawer?.release()
             drawer = null
+            stage?.release()
+            stage = null
+            effects?.release()
+            effects = null
+            stopReplay()
             if (dummy != EGL14.EGL_NO_SURFACE) {
                 EGL14.eglDestroySurface(display, dummy)
                 dummy = EGL14.EGL_NO_SURFACE
@@ -336,5 +544,10 @@ class CompositorProcessor : SurfaceProcessor, SurfaceTexture.OnFrameAvailableLis
 
     private companion object {
         const val TAG = "OffgridCompositor"
+
+        const val REPLAY_STEP = 16
+
+        /** The stage picture's longest side, in pixels. The video is 1280 tall, so this keeps it sharp. */
+        const val MAX_STAGE_SIDE = 1920f
     }
 }

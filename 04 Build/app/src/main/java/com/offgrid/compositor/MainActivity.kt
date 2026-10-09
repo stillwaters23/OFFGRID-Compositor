@@ -23,10 +23,13 @@ import android.view.TextureView
 import android.view.View
 import android.widget.Button
 import android.widget.FrameLayout
+import android.view.RoundedCorner
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.OptIn
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ExperimentalMirrorMode
 import androidx.camera.core.MirrorMode
 import androidx.camera.core.Preview
 import androidx.camera.core.UseCaseGroup
@@ -50,6 +53,10 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import com.offgrid.compositor.effects.EffectEngine
+import com.offgrid.compositor.effects.EffectLayers
+import com.offgrid.compositor.effects.FxKeys
+import com.offgrid.compositor.terminal.ScreenEdges
 import com.offgrid.compositor.terminal.TerminalPanel
 import java.io.File
 
@@ -57,6 +64,10 @@ import java.io.File
  * Step 1. Shows the painted camera picture, records a few seconds, and plays it back.
  * The mic stays off.
  * Step 2. The floating terminal panel sits on top. It is not painted into the video.
+ * Step 2.1. The yellow test diamond is off unless Panel settings turns it on.
+ * Final build. The effects, the no-face camera modes, and the face finder are baked into the
+ * video. The screen shows the same picture viewers get, not a mirror. Videos can be any
+ * length and also go to the gallery.
  */
 class MainActivity : AppCompatActivity() {
 
@@ -88,6 +99,13 @@ class MainActivity : AppCompatActivity() {
     private var videoWidth = 0
     private var videoHeight = 0
     private var playbackRotation = 0
+    private var shownMessage = 0
+    private var diamondInVideo: Boolean? = null
+    private lateinit var effects: EffectsController
+
+    /** True when the effects could not start on this phone. The camera screen says why it is black. */
+    private var effectsBroken = false
+    private lateinit var faces: FaceTracker
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private var stopRecordingTask: Runnable? = null
@@ -122,8 +140,24 @@ class MainActivity : AppCompatActivity() {
         terminalPanel = findViewById(R.id.terminal_panel)
 
         onBackPressedDispatcher.addCallback(this, terminalPanel.backCallback)
+        terminalPanel.matchLook(
+            bars = listOf(controlBar, playbackBar),
+            texts = listOf(statusText, playbackHint),
+            buttons = listOf(recordButton, playButton, actionButton, backButton),
+        )
+        terminalPanel.onTestDiamond = { on -> onTestDiamondChanged(on) }
+        val engine = EffectEngine()
+        faces = FaceTracker(this, engine)
+        effects = EffectsController(this, terminalPanel, engine)
+        effects.lastVideo = { recordingFile() }
+        effects.onSettings = { onEffectSettings() }
+        effects.start()
+        effects.attachInk(previewView)
+        terminalPanel.useGuides(findViewById(R.id.snap_guides))
+        describeCamera(terminalPanel.testDiamondOn)
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.root)) { _, insets ->
             terminalPanel.onKeyboardInset(insets.getInsets(WindowInsetsCompat.Type.ime()).bottom)
+            terminalPanel.onScreenEdges(screenEdges(insets))
             insets
         }
         recordButton.setOnClickListener { startFiveSecondRecording() }
@@ -135,6 +169,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        effects.resume()
         hideSystemBars()
         if (hasCameraPermission()) {
             startCamera()
@@ -148,6 +183,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onPause() {
+        effects.pause()
         hidePlayback()
         stopRecording()
         unbindCamera()
@@ -155,8 +191,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        effects.release()
         processor?.onFirstFrame = null
         processor?.onFailed = null
+        processor?.onEffectsFailed = null
         processor?.release()
         processor = null
         super.onDestroy()
@@ -199,15 +237,29 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
+    @OptIn(ExperimentalMirrorMode::class)
     private fun bindCamera(provider: ProcessCameraProvider, withFrameRate: Boolean) {
-        val painter = processor ?: CompositorProcessor().also { created ->
-            created.onFirstFrame = { showLivePicture() }
+        val painter = processor ?: CompositorProcessor(effects.engine, EffectLayers.all()).also { created ->
+            created.onFirstFrame = {
+                created.inputSize?.let { size ->
+                    faces.streamAspect = maxOf(size.width, size.height).toFloat() / minOf(size.width, size.height)
+                }
+                showLivePicture()
+            }
+            created.onEffectsFailed = {
+                effectsBroken = true
+                showLivePicture()
+            }
             created.onFailed = {
                 stopRecording()
                 showMessage(R.string.camera_failed, ButtonMode.NONE)
             }
             processor = created
         }
+        painter.testShapeOn = terminalPanel.testDiamondOn
+        painter.reducedMotion = reducedMotion()
+        effects.processor = painter
+        faces.outputAspect = previewView.width.toFloat() / previewView.height
         val effect = CompositorEffect(
             painter.executor,
             painter,
@@ -229,9 +281,13 @@ class MainActivity : AppCompatActivity() {
                 ),
             )
             .build()
+        // The screen shows exactly what viewers get, not a mirror, so words read the right way
+        // and the face diamond and drawings land where they look (final build).
         val previewBuilder = Preview.Builder()
             .setResolutionSelector(previewResolution())
             .setTargetRotation(rotation)
+            .setMirrorMode(MirrorMode.MIRROR_MODE_OFF)
+        faces.attach(previewBuilder)
         val videoBuilder = VideoCapture.Builder(recorder)
             .setTargetRotation(rotation)
             .setMirrorMode(MirrorMode.MIRROR_MODE_OFF)
@@ -276,6 +332,8 @@ class MainActivity : AppCompatActivity() {
     private fun startFiveSecondRecording() {
         val capture = videoCapture ?: return
         if (recording) {
+            // While recording, the same button is Stop.
+            requestStop()
             return
         }
         val temp = File(filesDir, TEMP_NAME)
@@ -285,17 +343,26 @@ class MainActivity : AppCompatActivity() {
         }
         recording = true
         stopRequested = false
+        diamondInVideo = terminalPanel.testDiamondOn
         showMessage(R.string.recording_now, ButtonMode.RECORDING)
+        recordSeconds().takeIf { it > 0 }?.let { statusText.text = getString(R.string.recording_timed, it) }
         val options = FileOutputOptions.Builder(temp).build()
         val pending = capture.output.prepareRecording(this, options)
         val started = pending.start(ContextCompat.getMainExecutor(this)) { event ->
             onRecordEvent(event, temp)
         }
         activeRecording = started
-        val stopTask = Runnable { requestStop() }
-        stopRecordingTask = stopTask
-        mainHandler.postDelayed(stopTask, FALLBACK_STOP_MS)
+        val seconds = recordSeconds()
+        if (seconds > 0) {
+            // A safety stop in case the recorder never says it started.
+            val stopTask = Runnable { requestStop() }
+            stopRecordingTask = stopTask
+            mainHandler.postDelayed(stopTask, seconds * 1000L + FALLBACK_EXTRA_MS)
+        }
     }
+
+    /** The typed record length in seconds. 0 means record until Stop. */
+    private fun recordSeconds(): Int = effects.engine.settings.raw(FxKeys.RECORD_SECONDS)
 
     private fun requestStop() {
         if (stopRequested) {
@@ -309,17 +376,24 @@ class MainActivity : AppCompatActivity() {
         when (event) {
             is VideoRecordEvent.Start -> {
                 stopRecordingTask?.let { mainHandler.removeCallbacks(it) }
-                val stopTask = Runnable { requestStop() }
-                stopRecordingTask = stopTask
-                mainHandler.postDelayed(stopTask, RECORD_MS)
+                stopRecordingTask = null
+                val seconds = recordSeconds()
+                if (seconds > 0) {
+                    val stopTask = Runnable { requestStop() }
+                    stopRecordingTask = stopTask
+                    mainHandler.postDelayed(stopTask, seconds * 1000L)
+                }
             }
             is VideoRecordEvent.Finalize -> {
                 stopRecordingTask?.let { mainHandler.removeCallbacks(it) }
                 stopRecordingTask = null
                 activeRecording = null
                 recording = false
-                if (event.hasError()) {
-                    Log.e(TAG, "Recording failed with code ${event.error}")
+                // Some errors still leave a whole, playable video, like a full phone or the camera
+                // closing when the app goes to the background. Those videos are kept.
+                val kept = !event.hasError() || (event.error in KEPT_ERRORS && temp.exists() && temp.length() > 0L)
+                if (event.hasError()) Log.e(TAG, "Recording ended with code ${event.error}, kept: $kept")
+                if (!kept) {
                     if (temp.exists()) {
                         temp.delete()
                     }
@@ -335,6 +409,16 @@ class MainActivity : AppCompatActivity() {
                         temp.delete()
                     }
                     showMessage(R.string.record_saved, ButtonMode.LIVE)
+                    if (effects.engine.settings.on(FxKeys.RECORD_GALLERY)) {
+                        GallerySaver.saveLater(this, saved) { name ->
+                            // Only change the words if they still say the video was saved.
+                            if (isDestroyed || shownMessage != R.string.record_saved) return@saveLater
+                            showMessage(
+                                if (name != null) R.string.record_saved_gallery else R.string.record_gallery_failed,
+                                ButtonMode.LIVE,
+                            )
+                        }
+                    }
                 }
             }
             else -> Unit
@@ -359,7 +443,8 @@ class MainActivity : AppCompatActivity() {
         playbackBackdrop.visibility = View.VISIBLE
         playbackView.visibility = View.VISIBLE
         playbackBar.visibility = View.VISIBLE
-        playbackHint.setText(R.string.playback_hint)
+        val diamond = diamondInVideo ?: terminalPanel.testDiamondOn
+        playbackHint.setText(if (diamond) R.string.playback_hint else R.string.playback_hint_plain)
         playbackRotation = readVideoRotation(file)
         if (playbackSurface != null) {
             startPlayer(file)
@@ -542,7 +627,54 @@ class MainActivity : AppCompatActivity() {
         if (recording || playRequested) {
             return
         }
-        showMessage(R.string.shape_ready, ButtonMode.LIVE)
+        val settings = effects.engine.settings
+        val hidingFace = settings.on(FxKeys.DIAMOND_ON) || !settings.chose(FxKeys.CAMERA_MODE, FxKeys.MODE_LIVE)
+        val message = when {
+            effectsBroken && hidingFace -> R.string.effects_failed
+            settings.chose(FxKeys.CAMERA_MODE, FxKeys.MODE_GHOST) -> R.string.ghost_on
+            terminalPanel.testDiamondOn -> R.string.shape_ready
+            else -> R.string.camera_ready
+        }
+        showMessage(message, ButtonMode.LIVE)
+    }
+
+    /** The Test diamond toggle in Panel settings. Off paints nothing extra into the video. */
+    private fun onTestDiamondChanged(on: Boolean) {
+        processor?.testShapeOn = on
+        describeCamera(on)
+        if (shownMessage in LIVE_MESSAGES) {
+            showLivePicture()
+        }
+    }
+
+    /** Effect settings changed: the GHOST ON line and the Record button's length follow at once. */
+    private fun onEffectSettings() {
+        if (!::effects.isInitialized) return
+        processor?.reducedMotion = reducedMotion()
+        if (shownMessage in LIVE_MESSAGES) {
+            showLivePicture()
+        } else if (!recording) {
+            setRecordLabel()
+        }
+    }
+
+    /** True when the phone's Remove animations setting is on. Effects stay, but calmer. */
+    private fun reducedMotion(): Boolean =
+        Settings.Global.getFloat(contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
+
+    private fun setRecordLabel() {
+        val seconds = if (::effects.isInitialized) recordSeconds() else 0
+        if (seconds > 0) {
+            recordButton.text = getString(R.string.record_seconds, seconds)
+        } else {
+            recordButton.setText(R.string.record_open)
+        }
+    }
+
+    private fun describeCamera(diamondOn: Boolean) {
+        previewView.contentDescription = getString(
+            if (diamondOn) R.string.camera_picture else R.string.camera_picture_plain,
+        )
     }
 
     private fun showPermissionHelp() {
@@ -559,17 +691,20 @@ class MainActivity : AppCompatActivity() {
             hidePlayback()
         }
         controlBar.visibility = View.VISIBLE
+        shownMessage = textRes
         statusText.setText(textRes)
         val showRecord = buttonMode == ButtonMode.LIVE || buttonMode == ButtonMode.RECORDING
         recordButton.visibility = if (showRecord) View.VISIBLE else View.GONE
         playButton.visibility = if (showRecord) View.VISIBLE else View.GONE
-        recordButton.isEnabled = buttonMode == ButtonMode.LIVE
+        recordButton.isEnabled = buttonMode == ButtonMode.LIVE || buttonMode == ButtonMode.RECORDING
         if (buttonMode == ButtonMode.RECORDING) {
-            recordButton.setText(R.string.recording_now)
+            recordButton.setText(R.string.record_stop)
         } else {
-            recordButton.setText(R.string.record_five)
+            setRecordLabel()
         }
         refreshPlayButton()
+        // A button to tap must never hide behind the panel (final build, Rex's review).
+        terminalPanel.setBarNeedsTap(buttonMode == ButtonMode.TRY_AGAIN || buttonMode == ButtonMode.SETTINGS)
         when (buttonMode) {
             ButtonMode.NONE, ButtonMode.LIVE, ButtonMode.RECORDING -> {
                 actionButton.visibility = View.GONE
@@ -603,6 +738,38 @@ class MainActivity : AppCompatActivity() {
         startActivity(intent)
     }
 
+    /**
+     * The bars, camera hole, gesture areas, and round corners, for the panel (final build, M2).
+     * Bars are measured as if they show, so pulling the status bar down never moves the panel.
+     */
+    private fun screenEdges(insets: WindowInsetsCompat): ScreenEdges {
+        val bars = insets.getInsetsIgnoringVisibility(WindowInsetsCompat.Type.systemBars())
+        val cutout = insets.getInsets(WindowInsetsCompat.Type.displayCutout())
+        val gestures = insets.getInsetsIgnoringVisibility(WindowInsetsCompat.Type.systemGestures())
+        val mandatory = insets.getInsetsIgnoringVisibility(WindowInsetsCompat.Type.mandatorySystemGestures())
+        val platform = insets.toWindowInsets()
+        val corner = if (platform != null) {
+            listOf(
+                RoundedCorner.POSITION_TOP_LEFT,
+                RoundedCorner.POSITION_TOP_RIGHT,
+                RoundedCorner.POSITION_BOTTOM_LEFT,
+                RoundedCorner.POSITION_BOTTOM_RIGHT,
+            ).maxOf { platform.getRoundedCorner(it)?.radius ?: 0 }
+        } else {
+            0
+        }
+        return ScreenEdges(
+            top = maxOf(bars.top, cutout.top),
+            bottom = maxOf(bars.bottom, cutout.bottom),
+            left = maxOf(bars.left, cutout.left),
+            right = maxOf(bars.right, cutout.right),
+            gestureLeft = gestures.left,
+            gestureRight = gestures.right,
+            gestureBottom = maxOf(gestures.bottom, mandatory.bottom),
+            cornerRadius = corner,
+        )
+    }
+
     private fun hideSystemBars() {
         val controller = WindowInsetsControllerCompat(window, window.decorView)
         controller.hide(WindowInsetsCompat.Type.systemBars())
@@ -622,7 +789,17 @@ class MainActivity : AppCompatActivity() {
         const val TAG = "OffgridCompositor"
         const val SAVED_NAME = "last-recording.mp4"
         const val TEMP_NAME = "recording-now.mp4"
-        const val RECORD_MS = 5_000L
-        const val FALLBACK_STOP_MS = 8_000L
+        const val FALLBACK_EXTRA_MS = 3_000L
+
+        /** The words shown while the camera is live, which follow the settings. */
+        val LIVE_MESSAGES = setOf(R.string.shape_ready, R.string.camera_ready, R.string.ghost_on, R.string.effects_failed)
+
+        /** Recording errors that still leave a whole video behind. */
+        val KEPT_ERRORS = setOf(
+            VideoRecordEvent.Finalize.ERROR_FILE_SIZE_LIMIT_REACHED,
+            VideoRecordEvent.Finalize.ERROR_DURATION_LIMIT_REACHED,
+            VideoRecordEvent.Finalize.ERROR_INSUFFICIENT_STORAGE,
+            VideoRecordEvent.Finalize.ERROR_SOURCE_INACTIVE,
+        )
     }
 }
