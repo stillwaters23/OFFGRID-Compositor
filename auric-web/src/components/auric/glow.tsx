@@ -4,6 +4,7 @@ import { useFace } from "@/lib/use-face";
 import { floorSrc } from "@/lib/floors";
 import { useAuric } from "@/lib/store";
 import { canApplyAppearance, SAFE_DARK, boundedPercent, committedPalette, type AppearanceMode } from "@/lib/appearance";
+import { laserVars, resolveReelNumberColor } from "@/lib/contrast-guard";
 
 
 export function FloorLayer() {
@@ -56,6 +57,11 @@ export function PaletteApplier() {
   const intensity = useAuric((s) => s.glowIntensity);
   const scale = useAuric((s) => s.digitScale);
   const glass = useAuric((s) => s.houseOpacity);
+  const laserEnabled = useAuric((s) => s.laserEnabled);
+  const laserIntensity = useAuric((s) => s.laserIntensity);
+  const laserColor = useAuric((s) => s.laserColor);
+  const numberColor = useAuric((s) => s.numberColor);
+  const folderSizeAll = useAuric((s) => s.folderSizeAll);
   const palette = useMemo(
     () =>
       committedPalette({
@@ -87,7 +93,20 @@ export function PaletteApplier() {
     root.style.setProperty("--glow-intensity", String(boundedPercent(intensity)));
     root.style.setProperty("--digit-scale", String(0.85 + (boundedPercent(scale) / 100) * 0.45));
     root.style.setProperty("--house-alpha", String(boundedPercent(glass)));
-  }, [applied.felt, applied.chrome, applied.digit, applied.accent, applied.danger, applied.glow, applied.light, intensity, scale, glass]);
+    const theme = applied.light ? "light" : "dark";
+    const resolvedNumber = resolveReelNumberColor(applied, numberColor?.[theme] ?? null, theme, {
+      palette: applied,
+      laserColor,
+      laserIntensity: boundedPercent(laserIntensity, 100),
+      laserEnabled,
+    });
+    root.style.setProperty("--reel-number", resolvedNumber);
+    root.style.setProperty("--folder-size", `${boundedPercent(folderSizeAll, 50)}%`);
+    root.dataset.laserEnabled = laserEnabled ? "true" : "false";
+    for (const [name, value] of Object.entries(laserVars(laserColor, laserIntensity, laserEnabled))) {
+      root.style.setProperty(name, value);
+    }
+  }, [applied, applied.felt, applied.chrome, applied.digit, applied.accent, applied.danger, applied.glow, applied.light, intensity, scale, glass, laserEnabled, laserIntensity, laserColor, numberColor, folderSizeAll]);
 
   return null;
 }

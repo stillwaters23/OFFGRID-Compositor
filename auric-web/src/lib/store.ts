@@ -25,7 +25,7 @@ import { HOUSE_WAKE_ID, wakeById } from "@/lib/wake";
 import { evaluateUnlocks, computeStreak } from "@/lib/achievements";
 import { msFromHms, msFromSpan, spanFromMs, SPAN_MAX, type Span } from "@/lib/format";
 import { uid } from "@/lib/utils";
-import { ensureReadable } from "@/lib/color";
+import { ensureReadable, hexToRgb, isValidHex, normalizeHex } from "@/lib/color";
 import type { PavilionRoomId } from "@/lib/literacy";
 import type { FloorId } from "@/lib/floors";
 import { HOUSE_CLICK_ID, tickById } from "@/lib/ticks";
@@ -34,10 +34,17 @@ import { DEFAULT_PALETTE, paletteById } from "@/lib/palettes";
 import { HOUSE_FACE_ID, faceById, faceLoadState } from "@/lib/faces";
 import { HOUSE_CONTROL_ID, controlById } from "@/lib/controls";
 import { timerFinishedCopy } from "@/lib/alert-copy";
-import type { AppearanceDraft, AppearanceMode } from "@/lib/appearance";
+import type {
+  AppearanceDraft,
+  AppearanceMode,
+  FolderIconStyle,
+  FolderLayout,
+  NumberColor,
+} from "@/lib/appearance";
 import { canApplyAppearance, committedPalette, draftsDiffer, makeReadable, SAFE_DARK, previewPalette, boundedPercent } from "@/lib/appearance";
 import type { HourCycle } from "@/lib/clock";
-import { FREE_MODULE_IDS, withFreeModules, type ModuleId } from "@/lib/modules";
+import { FREE_MODULE_IDS, MODULES, withFreeModules, type ModuleId } from "@/lib/modules";
+import { checkNumberColor } from "@/lib/contrast-guard";
 
 
 const DEFAULT_SECTIONS: VaultSectionId[] = [
@@ -146,6 +153,16 @@ export type AppState = {
   scheduleLight: string;
   scheduleDark: string;
   appearanceDraft: AppearanceDraft | null;
+  laserEnabled: boolean;
+  laserIntensity: number;
+  laserColor: string;
+  numberColor: NumberColor;
+  folderSizeAll: number;
+  folderSizes: Record<string, number>;
+  folderLayout: FolderLayout;
+  folderIconStyle: Record<string, FolderIconStyle>;
+  folderNames: Record<string, string>;
+  folderOrder: string[];
   hourCycle: HourCycle;
   timeZoneLocked: boolean;
   timeZoneId: string;
@@ -153,7 +170,7 @@ export type AppState = {
   soundEnabled: boolean;
   deviceBatteryOn: boolean;
   deviceNetworkOn: boolean;
-  customizationFolder: null | "color" | "themes" | "icons" | "sizing" | "opacity";
+  customizationFolder: null | "color" | "themes" | "icons" | "sizing" | "opacity" | "laser";
   taskDetailId: string | null;
   shell: "session" | "home" | "tool" | "minimized" | "closed";
   resumeShell: "session" | "home" | "tool";
@@ -223,6 +240,16 @@ type Actions = {
   updateTask: (id: string, text: string) => void;
   setTaskDetail: (id: string | null) => void;
   setCustomizationFolder: (folder: AppState["customizationFolder"]) => void;
+  setLaserEnabled: (enabled: boolean) => void;
+  setLaserIntensity: (value: number) => void;
+  setLaserColor: (value: string) => { ok: true } | { ok: false; reason: string };
+  setNumberColor: (theme: "dark" | "light", value: string | null) => { ok: true } | { ok: false; reason: string };
+  setFolderSizeAll: (value: number) => void;
+  setFolderSize: (id: string, value: number | null) => void;
+  setFolderLayout: (value: FolderLayout) => void;
+  setFolderIconStyle: (id: string, value: FolderIconStyle) => void;
+  setFolderName: (id: string, value: string) => boolean;
+  setFolderOrder: (ids: string[]) => void;
   setHourCycle: (cycle: HourCycle) => void;
   setTimeZoneLocked: (on: boolean) => void;
   setTimeZoneId: (id: string) => void;
@@ -241,6 +268,16 @@ type Actions = {
   setDraftOpacity: (n: number) => void;
   setDraftFont: (id: string) => void;
   setDraftScale: (n: number) => void;
+  setDraftLaserEnabled: (enabled: boolean) => void;
+  setDraftLaserIntensity: (value: number) => void;
+  setDraftLaserColor: (value: string) => boolean;
+  setDraftNumberColor: (theme: "dark" | "light", value: string | null) => void;
+  setDraftFolderSizeAll: (value: number) => void;
+  setDraftFolderSize: (id: string, value: number | null) => void;
+  setDraftFolderLayout: (value: FolderLayout) => void;
+  setDraftFolderIconStyle: (id: string, value: FolderIconStyle) => void;
+  setDraftFolderName: (id: string, value: string) => boolean;
+  setDraftFolderOrder: (ids: string[]) => void;
   applyAppearance: () => { ok: true } | { ok: false; reason: string };
   discardAppearance: () => void;
   restoreReadableAppearance: () => void;
@@ -408,6 +445,16 @@ const initial: AppState = {
   scheduleLight: "07:00",
   scheduleDark: "19:00",
   appearanceDraft: null,
+  laserEnabled: true,
+  laserIntensity: 100,
+  laserColor: "#FF0000",
+  numberColor: { dark: null, light: null },
+  folderSizeAll: 50,
+  folderSizes: {},
+  folderLayout: "big",
+  folderIconStyle: {},
+  folderNames: {},
+  folderOrder: [],
   hourCycle: "auto",
   timeZoneLocked: false,
   timeZoneId: "",
@@ -438,7 +485,54 @@ function blankDraft(s: AppState): AppearanceDraft {
     houseOpacity: s.houseOpacity,
     digitFont: s.digitFont,
     digitScale: s.digitScale,
+    laserEnabled: s.laserEnabled,
+    laserIntensity: s.laserIntensity,
+    laserColor: s.laserColor,
+    numberColor: { ...s.numberColor },
+    folderSizeAll: s.folderSizeAll,
+    folderSizes: { ...s.folderSizes },
+    folderLayout: s.folderLayout,
+    folderIconStyle: { ...s.folderIconStyle },
+    folderNames: { ...s.folderNames },
+    folderOrder: [...s.folderOrder],
   };
+}
+
+function numberColorContext(
+  state: AppState,
+  theme: "dark" | "light",
+  source?: Pick<AppearanceDraft, "palette" | "laserEnabled" | "laserIntensity" | "laserColor">,
+) {
+  const palette = source?.palette ?? state.customPalette ?? paletteById(state.paletteId);
+  const laserColor = source?.laserColor ?? state.laserColor;
+  const laserIntensity = source?.laserIntensity ?? state.laserIntensity;
+  const laserEnabled = source?.laserEnabled ?? state.laserEnabled;
+  return {
+    palette: committedPalette({
+      paletteId: palette.id,
+      customPalette: palette.id === "custom" ? palette : null,
+      mode: theme,
+      scheduleEnabled: false,
+      lightStart: state.scheduleLight,
+      darkStart: state.scheduleDark,
+      nowMs: Number.isFinite(state.now) ? state.now : 1,
+      zone: state.timeZoneLocked ? state.timeZoneId : null,
+    }),
+    laserColor,
+    laserIntensity,
+    laserEnabled,
+  };
+}
+
+function isOpaqueHex(value: string): string | null {
+  if (!isValidHex(value)) return null;
+  const rgb = hexToRgb(value);
+  return rgb?.a === 1 ? normalizeHex(value) : null;
+}
+
+function cleanFolderOrder(ids: string[]): string[] {
+  const known = new Set(MODULES.map((module) => module.id));
+  return [...new Set(ids.filter((id) => typeof id === "string" && known.has(id as ModuleId)))];
 }
 
 export function isAppearanceDirty(s: AppState): boolean {
@@ -835,6 +929,52 @@ export const useAuric = create<AuricStore>()(
         set({ tasks: get().tasks.map((t) => (t.id === id ? { ...t, text: text.trim() || t.text } : t)) }),
       setTaskDetail: (id) => set({ taskDetailId: id }),
       setCustomizationFolder: (folder) => set({ customizationFolder: folder }),
+      setLaserEnabled: (laserEnabled) => set({ laserEnabled }),
+      setLaserIntensity: (value) => set({ laserIntensity: boundedPercent(value, 100) }),
+      setLaserColor: (value) => {
+        const laserColor = isOpaqueHex(value);
+        if (!laserColor) return { ok: false, reason: "Use a valid opaque #RGB or #RRGGBB laser color." };
+        set({ laserColor });
+        return { ok: true };
+      },
+      setNumberColor: (theme, value) => {
+        if (value === null) {
+          set({ numberColor: { ...get().numberColor, [theme]: null } });
+          return { ok: true };
+        }
+        const color = isOpaqueHex(value);
+        if (!color) return { ok: false, reason: "Use a valid opaque #RGB or #RRGGBB number color." };
+        const state = get();
+        const result = checkNumberColor(color, theme, numberColorContext(state, theme));
+        if (!result.ok) return { ok: false, reason: result.message };
+        set({ numberColor: { ...state.numberColor, [theme]: color } });
+        return { ok: true };
+      },
+      setFolderSizeAll: (value) => set({ folderSizeAll: boundedPercent(value, 50) }),
+      setFolderSize: (id, value) =>
+        set({
+          folderSizes: (() => {
+            const next = { ...get().folderSizes };
+            if (!id.trim()) return next;
+            if (value === null) delete next[id];
+            else next[id] = boundedPercent(value, 50);
+            return next;
+          })(),
+        }),
+      setFolderLayout: (value) => {
+        if (value === "grid" || value === "big" || value === "single") set({ folderLayout: value });
+      },
+      setFolderIconStyle: (id, value) => {
+        if (!id.trim() || !["3d", "flat", "etched"].includes(value)) return;
+        set({ folderIconStyle: { ...get().folderIconStyle, [id]: value } });
+      },
+      setFolderName: (id, value) => {
+        const name = value.trim();
+        if (!id.trim() || name.length < 1 || name.length > 24) return false;
+        set({ folderNames: { ...get().folderNames, [id]: name } });
+        return true;
+      },
+      setFolderOrder: (ids) => set({ folderOrder: cleanFolderOrder(ids) }),
       setHourCycle: (cycle) => set({ hourCycle: cycle }),
       setTimeZoneLocked: (on) => set({ timeZoneLocked: on }),
       setTimeZoneId: (id) => set({ timeZoneId: id }),
@@ -1049,6 +1189,60 @@ export const useAuric = create<AuricStore>()(
         const draft = get().appearanceDraft ?? blankDraft(get());
         set({ appearanceDraft: { ...draft, digitScale: boundedPercent(n) } });
       },
+      setDraftLaserEnabled: (laserEnabled) => {
+        const draft = get().appearanceDraft ?? blankDraft(get());
+        set({ appearanceDraft: { ...draft, laserEnabled } });
+      },
+      setDraftLaserIntensity: (value) => {
+        const draft = get().appearanceDraft ?? blankDraft(get());
+        set({ appearanceDraft: { ...draft, laserIntensity: boundedPercent(value, 100) } });
+      },
+      setDraftLaserColor: (value) => {
+        const color = isOpaqueHex(value);
+        if (!color) return false;
+        const draft = get().appearanceDraft ?? blankDraft(get());
+        set({ appearanceDraft: { ...draft, laserColor: color } });
+        return true;
+      },
+      setDraftNumberColor: (theme, value) => {
+        const draft = get().appearanceDraft ?? blankDraft(get());
+        const color = value === null ? null : normalizeHex(value);
+        set({ appearanceDraft: { ...draft, numberColor: { ...draft.numberColor, [theme]: color } } });
+      },
+      setDraftFolderSizeAll: (value) => {
+        const draft = get().appearanceDraft ?? blankDraft(get());
+        set({ appearanceDraft: { ...draft, folderSizeAll: boundedPercent(value, 50) } });
+      },
+      setDraftFolderSize: (id, value) => {
+        const draft = get().appearanceDraft ?? blankDraft(get());
+        const folderSizes = { ...draft.folderSizes };
+        if (id.trim()) {
+          if (value === null) delete folderSizes[id];
+          else folderSizes[id] = boundedPercent(value, 50);
+        }
+        set({ appearanceDraft: { ...draft, folderSizes } });
+      },
+      setDraftFolderLayout: (folderLayout) => {
+        if (!["grid", "big", "single"].includes(folderLayout)) return;
+        const draft = get().appearanceDraft ?? blankDraft(get());
+        set({ appearanceDraft: { ...draft, folderLayout } });
+      },
+      setDraftFolderIconStyle: (id, value) => {
+        if (!id.trim() || !["3d", "flat", "etched"].includes(value)) return;
+        const draft = get().appearanceDraft ?? blankDraft(get());
+        set({ appearanceDraft: { ...draft, folderIconStyle: { ...draft.folderIconStyle, [id]: value } } });
+      },
+      setDraftFolderName: (id, value) => {
+        const name = value.trim();
+        if (!id.trim() || name.length < 1 || name.length > 24) return false;
+        const draft = get().appearanceDraft ?? blankDraft(get());
+        set({ appearanceDraft: { ...draft, folderNames: { ...draft.folderNames, [id]: name } } });
+        return true;
+      },
+      setDraftFolderOrder: (ids) => {
+        const draft = get().appearanceDraft ?? blankDraft(get());
+        set({ appearanceDraft: { ...draft, folderOrder: cleanFolderOrder(ids) } });
+      },
       applyAppearance: () => {
         const draft = get().appearanceDraft;
         if (!draft) return { ok: true };
@@ -1059,6 +1253,12 @@ export const useAuric = create<AuricStore>()(
         }
         if (draft.scheduleEnabled && ![draft.scheduleLight, draft.scheduleDark].every((time) => /^([01]\d|2[0-3]):[0-5]\d$/.test(time))) {
           return { ok: false, reason: "Enter valid light and dark start times." };
+        }
+        for (const theme of ["dark", "light"] as const) {
+          const numberColor = draft.numberColor[theme];
+          if (!numberColor) continue;
+          const result = checkNumberColor(numberColor, theme, numberColorContext(state, theme, draft));
+          if (!result.ok) return { ok: false, reason: result.message };
         }
         if (typeof window !== "undefined" && draft.digitFont !== state.digitFont && faceLoadState(draft.digitFont) !== "loaded") {
           return { ok: false, reason: "The selected font has not loaded. Retry it or keep the current font." };
@@ -1077,6 +1277,25 @@ export const useAuric = create<AuricStore>()(
           houseOpacity: boundedPercent(draft.houseOpacity),
           digitFont: faceById(draft.digitFont).id,
           digitScale: boundedPercent(draft.digitScale),
+          laserEnabled: draft.laserEnabled,
+          laserIntensity: boundedPercent(draft.laserIntensity, 100),
+          laserColor: isOpaqueHex(draft.laserColor) ?? state.laserColor,
+          numberColor: {
+            dark: draft.numberColor.dark && checkNumberColor(draft.numberColor.dark, "dark", numberColorContext(state, "dark", draft)).ok
+              ? normalizeHex(draft.numberColor.dark)
+              : null,
+            light: draft.numberColor.light && checkNumberColor(draft.numberColor.light, "light", numberColorContext(state, "light", draft)).ok
+              ? normalizeHex(draft.numberColor.light)
+              : null,
+          },
+          folderSizeAll: boundedPercent(draft.folderSizeAll, 50),
+          folderSizes: Object.fromEntries(
+            Object.entries(draft.folderSizes).map(([id, value]) => [id, boundedPercent(value, 50)]),
+          ),
+          folderLayout: draft.folderLayout,
+          folderIconStyle: { ...draft.folderIconStyle },
+          folderNames: { ...draft.folderNames },
+          folderOrder: cleanFolderOrder(draft.folderOrder),
           appearanceDraft: null,
         });
         return { ok: true };
@@ -1093,6 +1312,7 @@ export const useAuric = create<AuricStore>()(
           scheduleEnabled: false,
           digitFont: HOUSE_FACE_ID,
           digitScale: 50,
+          numberColor: { dark: null, light: null },
           floorId: "none",
           glowMode: false,
         }),
@@ -1201,6 +1421,16 @@ export const useAuric = create<AuricStore>()(
         floatingX: s.floatingX,
         floatingY: s.floatingY,
         floatingUsed: s.floatingUsed,
+        laserEnabled: s.laserEnabled,
+        laserIntensity: s.laserIntensity,
+        laserColor: s.laserColor,
+        numberColor: s.numberColor,
+        folderSizeAll: s.folderSizeAll,
+        folderSizes: s.folderSizes,
+        folderLayout: s.folderLayout,
+        folderIconStyle: s.folderIconStyle,
+        folderNames: s.folderNames,
+        folderOrder: s.folderOrder,
         onboardingDone: s.onboardingDone,
         literacyIndex: s.literacyIndex,
         culetFound: s.culetFound,
@@ -1222,6 +1452,65 @@ export const useAuric = create<AuricStore>()(
         resumeShell: s.resumeShell === "tool" ? "home" : s.resumeShell,
         installedModules: withFreeModules(s.installedModules),
       }),
+      merge: (persistedState, currentState) => {
+        const persisted = persistedState && typeof persistedState === "object"
+          ? persistedState as Partial<AppState>
+          : {};
+        const next = { ...currentState, ...persisted };
+        const colorState = next as AppState;
+        const candidateNumbers = persisted.numberColor && typeof persisted.numberColor === "object"
+          ? persisted.numberColor
+          : currentState.numberColor;
+        const numberColor: NumberColor = { dark: null, light: null };
+        let invalidNumberColor = false;
+        for (const theme of ["dark", "light"] as const) {
+          const value = candidateNumbers[theme];
+          if (value === null || value === undefined) continue;
+          const color = typeof value === "string" ? isOpaqueHex(value) : null;
+          if (color && checkNumberColor(color, theme, numberColorContext(colorState, theme)).ok) {
+            numberColor[theme] = color;
+          } else {
+            invalidNumberColor = true;
+          }
+        }
+        const folderSizes = persisted.folderSizes && typeof persisted.folderSizes === "object"
+          ? Object.fromEntries(
+              Object.entries(persisted.folderSizes).filter(([id]) => id.trim()).map(([id, value]) => [
+                id,
+                boundedPercent(value, 50),
+              ]),
+            )
+          : currentState.folderSizes;
+        const folderIconStyle = persisted.folderIconStyle && typeof persisted.folderIconStyle === "object"
+          ? Object.fromEntries(Object.entries(persisted.folderIconStyle).filter((entry): entry is [string, FolderIconStyle] =>
+              ["3d", "flat", "etched"].includes(entry[1] as string),
+            ))
+          : currentState.folderIconStyle;
+        const folderNames = persisted.folderNames && typeof persisted.folderNames === "object"
+          ? Object.fromEntries(Object.entries(persisted.folderNames).flatMap(([id, value]) => {
+              const name = typeof value === "string" ? value.trim() : "";
+              return id.trim() && name.length >= 1 && name.length <= 24 ? [[id, name]] : [];
+            }))
+          : currentState.folderNames;
+        return {
+          ...next,
+          laserEnabled: typeof persisted.laserEnabled === "boolean" ? persisted.laserEnabled : currentState.laserEnabled,
+          laserIntensity: boundedPercent(persisted.laserIntensity ?? currentState.laserIntensity, 100),
+          laserColor: isOpaqueHex(persisted.laserColor ?? currentState.laserColor) ?? currentState.laserColor,
+          numberColor,
+          folderSizeAll: boundedPercent(persisted.folderSizeAll ?? currentState.folderSizeAll, 50),
+          folderSizes,
+          folderLayout: ["grid", "big", "single"].includes(persisted.folderLayout as string)
+            ? persisted.folderLayout!
+            : currentState.folderLayout,
+          folderIconStyle,
+          folderNames,
+          folderOrder: cleanFolderOrder(persisted.folderOrder ?? currentState.folderOrder),
+          toasts: invalidNumberColor
+            ? [...next.toasts, { id: "number-color-hydration-warning", title: "Number color reset", body: "A saved number color no longer meets the contrast guard and was reset to the palette digit.", tone: "mute" as const }]
+            : next.toasts,
+        };
+      },
     },
   ),
 );
