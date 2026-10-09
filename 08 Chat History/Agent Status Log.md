@@ -228,3 +228,12 @@ States: passed, waiting for review, blocked, or waiting for Royalty's phone test
 - **Requests for other lanes:** Add `final-build` to the build workflow's pull-request branch filter so this PR can receive a CI run.
 - **PR / commit:** Pull request #15, draft, targeting `final-build`.
 - **State:** open and unmerged for Rex's review
+
+## 2026-10-09 9:43 AM CT: Lane A round 2 fixes
+
+- **What was done:** Restored the panel top bar and camera/microphone quick toggles, added the `fx.cam.on` and `fx.mic.*` rows, corrected the recording audio notes, removed the resize grip, added bottom-edge resize zones, strengthened the high-glow bloom, and split panel behavior into focused files. `TerminalPanel.kt` is under 1,000 lines.
+- **Tests added:** Full-bleed measurement, panel geometry and resize zones, border inset, glow curve, scroll thumb geometry, responsive top-bar layout, microphone contract coverage, and toggle persistence/UI refresh.
+- **Validation:** `git diff --check` passes and no grip, slider, TODO, FIXME, or em-dash matches remain in owned panel sources. Local Gradle tests cannot configure because Android Gradle Plugin 8.13.2 is unavailable from the configured repositories. The latest successful PR build is from the earlier head, not these round 2 changes. The older failed `final-build` run stopped while downloading Android SDK command-line tools.
+- **Device evidence:** No screenshot or `dumpsys gfxinfo` result is available from this environment.
+- **PR:** Pull request #15 remains draft, based on `final-build`, and unmerged.
+- **State:** round 2 validation and publication in progress

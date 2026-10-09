@@ -102,6 +102,7 @@ class PanelSettingsTest {
         assertEquals(Theme.OLED, after.base())
         assertEquals(50, after.number(LookKeys.FONT_SIZE))
         assertEquals(ToggleStyle.WHITE, after.look().toggleStyle)
+        assertEquals(FolderView.BIG_LIST, FolderSettings(PanelPrefs(context)).view)
         assertTrue(PanelPrefs(context).toggle("test.tiktok.tests.chat_gifts", false))
         assertEquals(PanelPrefs.LAYOUT_NOW, PanelPrefs(context).layoutVersion)
     }
@@ -111,6 +112,7 @@ class PanelSettingsTest {
         val home = PanelTree.build()
         val settings = FolderSettings(PanelPrefs(context))
         assertEquals(FolderSort.IMPORTANT, settings.sort)
+        assertEquals(FolderView.BIG_LIST, settings.view)
         assertEquals(listOf("Panel settings"), settings.arrange(home).take(1).map { it.title })
         settings.sort = FolderSort.A_TO_Z
         val names = settings.arrange(home).map { FolderSettings.sortName(it) }

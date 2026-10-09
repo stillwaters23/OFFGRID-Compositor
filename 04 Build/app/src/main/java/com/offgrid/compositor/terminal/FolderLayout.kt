@@ -26,13 +26,13 @@ internal fun folderColumnCount(innerWidth: Int, minimumCellWidth: Float, request
 /** How folders are laid out (Step 2.4, the ⋮ menu). */
 internal enum class FolderView(val key: String, val title: String, val help: String, val columns: Int) {
     LIST("list", "List", "One folder per row, top to bottom.", 1),
-    BIG_LIST("big_list", "Big list", "One big folder per row.", 1),
+    BIG_LIST("big_list", "Big tiles", "One big folder per row.", 1),
     GRID_2("grid_2", "Grid 2", "Two folders side by side.", 2),
     GRID_3("grid_3", "Grid 3", "Three folders across.", 3),
     ;
 
     companion object {
-        fun from(key: String?): FolderView = entries.firstOrNull { it.key == key } ?: LIST
+        fun from(key: String?): FolderView = entries.firstOrNull { it.key == key } ?: BIG_LIST
     }
 }
 
@@ -50,7 +50,7 @@ internal enum class FolderSort(val key: String, val title: String, val help: Str
 
 /**
  * The ⋮ menu's choices, saved on the phone. Reset all clears them, which brings back the
- * start: List, Important first, folder size 50, folders locked.
+ * start: Big tiles, Important first, folder size 50, folders locked.
  */
 internal class FolderSettings(private val prefs: PanelPrefs) {
     var view: FolderView
@@ -249,7 +249,7 @@ internal class FolderLayout(context: Context, private val sub: Boolean) : ViewGr
 
     private val order = ArrayList<PanelFolder>()
     private val cells = HashMap<String, View>()
-    private var view = FolderView.LIST
+    private var view = FolderView.BIG_LIST
     private var size = FolderSettings.START_SIZE
     private var activeId: String? = null
     private var columns = 1

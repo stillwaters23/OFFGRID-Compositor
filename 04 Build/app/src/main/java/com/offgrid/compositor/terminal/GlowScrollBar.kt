@@ -38,9 +38,8 @@ internal class GlowScrollBar(context: Context, private val scrollView: ScrollVie
         val thumbWidth = Hud.dp(context, 8f)
         val left = if (layoutDirection == LAYOUT_DIRECTION_RTL) 0f else width - thumbWidth
         trackRect.set(left + (thumbWidth - trackWidth) / 2f, 0f, left + (thumbWidth + trackWidth) / 2f, height.toFloat())
-        val thumbHeight = (height * height.toFloat() / total).coerceAtLeast(Hud.dp(context, 32f))
-        val maxScroll = (total - height).coerceAtLeast(1)
-        val top = (height - thumbHeight) * scrollView.scrollY / maxScroll
+        val thumbHeight = PanelGeometry.scrollThumbHeight(height, total, Hud.dp(context, 32f))
+        val top = PanelGeometry.scrollThumbTop(height, total, scrollView.scrollY, thumbHeight)
         thumbRect.set(left, top, left + thumbWidth, top + thumbHeight)
         canvas.drawRoundRect(trackRect, trackWidth, trackWidth, track)
         canvas.drawRoundRect(thumbRect, thumbWidth / 2f, thumbWidth / 2f, bloom)
@@ -56,13 +55,16 @@ internal class GlowScrollBar(context: Context, private val scrollView: ScrollVie
             alpha = 1f
         }
         removeCallbacks(hideThumb)
-        if (ValueAnimator.areAnimatorsEnabled()) postDelayed(hideThumb, 900L)
+        postDelayed(hideThumb, 900L)
         invalidate()
     }
 
     private val hideThumb = Runnable {
         if (ValueAnimator.areAnimatorsEnabled()) {
             animate().alpha(0f).setDuration(240L).withEndAction { visibility = INVISIBLE }.start()
+        } else {
+            alpha = 0f
+            visibility = INVISIBLE
         }
     }
 
@@ -83,7 +85,7 @@ internal class GlowScrollBar(context: Context, private val scrollView: ScrollVie
             }
             MotionEvent.ACTION_MOVE -> if (dragging) {
                 val childHeight = scrollView.getChildAt(0)?.height ?: height
-                val thumbHeight = if (childHeight == 0) height.toFloat() else height * height.toFloat() / childHeight
+                val thumbHeight = PanelGeometry.scrollThumbHeight(height, childHeight, Hud.dp(context, 32f))
                 val trackTravel = (height - thumbHeight).coerceAtLeast(1f)
                 val top = (event.y - touchOffset).coerceIn(0f, trackTravel)
                 scrollView.scrollTo(0, ((childHeight - height) * top / trackTravel).toInt())

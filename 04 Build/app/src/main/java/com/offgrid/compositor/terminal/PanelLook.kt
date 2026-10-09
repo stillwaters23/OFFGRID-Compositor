@@ -1,6 +1,7 @@
 package com.offgrid.compositor.terminal
 
 import android.content.Context
+import android.content.res.Configuration
 import android.content.res.Resources
 
 /** The seven parts of the panel that each have their own color folder, most used first. */
@@ -30,9 +31,15 @@ internal enum class SystemRole(private val resId: Int, private val fallback: Int
     NEUTRAL1_50(android.R.color.system_neutral1_50, 0xFFF2F2F2.toInt()),
     NEUTRAL1_100(android.R.color.system_neutral1_100, 0xFFE4E4E4.toInt()),
     NEUTRAL1_1000(android.R.color.system_neutral1_1000, 0xFF000000.toInt()),
-    NEUTRAL2_900(android.R.color.system_neutral2_900, 0xFF1B1B1B.toInt());
+    NEUTRAL2_900(android.R.color.system_neutral2_900, 0xFF1B1B1B.toInt()),
+    SYSTEM_TEXT(0, 0xFFF4ECFF.toInt());
 
     fun resolve(context: Context): Int {
+        if (this == SYSTEM_TEXT) {
+            val night = context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK ==
+                Configuration.UI_MODE_NIGHT_YES
+            return if (night) 0xFFF4ECFF.toInt() else 0xFF17131C.toInt()
+        }
         return try {
             context.getColor(resId) or 0xFF000000.toInt()
         } catch (error: Resources.NotFoundException) {
@@ -49,16 +56,17 @@ internal enum class Theme(val key: String, val title: String, val blurb: String)
     OLED(
         "oled",
         "OLED Bioluminescent",
-        "True black glass and teal laser text. Edges glow in your phone's colors.",
+        "True black glass with phone-aware text and bioluminescent edges.",
     ),
     TITANIUM(
         "titanium_sapphire",
         "Titanium Sapphire",
-        "Titanium frame. Sapphire glass. Teal laser light everywhere.",
+        "Titanium frame, sapphire glass, and phone-aware text.",
     ),
     TERMUX("termux", "Termux Black", "Plain black. Green text. No glow."),
     SYSTEM("system", "System Colors", "Your phone's colors everywhere. Calm, with no pulse."),
-    HOLO("holo", "Holo Classic", "The Step 2 look. Cyan and gold lines.");
+    HOLO("holo", "Holo Classic", "The Step 2 look. Cyan and gold lines."),
+    UV_BLACK_LIGHT("uv_black_light", "UV Black Light", "Black glass with ultraviolet neon colors.");
 
     companion object {
         fun from(key: String?): Theme = entries.firstOrNull { it.key == key } ?: OLED
@@ -82,6 +90,7 @@ internal object LookKeys {
     const val HEIGHT = "height"
     const val FULL_SCREEN = "full_screen"
     const val SEE_THROUGH_FULL_SIZE = "see_through_full_size"
+    const val BORDER_THICKNESS = "border_thickness"
 
     const val TEST_DIAMOND = "test_diamond"
     const val SCAN_LINE = "scan_line"
@@ -116,9 +125,6 @@ internal class ThemeSpec(
 )
 
 internal object Themes {
-    /** Laser Jet Bright cyan teal, for titles and typed text. */
-    const val LASER_TEAL = 0xFF2BF5E6.toInt()
-
     /** Step 2.3: the laser cursor is a solid pure white block by default. */
     const val CURSOR_WHITE = 0xFFFFFFFF.toInt()
 
@@ -144,7 +150,7 @@ internal object Themes {
         Theme.OLED -> ThemeSpec(
             parts = ColorPart.entries.associateWith {
                 when (it) {
-                    in LASER_PARTS -> fixed(LASER_TEAL, role(it))
+                    in LASER_PARTS -> phone(SystemRole.SYSTEM_TEXT)
                     ColorPart.CURSOR -> fixed(CURSOR_WHITE, role(it))
                     else -> phone(role(it))
                 }
@@ -167,10 +173,10 @@ internal object Themes {
                 ColorPart.SKIN to fixed(0xFF020809.toInt(), role(ColorPart.SKIN)),
                 ColorPart.EDGE to fixed(0xFF19E3D6.toInt(), role(ColorPart.EDGE)),
                 ColorPart.OUTER_GLOW to fixed(0xFF00BFB3.toInt(), role(ColorPart.OUTER_GLOW)),
-                ColorPart.TEXT to fixed(LASER_TEAL, role(ColorPart.TEXT)),
+                ColorPart.TEXT to phone(SystemRole.SYSTEM_TEXT),
                 ColorPart.CURSOR to fixed(CURSOR_WHITE, role(ColorPart.CURSOR)),
                 ColorPart.FOLDER to fixed(0xFF36E9FF.toInt(), role(ColorPart.FOLDER)),
-                ColorPart.STATUS to fixed(LASER_TEAL, role(ColorPart.STATUS)),
+                ColorPart.STATUS to phone(SystemRole.SYSTEM_TEXT),
             ),
             numbers = mapOf(
                 LookKeys.OPACITY to 85, LookKeys.CORNERS to 4, LookKeys.GLOW to 57,
@@ -213,10 +219,10 @@ internal object Themes {
                 ColorPart.SKIN to phone(SystemRole.NEUTRAL2_900),
                 ColorPart.EDGE to phone(SystemRole.ACCENT1_200),
                 ColorPart.OUTER_GLOW to phone(SystemRole.ACCENT1_300),
-                ColorPart.TEXT to phone(SystemRole.NEUTRAL1_50),
+                ColorPart.TEXT to phone(SystemRole.SYSTEM_TEXT),
                 ColorPart.CURSOR to phone(SystemRole.ACCENT1_200),
                 ColorPart.FOLDER to phone(SystemRole.ACCENT2_200),
-                ColorPart.STATUS to phone(SystemRole.ACCENT1_100),
+                ColorPart.STATUS to phone(SystemRole.SYSTEM_TEXT),
             ),
             numbers = mapOf(
                 LookKeys.OPACITY to 75, LookKeys.CORNERS to 6, LookKeys.GLOW to 32,
@@ -254,14 +260,37 @@ internal object Themes {
                 LookKeys.TOUCH_GLOW to true, LookKeys.TYPING_GLOW to true,
             ),
         )
+        Theme.UV_BLACK_LIGHT -> ThemeSpec(
+            parts = mapOf(
+                ColorPart.SKIN to fixed(0xFF000000.toInt(), role(ColorPart.SKIN)),
+                ColorPart.EDGE to fixed(NeonPalette.UV_VIOLET, role(ColorPart.EDGE)),
+                ColorPart.OUTER_GLOW to fixed(NeonPalette.ELECTRIC_PURPLE, role(ColorPart.OUTER_GLOW)),
+                ColorPart.TEXT to phone(SystemRole.SYSTEM_TEXT),
+                ColorPart.CURSOR to fixed(NeonPalette.BLACKLIGHT_WHITE, role(ColorPart.CURSOR)),
+                ColorPart.FOLDER to fixed(NeonPalette.CYAN_GLOW, role(ColorPart.FOLDER)),
+                ColorPart.STATUS to phone(SystemRole.SYSTEM_TEXT),
+            ),
+            numbers = mapOf(
+                LookKeys.OPACITY to 92, LookKeys.CORNERS to 4, LookKeys.GLOW to 100,
+                LookKeys.PULSE_SPEED to 50, LookKeys.CURSOR_GLOW to 0,
+            ),
+            toggles = mapOf(
+                LookKeys.SCAN_LINE to false, LookKeys.RING to true, LookKeys.UNFOLD to true,
+                LookKeys.EDGE_GLOW to true, LookKeys.OUTER_GLOW to true, LookKeys.PULSE to false,
+                LookKeys.GLOW_ON to true,
+                LookKeys.TITANIUM_FRAME to false, LookKeys.SAPPHIRE_GLASS to false,
+                LookKeys.TOUCH_GLOW to true, LookKeys.TYPING_GLOW to true,
+            ),
+        )
     }
 
-    /** Parts that are Laser Jet Bright teal in OLED Bioluminescent: the typed text and the status line. */
+    /** Text in OLED, Titanium, and UV Black Light follows the phone's light or dark mode. */
     private val LASER_PARTS = setOf(ColorPart.TEXT, ColorPart.STATUS)
 
     /** Settings no theme touches, with their start values. */
     val PERSONAL_NUMBERS = mapOf(
         LookKeys.TYPING to 1, LookKeys.FONT_SIZE to 50, LookKeys.WIDTH to 100, LookKeys.HEIGHT to 100,
+        LookKeys.BORDER_THICKNESS to 50,
     )
     val PERSONAL_TOGGLES = mapOf(
         LookKeys.LASER_TYPING to true, LookKeys.TEST_DIAMOND to false,
@@ -319,6 +348,8 @@ internal data class PanelLook(
     val toggleStyle: ToggleStyle = ToggleStyle.WHITE,
     /** A soft halo around toggles that are on. It starts off. */
     val toggleGlow: Boolean = false,
+    val borderThickness: Int = 50,
+    val glowBloom: Float = 0f,
 ) {
     /** Holo Classic keeps the Step 2 cut corners, gold brackets, and tinted glass. */
     val holo: Boolean get() = base == Theme.HOLO
@@ -460,7 +491,6 @@ internal class ThemeStore(private val context: Context, private val prefs: Panel
         val fontValue = number(LookKeys.FONT_SIZE)
         val fontScale = if (fontValue <= 50) 0.75f + 0.25f * fontValue / 50f else 1f + 0.45f * (fontValue - 50) / 50f
         val glowOn = toggle(LookKeys.GLOW_ON)
-        val glow = number(LookKeys.GLOW) / 100f
         val look = PanelLook(
             base = base,
             skin = color(ColorPart.SKIN),
@@ -475,8 +505,10 @@ internal class ThemeStore(private val context: Context, private val prefs: Panel
             decor = if (base == Theme.HOLO) Hud.HOLO_GOLD else edge,
             specialFolder = if (base == Theme.HOLO) Hud.HOLO_GOLD else folder,
             opacity = number(LookKeys.OPACITY) / 100f,
-            glowStrength = if (glowOn) minOf(1f, GLOW_NORMAL * glow / 0.5f) else 0f,
-            glowBoost = if (glowOn) ((glow - 0.5f) * 2f).coerceIn(0f, 1f) else 0f,
+            glowStrength = if (glowOn) PanelGeometry.glowStrength(number(LookKeys.GLOW)) else 0f,
+            glowBoost = if (glowOn) PanelGeometry.glowBoost(number(LookKeys.GLOW)) else 0f,
+            borderThickness = number(LookKeys.BORDER_THICKNESS),
+            glowBloom = if (glowOn) PanelGeometry.glowBloom(number(LookKeys.GLOW)) else 0f,
             edgeGlow = toggle(LookKeys.EDGE_GLOW),
             outerGlowOn = toggle(LookKeys.OUTER_GLOW),
             pulse = toggle(LookKeys.PULSE),
@@ -510,8 +542,6 @@ internal class ThemeStore(private val context: Context, private val prefs: Panel
     }
 
     private companion object {
-        /** How bright Glow strength 50 is: the same as 70 was in Step 2.2, Royalty's normal look. */
-        const val GLOW_NORMAL = 0.7f
         const val BASE = "base_theme"
         const val SYSTEM = "system_color."
         const val ROLE = "role."

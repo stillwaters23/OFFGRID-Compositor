@@ -1,6 +1,7 @@
 package com.offgrid.compositor.terminal
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PanelGeometryTest {
@@ -32,6 +33,60 @@ class PanelGeometryTest {
         assertEquals(0 to 0, PanelGeometry.sizeRange(0, minimum = 240))
         assertEquals(0, PanelGeometry.sizeFor(50, 0 to 0))
         assertEquals(100, PanelGeometry.percentFor(0f, 0 to 0))
+    }
+
+    @Test
+    fun fullBleedBorderStaysInsideDisplayCorners() {
+        assertEquals(2f, PanelGeometry.borderStrokeDp(0), 0f)
+        assertEquals(3f, PanelGeometry.borderStrokeDp(50), 0f)
+        assertEquals(6f, PanelGeometry.borderStrokeDp(100), 0f)
+        assertEquals(2f, PanelGeometry.borderInsetDp(50), 0f)
+        assertEquals(18f, PanelGeometry.borderCornerRadius(20f, 2f), 0f)
+        assertEquals(0f, PanelGeometry.borderCornerRadius(1f, 2f), 0f)
+    }
+
+    @Test
+    fun glowCurveIsContinuousAndGetsBrighterAboveTheNormalSetting() {
+        assertEquals(0f, PanelGeometry.glowStrength(0), 0f)
+        assertEquals(0.7f, PanelGeometry.glowStrength(50), 0f)
+        assertEquals(1f, PanelGeometry.glowStrength(100), 0f)
+        assertTrue(PanelGeometry.glowStrength(75) > PanelGeometry.glowStrength(50))
+        assertTrue(PanelGeometry.glowBloom(100) > PanelGeometry.glowBloom(50))
+    }
+
+    @Test
+    fun resizeZonesAvoidSystemGestureInsets() {
+        assertEquals(
+            PanelResizeZone.BOTTOM_LEFT,
+            PanelGeometry.resizeZone(30f, 360f, 300f, 400f, 24f, 20f, 24f, 24f),
+        )
+        assertEquals(
+            PanelResizeZone.BOTTOM_EDGE,
+            PanelGeometry.resizeZone(150f, 360f, 300f, 400f, 24f, 20f, 24f, 24f),
+        )
+        assertEquals(
+            PanelResizeZone.BOTTOM_RIGHT,
+            PanelGeometry.resizeZone(265f, 360f, 300f, 400f, 24f, 20f, 24f, 24f),
+        )
+        assertEquals(
+            PanelResizeZone.NONE,
+            PanelGeometry.resizeZone(10f, 360f, 300f, 400f, 24f, 20f, 24f, 24f),
+        )
+        assertEquals(
+            PanelResizeZone.NONE,
+            PanelGeometry.resizeZone(150f, 390f, 300f, 400f, 24f, 20f, 24f, 24f),
+        )
+    }
+
+    @Test
+    fun scrollThumbTracksTheScrollableRangeAndHasAMinimumHeight() {
+        val smallThumb = PanelGeometry.scrollThumbHeight(100, 1000, 32)
+        assertEquals(32f, smallThumb, 0f)
+        assertEquals(0f, PanelGeometry.scrollThumbTop(100, 1000, 0, smallThumb), 0f)
+        assertEquals(68f, PanelGeometry.scrollThumbTop(100, 1000, 900, smallThumb), 0f)
+        val normalThumb = PanelGeometry.scrollThumbHeight(100, 200, 32)
+        assertEquals(50f, normalThumb, 0f)
+        assertEquals(68f, PanelGeometry.scrollThumbTop(100, 1000, 2000, smallThumb), 0f)
     }
 
     @Test

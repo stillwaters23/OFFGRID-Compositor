@@ -9,6 +9,23 @@ package com.offgrid.compositor.effects
  * PanelTree, next to the folder that shows it.
  */
 object FxKeys {
+    const val CAMERA_ON = "fx.cam.on"
+    const val MIC_ON = "fx.mic.on"
+    const val MIC_FX_ON = "fx.mic.fx.on"
+    const val MIC_PITCH = "fx.mic.pitch"
+    const val MIC_ROBOT_ON = "fx.mic.robot"
+    const val MIC_ROBOT_AMOUNT = "fx.mic.robot.amount"
+    const val MIC_ECHO_ON = "fx.mic.echo"
+    const val MIC_ECHO_DELAY = "fx.mic.echo.delay"
+    const val MIC_ECHO_AMOUNT = "fx.mic.echo.amount"
+    const val MIC_RADIO_ON = "fx.mic.radio"
+    const val MIC_CAVE_ON = "fx.mic.cave"
+    const val MIC_CAVE_AMOUNT = "fx.mic.cave.amount"
+    const val MIC_GAIN = "fx.mic.gain"
+    const val MIC_GATE = "fx.mic.gate"
+    const val MIC_SOUNDS_IN_VIDEO = "fx.mic.sounds_in_video"
+    const val MIC_BEAT_GLOW = "fx.mic.beat_glow"
+
     // 📁 Camera: the no-face modes (features 9, 10, 11).
     const val CAMERA_MODE = "fx.camera.mode"
     const val MODE_LIVE = "live"

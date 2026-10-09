@@ -1,6 +1,9 @@
 package com.offgrid.compositor.terminal
 
+import kotlin.math.pow
 import kotlin.math.roundToInt
+
+internal enum class PanelResizeZone { NONE, BOTTOM_EDGE, BOTTOM_LEFT, BOTTOM_RIGHT }
 
 internal object PanelGeometry {
     fun isFullBleed(width: Int, height: Int, fullScreen: Boolean): Boolean =
@@ -22,5 +25,64 @@ internal object PanelGeometry {
         return ((size - range.first) / (range.second - range.first) * 100f)
             .roundToInt()
             .coerceIn(0, 100)
+    }
+
+    fun borderStrokeDp(value: Int): Float {
+        val amount = value.coerceIn(0, 100)
+        return if (amount <= 50) 2f + amount / 50f else 3f + (amount - 50) * 3f / 50f
+    }
+
+    fun borderInsetDp(value: Int): Float = borderStrokeDp(value) / 2f + 1f
+
+    fun borderCornerRadius(radius: Float, inset: Float): Float = (radius - inset).coerceAtLeast(0f)
+
+    fun glowStrength(value: Int): Float {
+        val amount = value.coerceIn(0, 100) / 100f
+        return if (amount <= 0.5f) 1.4f * amount else 0.7f + 0.3f * ((amount - 0.5f) * 2f).pow(1.4f)
+    }
+
+    fun glowBoost(value: Int): Float = ((value.coerceIn(0, 100) - 50).coerceAtLeast(0) / 50f)
+
+    fun glowBloom(value: Int): Float {
+        val aboveNormal = ((value.coerceIn(0, 100) - 50).coerceAtLeast(0) / 50f)
+        return 1.5f * aboveNormal * aboveNormal
+    }
+
+    fun resizeZone(
+        x: Float,
+        y: Float,
+        width: Float,
+        height: Float,
+        depth: Float,
+        gestureLeft: Float = 0f,
+        gestureRight: Float = 0f,
+        gestureBottom: Float = 0f,
+    ): PanelResizeZone {
+        if (width <= 0f || height <= 0f || depth <= 0f) return PanelResizeZone.NONE
+        val left = gestureLeft.coerceIn(0f, width)
+        val right = (width - gestureRight).coerceIn(left, width)
+        val bottom = (height - gestureBottom).coerceIn(0f, height)
+        if (x < left || x >= right || y < bottom - depth || y >= bottom) {
+            return PanelResizeZone.NONE
+        }
+        return when {
+            x < left + depth -> PanelResizeZone.BOTTOM_LEFT
+            x >= right - depth -> PanelResizeZone.BOTTOM_RIGHT
+            else -> PanelResizeZone.BOTTOM_EDGE
+        }
+    }
+
+    fun scrollThumbHeight(height: Int, total: Int, minimumHeight: Int): Float {
+        if (height <= 0 || total <= height) return height.toFloat()
+        return (height * height.toFloat() / total)
+            .coerceAtLeast(minimumHeight.toFloat())
+            .coerceAtMost(height.toFloat())
+    }
+
+    fun scrollThumbTop(height: Int, total: Int, scrollY: Int, thumbHeight: Float): Float {
+        if (height <= 0 || total <= height) return 0f
+        val travel = (height - thumbHeight).coerceAtLeast(0f)
+        val maxScroll = (total - height).coerceAtLeast(1)
+        return travel * scrollY.coerceIn(0, maxScroll) / maxScroll
     }
 }

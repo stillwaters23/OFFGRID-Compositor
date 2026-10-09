@@ -58,13 +58,9 @@
     <string name="terminal_folder_description">%1$s folder. %2$s.</string>
 
     <!-- Step 2.1. Resize, test diamond, and the theme office. Plain words, short sentences. -->
-    <string name="terminal_resize">Resize corner. Drag it to make the panel bigger or smaller.</string>
-    <string name="terminal_resize_hint">Drag this corner to make the panel bigger or smaller.</string>
     <string name="terminal_size_saved">Size saved. Width is %1$d. Height is %2$d.</string>
     <string name="terminal_width">Width</string>
     <string name="terminal_height">Height</string>
-    <string name="terminal_width_caption">WIDTH</string>
-    <string name="terminal_height_caption">HEIGHT</string>
     <string name="terminal_centered">The panel is in the middle now.</string>
     <string name="terminal_bigger">Make the panel bigger</string>
     <string name="terminal_smaller">Make the panel smaller</string>
@@ -76,6 +72,7 @@
     <string name="terminal_theme_applied">%1$s is on. You can still change every setting.</string>
     <string name="terminal_color_code">HEX CODE</string>
     <string name="terminal_color_mix">MIX NINE COLORS, 0 TO 100</string>
+    <string name="terminal_color_swatches">UV SWATCHES</string>
     <string name="terminal_color_system">Use system color</string>
     <string name="terminal_color_system_help">Follows your phone\'s own colors.</string>
     <string name="terminal_color_reset">Reset</string>
@@ -168,7 +165,7 @@
     <string name="record_stop">Stop</string>
     <string name="recording_timed">Recording now. It stops after %1$d seconds, or tap Stop.</string>
     <string name="record_saved_gallery">Saved, and also in your gallery in Movies › OFFGRID. Tap Play last video.</string>
-    <string name="ghost_on">GHOST ON. Viewers see a still picture or a blank box. No sound goes out.</string>
+    <string name="ghost_on">GHOST ON. Viewers see a still picture or blank box. Mic audio is included when Mic is on. Soundboard audio is included when Sounds in video is on.</string>
     <string name="fx_fired">Done. It is in your video now.</string>
     <string name="fx_ink_cleared">Your drawing is wiped off the video.</string>
     <string name="fx_kicked">You were kicked from %1$s. Wait a moment. Then tap Open %1$s and ask to join again yourself. Never use auto rejoin. It can get you banned.</string>

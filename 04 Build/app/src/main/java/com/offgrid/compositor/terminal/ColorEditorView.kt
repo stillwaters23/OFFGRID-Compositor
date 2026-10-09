@@ -47,6 +47,8 @@ internal class ColorEditorView(
             marginStart = Hud.dpi(context, 8f)
         })
         addView(top, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+        addView(label(R.string.terminal_color_swatches))
+        addView(NeonColorRow(context, ::onSwatch), LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
 
         val systemItem = ToggleItem(
             key = "system_color",
@@ -124,6 +126,13 @@ internal class ColorEditorView(
     }
 
     private fun onHex(color: Int) {
+        store.setCustom(part, color, RainbowMix.split(color))
+        refresh()
+        onLookChanged()
+        say(context.getString(R.string.terminal_color_saved, part.title, RainbowMix.hex(color)))
+    }
+
+    private fun onSwatch(color: Int) {
         store.setCustom(part, color, RainbowMix.split(color))
         refresh()
         onLookChanged()

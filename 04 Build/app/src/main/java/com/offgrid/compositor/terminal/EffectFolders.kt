@@ -28,6 +28,7 @@ internal object EffectFolders {
             mirrorScan(),
         ),
         items = listOf(
+            ToggleItem(FxKeys.CAMERA_ON, "Camera", "Send camera video. It starts on.", true, isTest = false),
             ChoiceItem(
                 FxKeys.CAMERA_MODE,
                 "Camera mode",
@@ -43,9 +44,35 @@ internal object EffectFolders {
         ),
         notes = listOf(
             "Pick what viewers see. It is baked into the video.",
+            "Use the top Camera toggle to stop or start camera video.",
             "Blackout, Cloak void, Status label, and Ghost never show your face.",
             "Reset never changes the camera mode, so your face never shows by surprise.",
         ),
+    )
+
+    fun microphone() = PanelFolder(
+        id = "microphone",
+        title = "📁 Microphone Effects",
+        tag = null,
+        kind = FolderKind.EFFECTS,
+        items = listOf(
+            ToggleItem(FxKeys.MIC_ON, "Mic", "Record microphone audio. It starts off.", false, isTest = false),
+            ToggleItem(FxKeys.MIC_FX_ON, "Microphone Effects", "Turn the voice effects on or off.", false, isTest = false),
+            NumberItem(FxKeys.MIC_PITCH, "Pitch", "50 keeps your natural pitch.", 50),
+            ToggleItem(FxKeys.MIC_ROBOT_ON, "Robot", "Give your voice a robot sound.", false, isTest = false),
+            NumberItem(FxKeys.MIC_ROBOT_AMOUNT, "Robot amount", "0 is natural. 100 is fully robotic.", 50),
+            ToggleItem(FxKeys.MIC_ECHO_ON, "Echo", "Add an echo to your voice.", false, isTest = false),
+            NumberItem(FxKeys.MIC_ECHO_DELAY, "Echo delay", "Set the time before the echo.", 50),
+            NumberItem(FxKeys.MIC_ECHO_AMOUNT, "Echo amount", "Set how much the echo repeats.", 50),
+            ToggleItem(FxKeys.MIC_RADIO_ON, "Radio", "Give your voice a radio sound.", false, isTest = false),
+            ToggleItem(FxKeys.MIC_CAVE_ON, "Cave", "Add a cave echo to your voice.", false, isTest = false),
+            NumberItem(FxKeys.MIC_CAVE_AMOUNT, "Cave amount", "0 is light. 100 is deep.", 50),
+            NumberItem(FxKeys.MIC_GAIN, "Mic volume", "0 is silent. 50 is natural. 100 is loud.", 50),
+            NumberItem(FxKeys.MIC_GATE, "Noise gate", "0 turns the gate off. Higher values cut quiet sounds.", 0),
+            ToggleItem(FxKeys.MIC_SOUNDS_IN_VIDEO, "Sounds in video", "Include soundboard audio in video recordings.", false, isTest = false),
+            ToggleItem(FxKeys.MIC_BEAT_GLOW, "Beat glow", "Let the audio pulse the panel glow.", false, isTest = false),
+        ),
+        notes = listOf("Everything runs on this phone. Nothing goes to the cloud."),
     )
 
     private fun faceDiamond() = PanelFolder(
@@ -131,7 +158,7 @@ internal object EffectFolders {
         ),
         notes = listOf(
             "Pick Ghost in Camera mode to turn it on. GHOST ON shows on your screen.",
-            "Ghost holds the last picture. Audio is not recorded.",
+            "Video audio uses the mic when Mic is on, with Microphone Effects applied. Soundboard sounds are included when Sounds in video is on.",
             "If ghost was already on when the app opened, the box stays blank.",
         ),
     )
@@ -345,7 +372,7 @@ internal object EffectFolders {
         fire(Fire.TIME_FREEZE, "Freeze now", "Holds your video still, then picks back up like a glitch."),
         notes = listOf(
             "Viewers see a paused picture, not a dropped stream.",
-            "The freeze changes the picture only. Audio is not recorded.",
+            "Video audio uses the mic when Mic is on, with Microphone Effects applied. Soundboard sounds are included when Sounds in video is on.",
         ),
     )
 
@@ -491,7 +518,7 @@ internal object EffectFolders {
         ),
         notes = listOf(
             "Sounds play from your phone's speaker only.",
-            "Soundboard audio is not included in videos.",
+            "Soundboard sounds are included in videos when Sounds in video is on.",
         ),
     )
 
@@ -512,7 +539,8 @@ internal object EffectFolders {
         ),
         notes = listOf(
             "Videos have your effects in them. The panel is never in them.",
-            "Video recordings do not include microphone audio.",
+            "Video audio uses the mic when Mic is on, with Microphone Effects applied.",
+            "Soundboard sounds are included when Sounds in video is on.",
             "Videos stay on your phone. Nothing uploads.",
         ),
     )

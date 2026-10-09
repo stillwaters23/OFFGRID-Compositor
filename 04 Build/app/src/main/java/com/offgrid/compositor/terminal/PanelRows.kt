@@ -5,7 +5,6 @@ import android.content.res.ColorStateList
 import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
 import android.graphics.Paint
-import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
@@ -18,7 +17,6 @@ import android.text.TextWatcher
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.HapticFeedbackConstants
-import android.view.TouchDelegate
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
@@ -635,29 +633,6 @@ internal class TileGrid(
     }
 }
 
-/** Six small dots that show where to grab the panel. */
-internal class GripView(context: Context) : View(context), Styled {
-    private val dot = Paint(Paint.ANTI_ALIAS_FLAG)
-
-    init {
-        importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
-    }
-
-    override fun applyLook(look: PanelLook) {
-        dot.color = Hud.withAlpha(look.edge, 0.8f)
-        invalidate()
-    }
-
-    override fun onDraw(canvas: Canvas) {
-        val radius = Hud.dp(context, 1.6f)
-        for (row in 0 until 3) {
-            for (column in 0 until 2) {
-                canvas.drawCircle(width * (0.3f + 0.4f * column), height * (0.2f + 0.3f * row), radius, dot)
-            }
-        }
-    }
-}
-
 /** The small button that shrinks the panel to a glowing tag. */
 internal class ShrinkButton(context: Context) : View(context), Styled {
     private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -692,39 +667,6 @@ internal class ShrinkButton(context: Context) : View(context), Styled {
     }
 }
 
-/** Three short lines in the bottom right corner. Drag them to make the panel bigger or smaller. */
-internal class ResizeGrip(context: Context) : View(context), Styled {
-    private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        strokeCap = Paint.Cap.ROUND
-    }
-
-    init {
-        isClickable = true
-        isFocusable = true
-        contentDescription = context.getString(R.string.terminal_resize)
-    }
-
-    override fun applyLook(look: PanelLook) {
-        stroke.color = look.decor
-        invalidate()
-    }
-
-    /** A tap on the corner says how to use it. A drag resizes the panel. */
-    override fun performClick(): Boolean = super.performClick()
-
-    override fun onDraw(canvas: Canvas) {
-        val right = width - Hud.dp(context, 7f)
-        val bottom = height - Hud.dp(context, 7f)
-        stroke.strokeWidth = Hud.dp(context, 1.8f)
-        for (step in 1..3) {
-            val reach = Hud.dp(context, 5.5f) * step
-            stroke.alpha = 120 + 45 * step
-            canvas.drawLine(right - reach, bottom, right, bottom - reach, stroke)
-        }
-    }
-}
-
 /** A thin line of light between parts of the panel. It fades out at both ends. */
 internal class GlowRule(context: Context, private val vertical: Boolean, private val decor: Boolean) : View(context), Styled {
     init {
@@ -751,46 +693,6 @@ internal class SweepBand(context: Context) : View(context), Styled {
             GradientDrawable.Orientation.TOP_BOTTOM,
             intArrayOf(0, Hud.withAlpha(look.edge, 0.32f), 0),
         )
-    }
-}
-
-/** A small typed box at the top of the panel, for Width or Height, with its name above it. */
-internal class SizeBox(
-    context: Context,
-    caption: String,
-    label: String,
-    start: Int,
-    onChange: (value: Int, announce: Boolean) -> Unit,
-    onProblem: (String) -> Unit,
-) : LinearLayout(context), Styled {
-    private val name = TextView(context)
-
-    /** The typed box, 0 to 100. */
-    val box = NumberBox(context, label, start, onChange, onProblem, baseSp = 12f)
-
-    init {
-        orientation = VERTICAL
-        gravity = Gravity.CENTER_HORIZONTAL
-        name.text = caption
-        name.typeface = Hud.monoBold(context)
-        name.letterSpacing = 0.08f
-        name.importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
-        // A small gap, so the typing glow around the box never touches the name.
-        addView(name, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply {
-            bottomMargin = Hud.dpi(context, 2f)
-        })
-        addView(box, LayoutParams(Hud.dpi(context, 48f), Hud.dpi(context, 36f)))
-    }
-
-    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
-        super.onSizeChanged(w, h, oldw, oldh)
-        // A tap on the name above the box opens the box too, so the whole spot is easy to hit.
-        touchDelegate = TouchDelegate(Rect(0, 0, w, h), box)
-    }
-
-    override fun applyLook(look: PanelLook) {
-        name.setTextSize(TypedValue.COMPLEX_UNIT_SP, 7.5f)
-        name.setTextColor(Hud.withAlpha(look.secondaryText, 0.75f))
     }
 }
 

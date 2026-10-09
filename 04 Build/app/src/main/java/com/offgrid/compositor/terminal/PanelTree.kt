@@ -214,6 +214,7 @@ internal object PanelTree {
         val top = listOf(
             settingsFolder(),
             EffectFolders.camera(),
+            EffectFolders.microphone(),
             EffectFolders.effects(),
             EffectFolders.record(),
             offgridFolder(),
@@ -326,6 +327,7 @@ internal object PanelTree {
                 false,
                 isTest = false,
             ),
+            NumberItem(LookKeys.BORDER_THICKNESS, "Border thickness", "0 is 2 dp. 50 is 3 dp. 100 is 6 dp.", 50),
         ),
         notes = listOf(
             "These change what the panel shows.",

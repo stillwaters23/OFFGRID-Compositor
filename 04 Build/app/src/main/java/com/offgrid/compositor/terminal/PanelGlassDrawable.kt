@@ -141,7 +141,7 @@ internal class PanelGlassDrawable(
     private var glassSheen: LinearGradient? = null
     private var titleShadow: LinearGradient? = null
 
-    private class Masks(val outer: Bitmap, val edge: Bitmap, val wash: Bitmap)
+    private class Masks(val outer: Bitmap, val bloom: Bitmap, val edge: Bitmap, val wash: Bitmap)
 
     private fun dp(value: Float) = value * density
 
@@ -217,12 +217,12 @@ internal class PanelGlassDrawable(
             }
         }
         if (fullBleed) {
-            val borderInset = dp(2.25f)
+            val borderInset = dp(PanelGeometry.borderInsetDp(look?.borderThickness ?: 50))
             val borderBox = RectF(glass).apply { inset(borderInset, borderInset) }
             if (!borderBox.isEmpty) {
                 val radii = displayCornerRadii ?: FloatArray(8) { size }
                 val innerRadii = FloatArray(radii.size) { index ->
-                    (radii[index] - borderInset).coerceAtLeast(0f)
+                    PanelGeometry.borderCornerRadius(radii[index], borderInset)
                 }
                 edgeShape.addRoundRect(borderBox, innerRadii, Path.Direction.CW)
             }
@@ -377,13 +377,14 @@ internal class PanelGlassDrawable(
     private fun masksFor(): Masks? {
         val b = bounds
         if (b.isEmpty || glass.isEmpty || pane) return null
-        val key = "${b.width()}x${b.height()}:${look?.roundness}:${look?.holo}"
+        val key = "${b.width()}x${b.height()}:$margin:${look?.roundness}:${look?.holo}"
         masks[key]?.let { return it }
         if (holdMasks) return masks.values.lastOrNull()
         // The masks are soft, so half size looks the same and uses a quarter of the memory.
         val maskWidth = (b.width() * MASK_SCALE).toInt().coerceAtLeast(1)
         val maskHeight = (b.height() * MASK_SCALE).toInt().coerceAtLeast(1)
         val outer = Bitmap.createBitmap(maskWidth, maskHeight, Bitmap.Config.ALPHA_8)
+        val bloom = Bitmap.createBitmap(maskWidth, maskHeight, Bitmap.Config.ALPHA_8)
         val edge = Bitmap.createBitmap(maskWidth, maskHeight, Bitmap.Config.ALPHA_8)
         val wash = Bitmap.createBitmap(maskWidth, maskHeight, Bitmap.Config.ALPHA_8)
         val local = Path(shape)
@@ -392,6 +393,8 @@ internal class PanelGlassDrawable(
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Hud.WHITE }
         paint.maskFilter = BlurMaskFilter((margin * 0.9f * MASK_SCALE).coerceAtLeast(1f), BlurMaskFilter.Blur.OUTER)
         Canvas(outer).drawPath(local, paint)
+        paint.maskFilter = BlurMaskFilter((margin * 1.35f * MASK_SCALE).coerceAtLeast(1f), BlurMaskFilter.Blur.OUTER)
+        Canvas(bloom).drawPath(local, paint)
         // Light that spreads inward from the edge and fades out toward the middle.
         // An inner blur is soft only at the rim and solid inside, so it is taken away
         // from a solid fill. What stays is a band of light just inside the edge.
@@ -406,7 +409,7 @@ internal class PanelGlassDrawable(
         paint.strokeWidth = dp(2.5f) * MASK_SCALE
         paint.maskFilter = BlurMaskFilter(dp(5f) * MASK_SCALE, BlurMaskFilter.Blur.NORMAL)
         Canvas(edge).drawPath(local, paint)
-        val made = Masks(outer, edge, wash)
+        val made = Masks(outer, bloom, edge, wash)
         masks[key] = made
         while (masks.size > 2) {
             val oldest = masks.keys.first()
@@ -431,13 +434,14 @@ internal class PanelGlassDrawable(
             return
         }
         val strength = current.glowStrength
-        val boost = current.glowBoost
+        val boost = current.glowBloom
         val breathing = if (current.pulse) breath else 0.8f
         val glow = masksFor()
         if (glow != null && current.outerGlowOn && strength > 0f) {
+            drawMask(canvas, glow.bloom, current.outerGlow, minOf(1f, boost * 0.35f) * breathing)
             drawMask(canvas, glow.outer, current.outerGlow, strength * (0.35f + 0.65f * breathing))
             // Above 50, a second layer makes the outer glow brighter and fuller.
-            drawMask(canvas, glow.outer, Hud.lighten(current.outerGlow, 0.2f * boost), boost * (0.5f + 0.5f * breathing))
+            drawMask(canvas, glow.outer, Hud.lighten(current.outerGlow, 0.3f * boost.coerceAtMost(1f)), minOf(1f, boost) * (0.5f + 0.5f * breathing))
         }
         val titanium = titaniumOn() && !frameBand.isEmpty
         if (titanium) {
@@ -456,7 +460,7 @@ internal class PanelGlassDrawable(
             drawMask(canvas, glow.edge, current.edge, strength * (0.4f + 0.6f * breathing))
             drawMask(canvas, glow.edge, Hud.lighten(current.edge, 0.3f * boost), boost * (0.5f + 0.5f * breathing))
         }
-        line.strokeWidth = dp(if (pane) 1f else 1.25f + 1.25f * boost)
+        line.strokeWidth = dp(if (pane) 1f else PanelGeometry.borderStrokeDp(current.borderThickness))
         line.color = Hud.withAlpha(Hud.lighten(current.edge, if (pane) 0f else 0.35f * boost), if (pane) 0.5f else 0.92f)
         canvas.drawPath(if (fullBleed) edgeShape else shape, line)
         if (titanium) {
@@ -573,7 +577,7 @@ internal class PanelGlassDrawable(
         /** How far the wash of light reaches in from the edge, and how bright it is at 50 and at 100. */
         const val WASH_DP = 26f
         const val WASH_NORMAL = 0.14f
-        const val WASH_BOOST = 0.6f
+        const val WASH_BOOST = 0.9f
 
         val grainBitmap: Bitmap get() = PanelTextures.grain
         val brushedBitmap: Bitmap get() = PanelTextures.brushed
