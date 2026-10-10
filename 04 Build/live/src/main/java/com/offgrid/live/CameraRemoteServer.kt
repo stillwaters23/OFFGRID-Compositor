@@ -30,7 +30,7 @@ class CameraRemoteServer(
     private fun acceptConnections() {
         while (running.get()) {
             val key = pairingKey()
-            if (!PairingKey.isValid(key ?: "")) {
+            if (key == null || !PairingKey.isValid(key)) {
                 onFailure("Make a pairing key before accepting a remote phone.")
                 running.set(false)
                 break

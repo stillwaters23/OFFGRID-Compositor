@@ -3,9 +3,9 @@ package com.offgrid.live
 import android.content.Context
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
-import android.net.wifi.WifiP2pConfig
-import android.net.wifi.WifiP2pManager
 import android.net.wifi.WifiManager
+import android.net.wifi.p2p.WifiP2pConfig
+import android.net.wifi.p2p.WifiP2pManager
 import java.net.Inet4Address
 import java.net.InetAddress
 import java.net.InetSocketAddress

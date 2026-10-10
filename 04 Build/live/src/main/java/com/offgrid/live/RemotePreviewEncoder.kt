@@ -57,7 +57,7 @@ class RemotePreviewEncoder(
             codecStarted = true
             frameSink = host.frameSurfaceSink()
             inputSurface = input
-            frameSink?.attach(input, WIDTH, HEIGHT)
+            frameSink?.attach(OUTPUT_ID, input, WIDTH, HEIGHT)
             drainThread = Thread({ drain(encoder) }, "OffgridRemoteVideo").apply { start() }
             return true
         } catch (error: IllegalStateException) {
@@ -123,7 +123,7 @@ class RemotePreviewEncoder(
         drainThread = null
         val surface = inputSurface
         if (surface != null) {
-            frameSink?.detach(surface)
+            frameSink?.detach(OUTPUT_ID)
             surface.release()
         }
         inputSurface = null
@@ -143,6 +143,7 @@ class RemotePreviewEncoder(
     }
 
     private companion object {
+        const val OUTPUT_ID = "remote"
         const val WIDTH = 960
         const val HEIGHT = 540
         const val BIT_RATE = 1_500_000

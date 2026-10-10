@@ -7,12 +7,14 @@ on:
       - step-2-2-premium-panel
       - step-2-4-presets-layouts
       - final-build
+      - copilot/lane-c-live-remote
   pull_request:
     branches:
       - main
       - ccr-c441a76e-hgt5wa
       - step-2-2-premium-panel
       - step-2-4-presets-layouts
+      - final-build
 
 permissions:
   contents: write

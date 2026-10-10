@@ -268,3 +268,11 @@ States: passed, waiting for review, blocked, or waiting for Royalty's phone test
 - **PR / commit:** Pull request #13. Follow-up changes are pending publication.
 - **State:** blocked
 - **Next:** The public Lane B output-surface API and real PC transport are still unavailable; finish those after Lane B lands, then rerun Android tests and device checks.
+
+## 2026-10-09 10:52 PM CT - Lane C PC transport
+
+- **Bootloader step:** Lane C. Live and Remote
+- **What was done:** Added a real H.264 Send to PC path (SRT caller and RTMP publisher) of the finished picture, plus a silent AAC-LC track. Pairing stays a 128-character SecureRandom key over a direct X25519, HKDF, and AES-GCM link, with reconnect backoff. Panel actions reach overlay settings, clean output, pairing, preview, and Send to PC. The old single-surface compositor path is archived. AGP stays 8.13.2. Local `testDebugUnitTest` reported 64 tests, 0 failures, 0 errors, 0 skipped, and `assembleDebug` succeeded. GitHub CI has not reported yet.
+- **PR / commit:** Pull request #13 on `copilot/lane-c-live-remote`.
+- **State:** waiting for CI
+- **Next:** Post the checklist comment once the GitHub workflow on this branch finishes.

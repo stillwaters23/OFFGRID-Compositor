@@ -64,7 +64,7 @@ Add these plain notes to the Bigo platform folder:
 
 - Lane A: Add the three notes above to the Bigo platform folder in 📁 Live and Remote.
 - Lane B: Add `setExtraOutput(id, surface, width, height)` using its shared `drawFinal` path so remote preview and PC encoder surfaces receive the same finished image without a duplicate compositor renderer. Its current PR branch does not yet expose this method, and it is not in `final-build`.
-- Lane B: Expose a read-only processed PCM tap for PC streaming when `fx.mic.on` is on. Until then the PC output remains video-only.
+- Lane B: Expose a read-only processed PCM tap for PC streaming when `fx.mic.on` is on. Until then the PC output sends H.264 video plus a silent AAC track, with no microphone capture.
 - Lane B: Keep camera and microphone foreground-service types off for overlay-only use. Add them only for stream work started while OFFGRID is visible. `RECORD_AUDIO` is declared by Lane B in the app manifest.
 
 ## Send to PC with OBS

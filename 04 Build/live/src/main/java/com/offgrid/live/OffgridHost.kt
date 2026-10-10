@@ -8,12 +8,12 @@ interface OffgridHost {
     fun fire(action: String)
     fun openApp()
     fun frameSurfaceSink(): FrameSink
+    fun restoreControls() = Unit
 }
 
-fun interface FrameSink {
-    fun attach(surface: Surface, width: Int, height: Int)
-
-    fun detach(surface: Surface) = Unit
+interface FrameSink {
+    fun attach(id: String, surface: Surface, width: Int, height: Int)
+    fun detach(id: String) = Unit
 }
 
 object LiveHostRegistry {

@@ -2,6 +2,7 @@ package com.offgrid.compositor.terminal
 
 import android.content.Context
 import com.offgrid.compositor.effects.FxKeys
+import com.offgrid.live.LiveActions
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -141,6 +142,11 @@ class EffectPanelTest {
         assertTrue(PanelAction.REMOTE_OPEN_PREVIEW in actions)
         assertFalse(folder.items.filterIsInstance<ToggleItem>().single { it.key == FxKeys.LIVE_OVERLAY }.default)
         assertEquals("off", folder.items.filterIsInstance<ChoiceItem>().first { it.key == FxKeys.REMOTE_ROLE }.default)
+        assertEquals(LiveActions.OPEN_OVERLAY, PanelAction.LIVE_OPEN_OVERLAY_SETTINGS.name)
+        assertEquals(LiveActions.CLEAN_OUTPUT, PanelAction.LIVE_CLEAN_OUTPUT.name)
+        assertEquals(LiveActions.OPEN_PAIRING, PanelAction.REMOTE_OPEN_PAIRING.name)
+        assertEquals(LiveActions.OPEN_PREVIEW, PanelAction.REMOTE_OPEN_PREVIEW.name)
+        assertEquals(LiveActions.SEND_TO_PC, PanelAction.LIVE_SEND_TO_PC.name)
     }
 
     @Test

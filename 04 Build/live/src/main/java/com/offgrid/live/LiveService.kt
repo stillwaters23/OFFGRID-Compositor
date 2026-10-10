@@ -27,7 +27,7 @@ class LiveService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action ?: ACTION_SHOW) {
             ACTION_SHOW, ACTION_HIDE -> startOverlayService(intent?.action == ACTION_HIDE)
-            ACTION_STREAM_START -> startStream(intent)
+            ACTION_STREAM_START -> if (intent != null) startStream(intent)
             ACTION_STREAM_STOP -> stopStream()
             ACTION_OPEN -> LiveHostRegistry.host?.openApp() ?: openApp()
             ACTION_STOP -> onNotificationStop()

@@ -157,7 +157,10 @@ internal class OverlayWindowController(
     override fun action(name: String) {
         when (name) {
             "bubble" -> animateBubble(true)
-            "expand" -> animateBubble(false)
+            "expand" -> {
+                animateBubble(false)
+                LiveHostRegistry.host?.restoreControls()
+            }
             "snap" -> snapToEdge()
             "close" -> onClose()
             "open" -> LiveHostRegistry.host?.openApp()

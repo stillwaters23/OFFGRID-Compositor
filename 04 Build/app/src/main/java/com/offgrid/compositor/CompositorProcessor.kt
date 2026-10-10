@@ -50,7 +50,7 @@ class CompositorProcessor(
      * True when this picture must not show the plain camera: a no-face mode or the face diamond
      * is on, but the effects that hide the face are not drawn (yet). The picture stays black.
      */
-    private var coverFace = false
+    internal var coverFace = false
 
     /** The Step 1 yellow test diamond. Off by default, so nothing extra is painted. */
     @Volatile
@@ -69,12 +69,12 @@ class CompositorProcessor(
     private val mainHandler = Handler(Looper.getMainLooper())
     val executor: Executor
 
-    private var display = EGL14.EGL_NO_DISPLAY
-    private var context = EGL14.EGL_NO_CONTEXT
-    private var dummy = EGL14.EGL_NO_SURFACE
-    private var config: android.opengl.EGLConfig? = null
-    private var drawer: CompositorDrawer? = null
-    private var stage: StagePainter? = null
+    internal var display = EGL14.EGL_NO_DISPLAY
+    internal var context = EGL14.EGL_NO_CONTEXT
+    internal var dummy = EGL14.EGL_NO_SURFACE
+    internal var config: android.opengl.EGLConfig? = null
+    internal var drawer: CompositorDrawer? = null
+    internal var stage: StagePainter? = null
     private var effects: OverlayRenderer? = null
     private val plan = StagePlan()
 
@@ -85,11 +85,7 @@ class CompositorProcessor(
     private var replayWanted = false
     private var replaySeconds = 30
     // Lane C hook
-    private var liveSurface: Surface? = null
-    private var liveEglSurface = EGL14.EGL_NO_SURFACE
-    private var liveWidth = 0
-    private var liveHeight = 0
-    private var lastLiveStamp = 0L
+    private val liveOutputs = LiveOutputDrawer()
 
     /** The camera stream's size, once the camera starts. The face finder uses its shape. */
     @Volatile
@@ -101,9 +97,9 @@ class CompositorProcessor(
     private var toldFirstFrame = false
 
     private var inputTexture: SurfaceTexture? = null
-    private var inputTextureId = 0
-    private val textureTransform = FloatArray(16)
-    private val updatedTransform = FloatArray(16)
+    internal var inputTextureId = 0
+    internal val textureTransform = FloatArray(16)
+    internal val updatedTransform = FloatArray(16)
     private val outputs = mutableListOf<OutputSlot>()
     private val retiredTextures = HashSet<SurfaceTexture>()
 
@@ -203,7 +199,8 @@ class CompositorProcessor(
             drawSlot(slot, stamp, painted)
         }
         drawReplay(snapshot, stamp, painted)
-        drawLiveSurface(snapshot, stamp, painted)
+        // Lane C hook
+        liveOutputs.draw(this, stamp, snapshot, painted)
     }
 
     /** Turns the replay buffer on or off, keeping the last [seconds] seconds. */
@@ -220,75 +217,24 @@ class CompositorProcessor(
     fun saveReplay(file: java.io.File): Boolean = replay?.save(file) ?: false
 
     // Lane C hook
-    fun setLiveSurface(surface: Surface, width: Int, height: Int) {
+    fun setExtraOutput(id: String, surface: Surface?, width: Int, height: Int) {
         executor.execute {
             if (released) return@execute
-            destroyLiveSurface()
-            liveSurface = surface
-            liveWidth = width
-            liveHeight = height
-            liveEglSurface = EGL14.eglCreateWindowSurface(
-                display,
-                config,
-                surface,
-                intArrayOf(EGL14.EGL_NONE),
-                0,
-            ) ?: EGL14.EGL_NO_SURFACE
-            if (liveEglSurface == EGL14.EGL_NO_SURFACE) {
-                liveSurface = null
-                Log.e(TAG, "Remote preview output could not start")
-            }
+            liveOutputs.set(this@CompositorProcessor, id, surface, width, height)
         }
+    }
+
+    // Lane C hook
+    fun setLiveSurface(surface: Surface, width: Int, height: Int) {
+        setExtraOutput("preview", surface, width, height)
     }
 
     // Lane C hook
     fun clearLiveSurface(surface: Surface) {
         executor.execute {
-            if (liveSurface === surface) destroyLiveSurface()
+            if (released) return@execute
+            liveOutputs.clear(this@CompositorProcessor, surface)
         }
-    }
-
-    // Lane C hook
-    private fun drawLiveSurface(slots: List<OutputSlot>, stamp: Long, painted: GlTarget?) {
-        if (liveEglSurface == EGL14.EGL_NO_SURFACE ||
-            liveWidth <= 0 ||
-            liveHeight <= 0 ||
-            stamp - lastLiveStamp < LIVE_FRAME_INTERVAL_NS
-        ) {
-            return
-        }
-        lastLiveStamp = stamp
-        if (!EGL14.eglMakeCurrent(display, liveEglSurface, liveEglSurface, context)) return
-        GLES20.glViewport(0, 0, liveWidth, liveHeight)
-        GLES20.glClearColor(0f, 0f, 0f, 1f)
-        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
-        val staged = stage
-        if (painted != null && staged != null) {
-            staged.present(painted, liveWidth, liveHeight)
-        } else if (!coverFace) {
-            val main = slots.maxByOrNull { it.width * it.height } ?: return
-            main.surfaceOutput.updateTransformMatrix(updatedTransform, textureTransform)
-            drawer?.drawCamera(inputTextureId, updatedTransform) ?: return
-        }
-        GLES20.glEnable(GLES20.GL_BLEND)
-        GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
-        effectList.drawAll(liveWidth, liveHeight)
-        if (testShapeOn) drawer?.drawTopLayer()
-        EGLExt.eglPresentationTimeANDROID(display, liveEglSurface, stamp)
-        EGL14.eglSwapBuffers(display, liveEglSurface)
-    }
-
-    // Lane C hook
-    private fun destroyLiveSurface() {
-        if (liveEglSurface != EGL14.EGL_NO_SURFACE) {
-            if (dummy != EGL14.EGL_NO_SURFACE) EGL14.eglMakeCurrent(display, dummy, dummy, context)
-            EGL14.eglDestroySurface(display, liveEglSurface)
-        }
-        liveEglSurface = EGL14.EGL_NO_SURFACE
-        liveSurface = null
-        liveWidth = 0
-        liveHeight = 0
-        lastLiveStamp = 0L
     }
 
     /** Draws the finished picture into the replay buffer too, the same one the video gets. */
@@ -556,7 +502,7 @@ class CompositorProcessor(
             effects = null
             stopReplay()
             // Lane C hook
-            destroyLiveSurface()
+            liveOutputs.release(this)
             if (dummy != EGL14.EGL_NO_SURFACE) {
                 EGL14.eglDestroySurface(display, dummy)
                 dummy = EGL14.EGL_NO_SURFACE
@@ -616,7 +562,7 @@ class CompositorProcessor(
         }
     }
 
-    private class OutputSlot(
+    internal class OutputSlot(
         val surfaceOutput: SurfaceOutput,
         val eglSurface: android.opengl.EGLSurface,
         val width: Int,
@@ -630,7 +576,5 @@ class CompositorProcessor(
 
         /** The stage picture's longest side, in pixels. The video is 1280 tall, so this keeps it sharp. */
         const val MAX_STAGE_SIDE = 1920f
-        // Lane C hook
-        const val LIVE_FRAME_INTERVAL_NS = 1_000_000_000L / 24
     }
 }

@@ -181,30 +181,6 @@ class RemoteSecurityTest {
                     } catch (error: IllegalArgumentException) {
                         error.message == "Keys don't match"
                     }
-
-                    @Test
-                    fun incompleteHandshakeTimesOut() {
-                        val loopback = InetAddress.getLoopbackAddress()
-                        val pairingKey = PairingKey.generate()
-                        val executor = Executors.newSingleThreadExecutor()
-                        ServerSocket(0, 1, loopback).use { server ->
-                            try {
-                                val timedOut = executor.submit<Boolean> {
-                                    try {
-                                        RemoteSession.establish(server.accept(), pairingKey, false, handshakeTimeoutMs = 100)
-                                        false
-                                    } catch (_: java.net.SocketTimeoutException) {
-                                        true
-                                    }
-                                }
-                                Socket(loopback, server.localPort).use {
-                                    assertTrue(timedOut.get(2, TimeUnit.SECONDS))
-                                }
-                            } finally {
-                                executor.shutdownNow()
-                            }
-                        }
-                    }
                 }
                 val failure = runCatching {
                     RemoteSession.establish(
@@ -215,6 +191,53 @@ class RemoteSecurityTest {
                 }.exceptionOrNull()
                 assertEquals("Keys don't match", failure?.message)
                 assertTrue(remote.get())
+            } finally {
+                executor.shutdownNow()
+            }
+        }
+    }
+
+    @Test
+    fun incompleteHandshakeTimesOut() {
+        val loopback = InetAddress.getLoopbackAddress()
+        val pairingKey = PairingKey.generate()
+        val executor = Executors.newSingleThreadExecutor()
+        ServerSocket(0, 1, loopback).use { server ->
+            try {
+                val timedOut = executor.submit<Boolean> {
+                    try {
+                        RemoteSession.establish(server.accept(), pairingKey, false, handshakeTimeoutMs = 100)
+                        false
+                    } catch (_: java.net.SocketTimeoutException) {
+                        true
+                    }
+                }
+                Socket(loopback, server.localPort).use {
+                    assertTrue(timedOut.get(2, TimeUnit.SECONDS))
+                }
+            } finally {
+                executor.shutdownNow()
+            }
+        }
+    }
+
+    @Test
+    fun closingOnePhoneUnblocksTheOther() {
+        val loopback = InetAddress.getLoopbackAddress()
+        val pairingKey = PairingKey.generate()
+        val executor = Executors.newSingleThreadExecutor()
+        ServerSocket(0, 1, loopback).use { server ->
+            try {
+                val remote = executor.submit<RemoteSession> {
+                    RemoteSession.establish(server.accept(), pairingKey, false)
+                }
+                RemoteSession.establish(Socket(loopback, server.localPort), pairingKey, true).use { camera ->
+                    val controller = remote.get(2, TimeUnit.SECONDS)
+                    camera.close()
+                    val error = runCatching { controller.receive() }.exceptionOrNull()
+                    assertTrue(error is java.io.IOException)
+                    controller.close()
+                }
             } finally {
                 executor.shutdownNow()
             }

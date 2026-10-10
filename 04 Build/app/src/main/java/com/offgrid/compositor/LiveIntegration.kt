@@ -17,7 +17,8 @@ import com.offgrid.live.LocalAddressPolicy
 import com.offgrid.live.OffgridHost
 import com.offgrid.live.PairingActivity
 import com.offgrid.live.PairingWorkflow
-import com.offgrid.live.PcOutputConfig
+import com.offgrid.compositor.effects.FxKeys
+import com.offgrid.live.LiveActions
 import com.offgrid.live.RemoteMessage
 import com.offgrid.live.RemotePacket
 import com.offgrid.live.RemotePreviewActivity
@@ -48,30 +49,36 @@ internal class LiveIntegration(
     private var remoteServer: CameraRemoteServer? = null
     private var remoteEncoder: RemotePreviewEncoder? = null
     private var streamServiceStarted = false
+    private val pc = PcOutputBridge(
+        host = host,
+        activity = { this.activity },
+        remoteStillRunning = { remoteServer != null || remoteEncoder != null || streamServiceStarted },
+        onStatus = ::showStatus,
+    )
     private var cleanOutput = false
     private var activity: Activity? = activity
     private var activeRole = "off"
 
     init {
+        host.onPcOutputChanged = { enabled -> if (enabled) pc.startFromSettings() else pc.stop() }
+        host.onRestoreControls = ::restoreCleanOutput
         LiveHostRegistry.host = host
         effects.onLiveAction = ::onAction
-        effects.onLiveSettings = ::syncRole
-        syncRole()
-        activity.lifecycle.addObserver(this)
+        effects.onLiveSettings = ::syncSettings
+        syncSettings()
+        (activity as? LifecycleOwner)?.lifecycle?.addObserver(this)
     }
 
     private fun onResume() {
-        if (cleanOutput) {
-            cleanOutput = false
-            controlBar?.visibility = View.VISIBLE
-            panel?.setHiddenForPlayback(false)
-        }
+        if (cleanOutput) restoreCleanOutput()
+        if (host.readSetting(FxKeys.LIVE_PC_ON) == "true") pc.startFromSettings()
         if (host.readSetting(LIVE_OVERLAY_KEY) == "true") {
             LiveOverlayController.openOverlay(appContext)
         }
     }
 
     private fun onPause() {
+        pc.stop()
         if (host.readSetting(LIVE_OVERLAY_KEY) == "true") {
             LiveOverlayController.openOverlay(appContext)
         } else if (remoteServer == null && remoteEncoder == null && !streamServiceStarted) {
@@ -88,6 +95,7 @@ internal class LiveIntegration(
         controlBar = null
         panel = null
         pairing.close()
+        pc.close()
         worker.shutdownNow()
     }
 
@@ -102,20 +110,23 @@ internal class LiveIntegration(
 
     private fun onAction(action: String) {
         when (action) {
-            "LIVE_OPEN_OVERLAY_SETTINGS" -> {
-                host.writeSetting(LIVE_OVERLAY_KEY, "true")
-            }
-            "LIVE_CLEAN_OUTPUT" -> {
-                host.writeSetting(LIVE_OVERLAY_KEY, "true")
+            LiveActions.OPEN_OVERLAY -> host.writeSetting(LIVE_OVERLAY_KEY, "true")
+            LiveActions.CLEAN_OUTPUT -> {
                 controlBar?.visibility = View.GONE
                 panel?.setHiddenForPlayback(true)
                 cleanOutput = true
                 LiveOverlayController.hideOverlay(appContext)
             }
-            "REMOTE_OPEN_PAIRING" -> launch(PairingActivity::class.java)
-            "REMOTE_OPEN_PREVIEW" -> launch(RemotePreviewActivity::class.java)
-            "LIVE_SEND_TO_PC" -> validatePcSettings()
+            LiveActions.OPEN_PAIRING -> launch(PairingActivity::class.java)
+            LiveActions.OPEN_PREVIEW -> launch(RemotePreviewActivity::class.java)
+            LiveActions.SEND_TO_PC -> pc.startFromSettings()
         }
+    }
+
+    private fun restoreCleanOutput() {
+        cleanOutput = false
+        controlBar?.visibility = View.VISIBLE
+        panel?.setHiddenForPlayback(false)
     }
 
     private fun launch(destination: Class<out Activity>) {
@@ -135,21 +146,6 @@ internal class LiveIntegration(
         }
     }
 
-    private fun validatePcSettings() {
-        try {
-            PcOutputConfig.create(
-                host.readSetting("fx.live.pc.protocol") ?: "srt",
-                host.readSetting("fx.live.pc.host").orEmpty(),
-                host.readSetting("fx.live.pc.port") ?: "9000",
-                host.readSetting("fx.live.pc.res") ?: "720p",
-                host.readSetting("fx.live.pc.bitrate") ?: "6000000",
-            )
-            showStatus("PC output is waiting for the shared compositor output hook.")
-        } catch (error: IllegalArgumentException) {
-            showStatus(error.message ?: "Check the PC output settings.")
-        }
-    }
-
     private fun changeRole(value: String) {
         if (activeRole == value) return
         activeRole = value
@@ -161,6 +157,11 @@ internal class LiveIntegration(
             }
             else -> stopCameraRole()
         }
+    }
+
+    private fun syncSettings() {
+        syncRole()
+        if (host.readSetting(FxKeys.LIVE_PC_ON) == "true") pc.startFromSettings() else pc.stop()
     }
 
     private fun syncRole() {
@@ -260,16 +261,14 @@ internal class LiveIntegration(
         }
     }
 
-    private companion object {
-        const val LIVE_OVERLAY_KEY = "fx.live.overlay"
-        val CAMERA_SETTINGS = mapOf(
+    companion object {
+        private const val LIVE_OVERLAY_KEY = "fx.live.overlay"
+        private val CAMERA_SETTINGS = mapOf(
             "fx.cam.on" to "true",
             "fx.mic.on" to "false",
             "fx.camera.mode" to "live",
         )
-    }
 
-    companion object {
         fun install(
             activity: Activity,
             effects: EffectsController,

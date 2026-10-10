@@ -16,14 +16,21 @@ data class PcOutputConfig(
     val height: Int,
     val bitrate: Int,
 ) {
+    val rtmpApp: String = "live"
+    val rtmpStream: String = "offgrid"
+    val srtStreamId: String = "live/offgrid"
+    val protocolLabel: String = if (protocol == PcOutputProtocol.SRT) "SRT" else "RTMP"
+
+    fun sendingStatus(): String = "Sending to PC $host ($protocolLabel)"
+
     val url: String
         get() {
             val authorityHost = if (host.contains(':') && !host.startsWith("[")) "[$host]" else host
             return when (protocol) {
                 PcOutputProtocol.SRT ->
-                    "srt://$authorityHost:$port?mode=caller&streamid=live/offgrid"
+                    "srt://$authorityHost:$port?mode=caller&streamid=$srtStreamId"
                 PcOutputProtocol.RTMP ->
-                    "rtmp://$authorityHost:$port/live/offgrid"
+                    "rtmp://$authorityHost:$port/$rtmpApp/$rtmpStream"
             }
         }
 
@@ -32,6 +39,7 @@ data class PcOutputConfig(
         const val DEFAULT_BITRATE = 6_000_000
         const val FRAME_RATE = 30
         const val KEYFRAME_INTERVAL_SECONDS = 1
+        const val LOST_PC = "Lost the PC. Trying again."
 
         fun create(
             protocol: String,
