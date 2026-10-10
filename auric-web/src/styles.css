@@ -1,7 +1,4 @@
 @import "tailwindcss";
-@import "./styles/reel-look.css";
-@import "./styles/folders.css";
-@import "./styles/clicker.css";
 
 :root {
   --felt: #05070e;

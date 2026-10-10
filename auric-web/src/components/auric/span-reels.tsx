@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { DrumReel } from "@/components/auric/drum-reel";
-import { LaserStrip } from "@/components/auric/laser-strip";
+import { LaserStrip } from "@/components/auric/laser_strip";
 import { SPAN_COUNT, type Span } from "@/lib/format";
 import { cn } from "@/lib/utils";
 

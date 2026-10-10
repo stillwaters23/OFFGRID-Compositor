@@ -37,7 +37,7 @@ async function waitForSettledValue(page, slider) {
 }
 
 try {
-  await page.goto(`${baseUrl}/laser-demo`, { waitUntil: "domcontentloaded" });
+  await page.goto(`${baseUrl}/laser_demo`, { waitUntil: "domcontentloaded" });
   await page.getByRole("heading", { name: "Laser Strip Lab" }).waitFor();
   await page.waitForFunction(() =>
     [...document.querySelectorAll(".barrel [data-reel-item]")].some(
@@ -49,10 +49,11 @@ try {
   assert.equal(await page.locator(".l1-demo-sample .aperture").count(), 0);
   assert.equal(await page.locator("[data-l1-aperture-witness] .aperture").count(), 1);
   assert.equal(await page.locator("[data-l1-aperture-witness] .barrel").count(), 1);
+  assert.equal(await page.locator('a[href="/laser_demo"]').count(), 0);
   assert.equal(await page.locator('a[href="/laser-demo"]').count(), 0);
 
   mkdirSync(resolve("screenshots/l1"), { recursive: true });
-  await page.screenshot({ path: "screenshots/l1/laser-demo.png", fullPage: true });
+  await page.screenshot({ path: "screenshots/l1/laser_demo.png", fullPage: true });
   const brightCore = await page
     .locator('.l1-demo-sample[data-laser-intensity="100"] .laser-strip')
     .first()
@@ -80,7 +81,7 @@ try {
     };
   });
   const beamPixels = await pixelStrip.screenshot();
-  writeFileSync("screenshots/l1/laser-strip.png", beamPixels);
+  writeFileSync("screenshots/l1/laser_strip.png", beamPixels);
   await pixelStrip.evaluate((strip) => {
     strip.style.opacity = "0";
   });
@@ -169,7 +170,7 @@ try {
     `selected glyph over the beam must stay near white, got ${glyph.join(",")}`,
   );
   await page.getByRole("button", { name: "light mood" }).click();
-  await page.screenshot({ path: "screenshots/l1/laser-light.png", fullPage: true });
+  await page.screenshot({ path: "screenshots/l1/laser_light.png", fullPage: true });
   await page.getByRole("button", { name: "dark mood" }).click();
 
   const geometry = await page.evaluate(() => {

@@ -7,7 +7,7 @@ import {
   laserVariables,
 } from "../src/lib/laser.ts";
 import { contrastRatio } from "../src/lib/color.ts";
-import { reelGeometry } from "../src/lib/reel-geometry.ts";
+import { reelGeometry } from "../src/lib/reel_geometry.ts";
 
 test("laser defaults are enabled at full intensity with the default red", () => {
   assert.equal(LASER_DEFAULT, "#f0243e");

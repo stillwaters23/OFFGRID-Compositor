@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { controlById } from "@/lib/controls";
-import { reelGeometry, rowsCrossed } from "@/lib/reel-geometry";
+import { reelGeometry, rowsCrossed } from "@/lib/reel_geometry";
 import { useAuric } from "@/lib/store";
 import { cn, wrapIndex } from "@/lib/utils";
 

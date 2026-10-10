@@ -5,7 +5,7 @@ import { SpanReels } from "@/components/auric/span-reels";
 import { LASER_PRESETS, laserVariables } from "@/lib/laser";
 import type { Span } from "@/lib/format";
 
-export const Route = createFileRoute("/laser-demo")({ component: LaserDemo });
+export const Route = createFileRoute("/laser_demo")({ component: LaserDemo });
 
 const SAMPLE: Span = {
   years: 77,

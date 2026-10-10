@@ -10,43 +10,43 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as LaserDemoRouteImport } from './routes/laser-demo'
+import { Route as Laser_demoRouteImport } from './routes/laser_demo'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const LaserDemoRoute = LaserDemoRouteImport.update({
-  id: '/laser-demo',
-  path: '/laser-demo',
+const Laser_demoRoute = Laser_demoRouteImport.update({
+  id: '/laser_demo',
+  path: '/laser_demo',
   getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/laser-demo': typeof LaserDemoRoute
+  '/laser_demo': typeof Laser_demoRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/laser-demo': typeof LaserDemoRoute
+  '/laser_demo': typeof Laser_demoRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/laser-demo': typeof LaserDemoRoute
+  '/laser_demo': typeof Laser_demoRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/laser-demo'
+  fullPaths: '/' | '/laser_demo'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/laser-demo'
-  id: '__root__' | '/' | '/laser-demo'
+  to: '/' | '/laser_demo'
+  id: '__root__' | '/' | '/laser_demo'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  LaserDemoRoute: typeof LaserDemoRoute
+  Laser_demoRoute: typeof Laser_demoRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -58,11 +58,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/laser-demo': {
-      id: '/laser-demo'
-      path: '/laser-demo'
-      fullPath: '/laser-demo'
-      preLoaderRoute: typeof LaserDemoRouteImport
+    '/laser_demo': {
+      id: '/laser_demo'
+      path: '/laser_demo'
+      fullPath: '/laser_demo'
+      preLoaderRoute: typeof Laser_demoRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -70,7 +70,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  LaserDemoRoute: LaserDemoRoute,
+  Laser_demoRoute: Laser_demoRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

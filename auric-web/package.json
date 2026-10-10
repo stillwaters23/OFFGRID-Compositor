@@ -21,7 +21,7 @@
     "format": "prettier --write .",
     "test:auric": "node --import ./scripts/test-aliases.mjs --experimental-strip-types --test tests/auric.test.ts tests/brainstorm.test.ts",
     "test:l1": "node --import ./scripts/test-aliases.mjs --experimental-strip-types --test tests/l1-*.test.ts tests/l1_*.test.ts",
-    "test:l1:e2e": "node tests/e2e/l1-reels.e2e.mjs",
+    "test:l1:e2e": "node tests/e2e/l1_reels.e2e.mjs",
     "brand:export": "python3 scripts/export-brand.py",
     "brand:verify": "python3 scripts/verify-brand.py"
   },
