@@ -1,4 +1,4 @@
-import type { Rect } from "./folder-layout.ts";
+import type { Rect } from "./folder_layout.ts";
 
 export type SpringState = { position: number; velocity: number; target: number };
 

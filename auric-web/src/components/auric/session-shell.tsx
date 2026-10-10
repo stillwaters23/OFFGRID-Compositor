@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { FolderGrid } from "@/components/auric/folder-grid";
-import { FolderLayoutSheet } from "@/components/auric/folder-layout-sheet";
+import { FolderLayoutSheet } from "@/components/auric/folder_layout_sheet";
 import { FolderStage } from "@/components/auric/folder-stage";
 import {
   AuricWordmark,
@@ -11,7 +11,7 @@ import {
   TaskbarPill,
   TxPanel,
 } from "@/components/auric/termux-chrome";
-import { DEFAULT_FOLDER_PREFERENCES, normalizeFolderPreferences } from "@/lib/folder-layout";
+import { DEFAULT_FOLDER_PREFERENCES, normalizeFolderPreferences } from "@/lib/folder_layout";
 import { FREE_MODULE_IDS, MODULES, moduleById } from "@/lib/modules";
 import { unlockAudio } from "@/lib/audio";
 import { cn } from "@/lib/utils";

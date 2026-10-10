@@ -1,5 +1,5 @@
 import type { ModuleSpec } from "@/lib/modules";
-import type { FolderIconStyle, FolderPreferences, FolderLayout } from "@/lib/folder-layout";
+import type { FolderIconStyle, FolderPreferences, FolderLayout } from "@/lib/folder_layout";
 
 export function FolderLayoutSheet({
   open,

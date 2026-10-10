@@ -6,7 +6,7 @@ import {
   normalizeFolderPreferences,
   orderFolderIds,
   paddedLabelRect,
-} from "../src/lib/folder-layout.ts";
+} from "../src/lib/folder_layout.ts";
 
 test("folder metrics clamp size and choose layout columns by available width", () => {
   assert.equal(folderMetrics(100, 8, "grid").iconPx, 0);

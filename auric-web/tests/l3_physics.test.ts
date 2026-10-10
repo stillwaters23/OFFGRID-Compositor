@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { clampToSafeArea, springStep } from "../src/lib/folder-physics.ts";
+import { clampToSafeArea, springStep } from "../src/lib/folder_physics.ts";
 
 test("critical spring settles within 500ms without crossing its target", () => {
   let spring = { position: 120, velocity: 0, target: 0 };

@@ -1,4 +1,4 @@
-import { classifyGesture, type GestureEvent } from "./folder-layout.ts";
+import { classifyGesture, type GestureEvent } from "./folder_layout.ts";
 
 export { classifyGesture };
 export type { GestureEvent };

@@ -344,11 +344,11 @@ test("L3 icon styles cover every glyph and etched text stays matte and readable"
   await setStyles("3d");
   await page.reload();
   await page.waitForFunction((count) => document.querySelectorAll(".tx-folder-3d-icon").length === count, ids.length);
-  await page.locator(".tx-folder-grid").screenshot({ path: `${screenshotDir}/icons-3d.png` });
+  await page.locator(".tx-folder-grid").screenshot({ path: `${screenshotDir}/icons_3d.png` });
   await setStyles("etched");
   await page.reload();
   await page.waitForFunction((count) => document.querySelectorAll(".tx-folder-art.is-etched").length === count, ids.length);
-  await page.locator(".tx-folder-grid").screenshot({ path: `${screenshotDir}/icons-etched.png` });
+  await page.locator(".tx-folder-grid").screenshot({ path: `${screenshotDir}/icons_etched.png` });
 
   for (const mood of ["dark", "light"]) {
     await page.evaluate((appearanceMode) => {

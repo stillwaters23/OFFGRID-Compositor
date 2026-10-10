@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { classifyGesture, shouldSuppressClick } from "../src/lib/folder-gestures.ts";
+import { classifyGesture, shouldSuppressClick } from "../src/lib/folder_gestures.ts";
 
 const start = { type: "start" as const, x: 10, y: 10, time: 0 };
 
