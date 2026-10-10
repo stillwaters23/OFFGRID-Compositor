@@ -18,7 +18,7 @@ export function FolderGrid() {
       {rows.map((spec) => {
         const owned = isInstalled(spec.id, installed);
         return (
-          <li key={spec.id}>
+          <li key={spec.id} data-folder-id={spec.id}>
             <button
               type="button"
               className={cn("tx-folder-tile", owned ? "is-on" : "is-off")}

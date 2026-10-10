@@ -60,7 +60,7 @@ test("Clicker Sounds lists, selects, previews, and stays within the viewport", a
     await page.goto(baseUrl);
     await page.waitForFunction(() => localStorage.getItem("auric-crowned-v21") !== null);
     await page.getByRole("button", { name: "OPEN SESSION" }).click();
-    await page.getByRole("button", { name: "clicker-sounds unlocked" }).click();
+    await page.locator('[data-folder-id="clicker-sounds"] button').click();
     await page.getByRole("heading", { name: "Clicker Sounds" }).waitFor();
     const clicker = page.locator(".tx-clicker");
     await page.waitForFunction(() => document.querySelector(".tx-clicker")?.dataset.folderName === "House Clicks");
