@@ -44,7 +44,7 @@ import type {
 import { canApplyAppearance, committedPalette, draftsDiffer, makeReadable, SAFE_DARK, previewPalette, boundedPercent } from "@/lib/appearance";
 import type { HourCycle } from "@/lib/clock";
 import { FREE_MODULE_IDS, MODULES, withFreeModules, type ModuleId } from "@/lib/modules";
-import { checkNumberColor } from "@/lib/contrast-guard";
+import { LASER_DEFAULT, checkNumberColor } from "@/lib/contrast-guard";
 
 
 const DEFAULT_SECTIONS: VaultSectionId[] = [
@@ -447,7 +447,7 @@ const initial: AppState = {
   appearanceDraft: null,
   laserEnabled: true,
   laserIntensity: 100,
-  laserColor: "#FF0000",
+  laserColor: LASER_DEFAULT,
   numberColor: { dark: null, light: null },
   folderSizeAll: 50,
   folderSizes: {},

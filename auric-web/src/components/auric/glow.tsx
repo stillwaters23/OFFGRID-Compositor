@@ -1,10 +1,13 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useLayoutEffect, useMemo } from "react";
 import { readableInk, contrastRatio } from "@/lib/color";
 import { useFace } from "@/lib/use-face";
 import { floorSrc } from "@/lib/floors";
 import { useAuric } from "@/lib/store";
 import { canApplyAppearance, SAFE_DARK, boundedPercent, committedPalette, type AppearanceMode } from "@/lib/appearance";
 import { laserVars, resolveReelNumberColor } from "@/lib/contrast-guard";
+import "@/styles/reel-look.css";
+
+const useIsoLayoutEffect = typeof document === "undefined" ? useEffect : useLayoutEffect;
 
 
 export function FloorLayer() {
@@ -78,7 +81,7 @@ export function PaletteApplier() {
   );
   const applied = canApplyAppearance(palette) ? palette : SAFE_DARK;
 
-  useEffect(() => {
+  useIsoLayoutEffect(() => {
     const root = document.documentElement;
     root.style.setProperty("--felt", applied.felt);
     root.style.setProperty("--chrome", applied.chrome);
@@ -101,6 +104,7 @@ export function PaletteApplier() {
       laserEnabled,
     });
     root.style.setProperty("--reel-number", resolvedNumber);
+    root.dataset.numberColor = numberColor?.[theme] ? "custom" : "palette";
     root.style.setProperty("--folder-size", `${boundedPercent(folderSizeAll, 50)}%`);
     root.dataset.laserEnabled = laserEnabled ? "true" : "false";
     for (const [name, value] of Object.entries(laserVars(laserColor, laserIntensity, laserEnabled))) {

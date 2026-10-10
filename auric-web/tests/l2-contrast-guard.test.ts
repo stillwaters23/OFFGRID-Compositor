@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { checkNumberColor, laserVars, resolveReelNumberColor, wheelBackgroundSamples } from "../src/lib/contrast-guard.ts";
+import { LASER_PRESETS, checkNumberColor, laserSpreadPx, laserVars, resolveReelNumberColor, wheelBackgroundSamples } from "../src/lib/contrast-guard.ts";
 import { committedPalette } from "../src/lib/appearance.ts";
 import { BLUE_DIAMOND, CURATED } from "../src/lib/palettes.ts";
 import type { Palette } from "../src/lib/types.ts";
@@ -104,18 +104,44 @@ test("invalid and translucent number colors are refused", () => {
   assert.equal(checkNumberColor("#FFFFFF80", "dark", ctx(BLUE_DIAMOND)).ok, false);
 });
 
+test("laser presets stay in brief order", () => {
+  assert.deepEqual(LASER_PRESETS.map((preset) => [preset.name, preset.hex]), [
+    ["Red", "#FF0000"],
+    ["Cyan", "#00E5FC"],
+    ["Blue", "#0032FF"],
+    ["Magenta", "#FF00A6"],
+    ["Violet", "#7B02B3"],
+  ]);
+});
+
 test("laser intensity maps linearly and disabling removes its beam opacity", () => {
   assert.deepEqual(laserVars("#FF00A6", 0, true), {
     "--laser-color": "#FF00A6",
-    "--laser-enabled": "1",
+    "--laser-core": "#FFFFFF",
     "--laser-core-opacity": "0.2",
     "--laser-bloom-opacity": "0",
+    "--laser-bloom-a": "0%",
+    "--laser-spread": "24px",
+    "--laser-on": "1",
+    "--laser-enabled": "1",
   });
   assert.equal(laserVars("#FF0000", 50, true)["--laser-core-opacity"], "0.6");
   assert.equal(laserVars("#FF0000", 50, true)["--laser-bloom-opacity"], "0.28");
+  assert.equal(laserVars("#FF0000", 50, true)["--laser-bloom-a"], "28%");
+  assert.equal(laserVars("#FF0000", 50, true)["--laser-spread"], "40px");
   assert.equal(laserVars("#FF0000", 100, true)["--laser-core-opacity"], "1");
   assert.equal(laserVars("#FF0000", 100, true)["--laser-bloom-opacity"], "0.55");
-  assert.equal(laserVars("#FF0000", 100, false)["--laser-core-opacity"], "0");
+  assert.equal(laserVars("#FF0000", 100, true)["--laser-bloom-a"], "55%");
+  assert.equal(laserVars("#FF0000", 100, true)["--laser-spread"], "48px");
+  assert.equal(laserVars("#FF0000", 100, true)["--laser-on"], "1");
+  const off = laserVars("#FF0000", 100, false);
+  assert.equal(off["--laser-core-opacity"], "0");
+  assert.equal(off["--laser-bloom-opacity"], "0");
+  assert.equal(off["--laser-bloom-a"], "0%");
+  assert.equal(off["--laser-on"], "0");
+  for (const intensity of [0, 50, 100]) {
+    assert.equal(laserSpreadPx(intensity) % 8, 0);
+  }
 });
 
 test("resolved reel numerals stay guard-approved and away from near-black for curated palettes", () => {

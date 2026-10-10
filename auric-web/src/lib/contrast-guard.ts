@@ -89,20 +89,45 @@ export function wheelBackgroundSamples(palette: Palette): string[] {
   ];
 }
 
+export const LASER_DEFAULT = "#FF0000";
+
+/** Brief order: Red, then the four named hex presets. */
+export const LASER_PRESETS = [
+  { name: "Red", hex: "#FF0000" },
+  { name: "Cyan", hex: "#00E5FC" },
+  { name: "Blue", hex: "#0032FF" },
+  { name: "Magenta", hex: "#FF00A6" },
+  { name: "Violet", hex: "#7B02B3" },
+] as const;
+
+const LASER_BLOOM_PEAK = 0.55;
+
 export function laserBloomComposite(bg: string, laserColor: string, intensity: number): string {
   const laser = opaqueHex(laserColor);
   if (!laser || !Number.isFinite(intensity) || intensity <= 0) return bg;
   return compositeOn(laser, bg, Math.min(1, intensity / 100) * 0.36);
 }
 
-export function laserVars(laserColor: string, intensity: number, enabled: boolean) {
-  const color = opaqueHex(laserColor) ?? "#FF0000";
+/** Spread runs 24px → 48px and snaps onto the 8px grid (36px would miss it). */
+export function laserSpreadPx(intensity: number): number {
   const percent = Number.isFinite(intensity) ? Math.max(0, Math.min(100, intensity)) : 100;
+  return Math.round((24 + (percent / 100) * 24) / 8) * 8;
+}
+
+export function laserVars(laserColor: string, intensity: number, enabled: boolean) {
+  const color = opaqueHex(laserColor) ?? LASER_DEFAULT;
+  const percent = Number.isFinite(intensity) ? Math.max(0, Math.min(100, intensity)) : 100;
+  const coreOpacity = enabled ? Number((0.2 + 0.8 * (percent / 100)).toFixed(2)) : 0;
+  const bloomOpacity = enabled ? Number((LASER_BLOOM_PEAK * (percent / 100)).toFixed(2)) : 0;
   return {
     "--laser-color": color,
+    "--laser-core": "#FFFFFF",
+    "--laser-core-opacity": String(coreOpacity),
+    "--laser-bloom-opacity": String(bloomOpacity),
+    "--laser-bloom-a": `${Math.round(bloomOpacity * 100)}%`,
+    "--laser-spread": `${laserSpreadPx(percent)}px`,
+    "--laser-on": enabled ? "1" : "0",
     "--laser-enabled": enabled ? "1" : "0",
-    "--laser-core-opacity": enabled ? String(Number((0.2 + 0.8 * (percent / 100)).toFixed(2))) : "0",
-    "--laser-bloom-opacity": enabled ? String(Number((0.55 * (percent / 100)).toFixed(2))) : "0",
   };
 }
 
