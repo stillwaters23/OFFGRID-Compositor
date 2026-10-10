@@ -8,13 +8,14 @@ on:
       - step-2-4-presets-layouts
       - final-build
       - copilot/lane-c-live-remote
+      - copilot/lane-e-media-pipe-person-segmentation
   pull_request:
     branches:
+      - final-build
       - main
       - ccr-c441a76e-hgt5wa
       - step-2-2-premium-panel
       - step-2-4-presets-layouts
-      - final-build
 
 permissions:
   contents: write
@@ -107,7 +108,7 @@ jobs:
 
       - name: Build the debug app
         working-directory: 04 Build
-        run: chmod +x ./gradlew && ./gradlew assembleDebug --stacktrace
+        run: chmod +x ./gradlew && ./gradlew testDebugUnitTest assembleDebug --stacktrace
 
       - name: Check the color mix math
         working-directory: 04 Build
@@ -123,6 +124,19 @@ jobs:
             exit 1
           fi
           echo "Mic permission is not in the app."
+          if ! grep -q "android.permission.INTERNET" "$merged"; then
+            echo "Send to PC and the direct phone link need INTERNET."
+            exit 1
+          fi
+          if grep -R -n -E "https?://" "04 Build/app/src/main/java/com/offgrid/compositor/person_segmenter.kt"; then
+            echo "Camera frames must stay on the phone."
+            exit 1
+          fi
+          if ! grep -q "isSiteLocalAddress" "04 Build/live/src/main/java/com/offgrid/live/LocalNetwork.kt"; then
+            echo "Public addresses must stay refused."
+            exit 1
+          fi
+          echo "INTERNET is only for local Send to PC and the direct phone link. The person mask stays on the phone."
 
       - name: Name the app file
         run: |

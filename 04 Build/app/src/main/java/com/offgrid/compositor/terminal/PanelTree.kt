@@ -195,6 +195,13 @@ internal class SettingDefaults(
  * The 18 platform folders follow 01 Brainstorm/Feature Scope.md, feature 13.
  */
 internal object PanelTree {
+    const val AURIC_LASER_COLOR = "auric_laser_color"
+    const val AURIC_LASER_DIMMER = "auric_laser_dimmer"
+    const val CLICKER_ENABLED = "clicker_enabled"
+    const val CLICKER_STYLE = "clicker_style"
+    const val CLICKER_VARIANT = "clicker_variant"
+    const val CLICKER_VOLUME = "clicker_volume"
+
     /** The start value of every setting in the tree, by key. Themes still win for their own settings. */
     val defaults: SettingDefaults by lazy {
         val numbers = HashMap<String, Int>()
@@ -244,6 +251,8 @@ internal object PanelTree {
             displayFolder(),
             glowFolder(),
             colorsFolder(),
+            auricWheelFolder(),
+            clickerSoundsFolder(),
             themesFolder(),
             presetsFolder(),
             resetFolder(),
@@ -279,7 +288,8 @@ internal object PanelTree {
         ),
         notes = listOf(
             "Width and Height are also at the top of the panel.",
-            "Pinch with two fingers, or drag the corner lines, to resize.",
+            "Turn the drum wheel to pick a whole number. Pinch or drag the corner lines to resize too.",
+            "Type the number under a wheel if you cannot turn it. The laser is one line across both wheels.",
         ),
     )
 
@@ -306,7 +316,13 @@ internal object PanelTree {
                 true,
                 isTest = false,
             ),
-            ToggleItem(LookKeys.TICK, "Tick when saved", "Your phone ticks softly when a setting is saved.", true, isTest = false),
+            ToggleItem(
+                LookKeys.TICK,
+                "Touch feedback",
+                "Use the phone's touch vibration on saves and every Auric wheel notch.",
+                true,
+                isTest = false,
+            ),
             ToggleItem(
                 LookKeys.TITANIUM_FRAME,
                 "Titanium frame",
@@ -325,6 +341,64 @@ internal object PanelTree {
         notes = listOf(
             "These change what the panel shows.",
             "The tick follows your phone's own touch feel setting.",
+        ),
+    )
+
+    private fun auricWheelFolder() = PanelFolder(
+        id = "auric_wheel",
+        title = "📁 Auric wheel",
+        tag = null,
+        kind = FolderKind.OFFICE,
+        items = listOf(
+            ChoiceItem(
+                AURIC_LASER_COLOR,
+                "Laser color",
+                listOf(
+                    Choice("2BF5E6", "Auric cyan", "Bright teal light."),
+                    Choice("E7FF78", "Lime", "Warm green light."),
+                    Choice("FFD36E", "Amber", "Soft gold light."),
+                    Choice("FFFFFF", "Ice", "White light."),
+                    Choice("C5A3FF", "Violet", "Purple light."),
+                    Choice("FF7B8B", "Rose", "Pink-red light."),
+                ),
+                "2BF5E6",
+            ),
+            NumberItem(AURIC_LASER_DIMMER, "Laser dimmer", "0 turns the laser off. 100 is full brightness.", 72),
+        ),
+        notes = listOf(
+            "Width and Height use the five-row Auric drum wheel.",
+            "The center laser stays in one unbroken line across the selected row.",
+            "Notches follow Touch feedback and your phone's system touch setting.",
+        ),
+    )
+
+    private fun clickerSoundsFolder() = PanelFolder(
+        id = "clicker_sounds",
+        title = "📁 Clicker Sounds",
+        tag = null,
+        kind = FolderKind.OFFICE,
+        items = listOf(
+            ToggleItem(CLICKER_ENABLED, "Clicker sounds", "Play a short generated click on each wheel notch.", true, isTest = false),
+            ChoiceItem(
+                CLICKER_STYLE,
+                "Sound style",
+                listOf(
+                    Choice("soft", "Soft", "A rounded sine click."),
+                    Choice("wood", "Wood", "A dry wooden tap."),
+                    Choice("digital", "Digital", "A compact square-wave tick."),
+                    Choice("rubber", "Rubber", "A descending, soft pop."),
+                    Choice("glass", "Glass", "A bright two-tone tap."),
+                    Choice("metal", "Metal", "A short inharmonic ring."),
+                    Choice("muted", "Muted", "A quiet low click."),
+                ),
+                "soft",
+            ),
+            NumberItem(CLICKER_VARIANT, "Tone variation", "77 generated tones. 0 is low. 100 is high.", 50),
+            NumberItem(CLICKER_VOLUME, "Volume", "0 is silent. 100 is loud.", 55),
+        ),
+        notes = listOf(
+            "Sounds are made by the app. No sound files or microphone are used.",
+            "Audio is prepared away from the screen thread.",
         ),
     )
 
@@ -433,6 +507,8 @@ internal object PanelTree {
 
     private val PART_HELP = mapOf(
         ColorPart.SKIN to "This colors the panel glass.",
+        ColorPart.NUMBER_DARK to "This colors numbers on dark panels. Keep at least 4.5 to 1 contrast.",
+        ColorPart.NUMBER_LIGHT to "This colors numbers on light panels. Keep at least 4.5 to 1 contrast.",
         ColorPart.EDGE to "This colors the thin line around the panel.",
         ColorPart.OUTER_GLOW to "This colors the soft glow outside the panel.",
         ColorPart.TEXT to "This colors the typed guidance text.",

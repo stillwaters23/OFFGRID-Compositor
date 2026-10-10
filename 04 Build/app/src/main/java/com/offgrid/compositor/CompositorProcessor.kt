@@ -78,6 +78,13 @@ class CompositorProcessor(
     private var effects: OverlayRenderer? = null
     private val plan = StagePlan()
 
+    /** The person mask. Set from the camera screen. The drawing thread only reads it. */
+    private var masks: MaskBus = MaskBus()
+
+    internal fun useMasks(bus: MaskBus) {
+        masks = bus
+    }
+
     /** The replay buffer and its drawing target, when it is on. */
     @Volatile
     private var replay: ReplayBuffer? = null
@@ -298,7 +305,8 @@ class CompositorProcessor(
     private fun paintStage(slots: List<OutputSlot>): GlTarget? {
         val settings = engine.settings
         val diamondOn = settings.on(FxKeys.DIAMOND_ON)
-        val hideFace = diamondOn || settings.choice(FxKeys.CAMERA_MODE).ifEmpty { FxKeys.MODE_LIVE } != FxKeys.MODE_LIVE
+        val mode = settings.choice(FxKeys.CAMERA_MODE).ifEmpty { FxKeys.MODE_LIVE }
+        val hideFace = diamondOn || mode != FxKeys.MODE_LIVE || MaskGate.hidesFace(settings.choice(FxKeys.BODY_MODE))
         coverFace = hideFace
         val painter = stage ?: return null
         val textureId = inputTextureId
@@ -323,7 +331,10 @@ class CompositorProcessor(
         val drawn = overlay != null && overlay.hasPicture
         // The face diamond is drawn with the other effects. Until that drawing arrives, the
         // picture stays black, so the face never shows for even a moment.
-        coverFace = diamondOn && !drawn
+        // A body look does the same when the person mask is missing or stale.
+        val mask = if (plan.bodyOn) masks.latest() else null
+        val maskClosed = plan.bodyOn && MaskGate.verdict(mask, System.nanoTime()) != MaskVerdict.APPLY
+        coverFace = (diamondOn && !drawn) || maskClosed
         if (coverFace || (plan.plain && !drawn)) return null
         if (!EGL14.eglMakeCurrent(display, main.eglSurface, main.eglSurface, context)) {
             fail("Could not draw a frame")
@@ -341,6 +352,7 @@ class CompositorProcessor(
                 time = time,
                 overlayTexture = if (drawn) overlay?.texture ?: 0 else 0,
                 overlayMatrix = overlay?.matrix ?: updatedTransform,
+                mask = mask,
             )
         } catch (error: RuntimeException) {
             Log.e(TAG, "Effects stage failed", error)

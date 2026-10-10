@@ -42,6 +42,18 @@ object FxKeys {
     const val GHOST_FROZEN = "frozen"
     const val GHOST_BLANK = "blank"
 
+    // The person mask (Lane E). MediaPipe cuts the body out of the video box.
+    const val BODY_MODE = "fx.body.mode"
+    const val BODY_OFF = "off"
+    const val BODY_SEE = "see"
+    const val BODY_REPLACE = "replace"
+    const val BODY_CLOAK = "cloak"
+    const val BODY_HOLO = "hologram"
+    const val BODY_PLATE = "fx.body.plate"
+    const val BODY_PLATE_BLACK = "black"
+    const val BODY_PLATE_VOID = "void"
+    const val BODY_EDGE = "fx.body.edge"
+
     // The face diamond: a diamond that covers the face.
     const val DIAMOND_ON = "fx.diamond.on"
     const val DIAMOND_STYLE = "fx.diamond.style"

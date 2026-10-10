@@ -1,0 +1,10 @@
+Lane E's Build debug app step failed the job when the merged manifest contained INTERNET.
+That check is archived here so the work is kept.
+The merged workflow still fails on RECORD_AUDIO, still requires the person segmenter to have no server URL,
+and still requires local-address refusal. INTERNET stays because Send to PC and the direct phone link need it.
+
+          if grep -q "android.permission.INTERNET" "$merged"; then
+            echo "Camera frames must stay on the phone."
+            exit 1
+          fi
+          echo "Internet permission is not in the app."

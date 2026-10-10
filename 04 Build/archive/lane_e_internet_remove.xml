@@ -1,0 +1,8 @@
+Lane E removed INTERNET so MediaPipe's logging library cannot upload camera frames.
+The person mask stays on the phone and still has no server call.
+Lane C restored INTERNET for local Send to PC and the direct phone link.
+Public hosts stay refused by LocalAddressPolicy.
+
+<uses-permission
+    android:name="android.permission.INTERNET"
+    tools:node="remove" />

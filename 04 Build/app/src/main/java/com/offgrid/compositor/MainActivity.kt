@@ -30,6 +30,7 @@ import androidx.annotation.OptIn
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ExperimentalMirrorMode
+import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.MirrorMode
 import androidx.camera.core.Preview
 import androidx.camera.core.UseCaseGroup
@@ -107,6 +108,10 @@ class MainActivity : AppCompatActivity() {
     private var effectsBroken = false
     private lateinit var faces: FaceTracker
 
+    /** The person mask, shared by the segmenter thread and the drawing thread. */
+    private val masks = MaskBus()
+    private lateinit var segmenter: PersonSegmenter
+
     private val mainHandler = Handler(Looper.getMainLooper())
     private var stopRecordingTask: Runnable? = null
 
@@ -148,6 +153,7 @@ class MainActivity : AppCompatActivity() {
         terminalPanel.onTestDiamond = { on -> onTestDiamondChanged(on) }
         val engine = EffectEngine()
         faces = FaceTracker(this, engine)
+        segmenter = PersonSegmenter(this, engine, masks)
         effects = EffectsController(this, terminalPanel, engine)
         LiveIntegration.install(this, effects, { processor }, controlBar, terminalPanel) // Lane C hook
         effects.lastVideo = { recordingFile() }
@@ -198,6 +204,7 @@ class MainActivity : AppCompatActivity() {
         processor?.onEffectsFailed = null
         processor?.release()
         processor = null
+        if (::segmenter.isInitialized) segmenter.release()
         super.onDestroy()
     }
 
@@ -228,7 +235,7 @@ class MainActivity : AppCompatActivity() {
                         showMessage(R.string.camera_missing, ButtonMode.NONE)
                         return@addListener
                     }
-                    bindCamera(provider, withFrameRate = true)
+                    bindCamera(provider, withFrameRate = true, withSegment = true)
                 } catch (error: Exception) {
                     Log.e(TAG, "Camera did not start", error)
                     showMessage(R.string.camera_failed, ButtonMode.NONE)
@@ -239,8 +246,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     @OptIn(ExperimentalMirrorMode::class)
-    private fun bindCamera(provider: ProcessCameraProvider, withFrameRate: Boolean) {
+    private fun bindCamera(provider: ProcessCameraProvider, withFrameRate: Boolean, withSegment: Boolean) {
         val painter = processor ?: CompositorProcessor(effects.engine, EffectLayers.all()).also { created ->
+            created.useMasks(masks)
             created.onFirstFrame = {
                 created.inputSize?.let { size ->
                     faces.streamAspect = maxOf(size.width, size.height).toFloat() / minOf(size.width, size.height)
@@ -303,23 +311,43 @@ class MainActivity : AppCompatActivity() {
         val viewPort = ViewPort.Builder(Rational(previewView.width, previewView.height), rotation)
             .setScaleType(ViewPort.FILL_CENTER)
             .build()
-        val group = UseCaseGroup.Builder()
+        val groupBuilder = UseCaseGroup.Builder()
             .setViewPort(viewPort)
             .addUseCase(preview)
             .addUseCase(capture)
             .addEffect(effect)
-            .build()
+        if (withSegment) {
+            // A small picture for the person cutout. Keep only the newest frame, so a slow
+            // mask never queues and the preview stays at 30fps.
+            // The preview and the video already ask for 30fps. This stream shares that session.
+            val analysis = ImageAnalysis.Builder()
+                .setResolutionSelector(segmentResolution())
+                .setTargetRotation(rotation)
+                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_YUV_420_888)
+                .build()
+            segmenter.attach(analysis)
+            groupBuilder.addUseCase(analysis)
+        }
+        val group = groupBuilder.build()
         try {
             provider.unbindAll()
             provider.bindToLifecycle(this, CameraSelector.DEFAULT_FRONT_CAMERA, group)
             videoCapture = capture
         } catch (error: Exception) {
-            if (withFrameRate) {
-                Log.w(TAG, "Steady frame rate was not available. Trying again.")
-                bindCamera(provider, withFrameRate = false)
-            } else {
-                Log.e(TAG, "Camera did not start", error)
-                showMessage(R.string.camera_failed, ButtonMode.NONE)
+            when {
+                withFrameRate -> {
+                    Log.w(TAG, "Steady frame rate was not available. Trying again.")
+                    bindCamera(provider, withFrameRate = false, withSegment = withSegment)
+                }
+                withSegment -> {
+                    Log.w(TAG, "Person segmentation stream was not available. Body modes stay black.")
+                    bindCamera(provider, withFrameRate = false, withSegment = false)
+                }
+                else -> {
+                    Log.e(TAG, "Camera did not start", error)
+                    showMessage(R.string.camera_failed, ButtonMode.NONE)
+                }
             }
         }
     }
@@ -624,12 +652,27 @@ class MainActivity : AppCompatActivity() {
             .build()
     }
 
+    /** A small 16:9 frame for the person mask, the same crop as the preview. */
+    private fun segmentResolution(): ResolutionSelector {
+        return ResolutionSelector.Builder()
+            .setAspectRatioStrategy(AspectRatioStrategy.RATIO_16_9_FALLBACK_AUTO_STRATEGY)
+            .setResolutionStrategy(
+                ResolutionStrategy(
+                    Size(360, 640),
+                    ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER,
+                ),
+            )
+            .build()
+    }
+
     private fun showLivePicture() {
         if (recording || playRequested) {
             return
         }
         val settings = effects.engine.settings
-        val hidingFace = settings.on(FxKeys.DIAMOND_ON) || !settings.chose(FxKeys.CAMERA_MODE, FxKeys.MODE_LIVE)
+        val hidingFace = settings.on(FxKeys.DIAMOND_ON) ||
+            !settings.chose(FxKeys.CAMERA_MODE, FxKeys.MODE_LIVE) ||
+            MaskGate.hidesFace(settings.choice(FxKeys.BODY_MODE))
         val message = when {
             effectsBroken && hidingFace -> R.string.effects_failed
             settings.chose(FxKeys.CAMERA_MODE, FxKeys.MODE_GHOST) -> R.string.ghost_on

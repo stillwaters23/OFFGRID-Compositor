@@ -284,3 +284,19 @@ States: passed, waiting for review, blocked, or waiting for Royalty's phone test
 - **PR / commit:** Pull request #13 on `copilot/lane-c-live-remote`.
 - **State:** waiting for CI
 - **Next:** Update the checklist comment with the GitHub log once the workflow finishes, and keep the 35 Lane C hook lines in the pull request description.
+
+## 2026-10-09 11:13 PM CT — Lane E
+
+- **Bootloader step:** Lane E. Person segmentation. Not a new Bootloader step. Voice stays paused.
+- **What was done:** Added an on-device MediaPipe Tasks Image Segmenter (selfie / person) that feeds the GL compositor. Inside the video box the body can be see-through, replaced, covered by a body-shaped cloak, or drawn as a hologram. The mask is computed on its own thread. The GPU upload stays on the drawing thread. If the mask is missing or older than two frames at 30fps, the box goes black so the face never shows. The internet permission that MediaPipe's logging library asks for is removed. AGP stays 8.13.2.
+- **PR / commit:** Pull request #21 (`copilot/lane-e-media-pipe-person-segmentation`), not merged. Rex reviews it.
+- **State:** waiting for review
+- **Next:** Royalty's phone test on the S25 Ultra: 📁 Camera > 📁 Body mask. Try See-through, Replace, Body cloak, and Hologram. Cover the camera and confirm the box goes black instead of showing a face.
+
+## 2026-10-10 1:05 PM CT - Lane C merge of final-build
+
+- **Bootloader step:** Lane C. Live and Remote
+- **What was done:** Merged `origin/final-build` (`30bfb5c`, Lane E, P1, and QA) into pull request #13 with a regular merge commit. Kept the person mask, Auric wheel, and Live and Remote. Kept INTERNET for local Send to PC and the direct phone link. Archived Lane E's manifest removal of that permission. The person mask still has no server call, and public hosts stay refused.
+- **PR / commit:** Pull request #13 on `copilot/lane-c-live-remote`. Not merged.
+- **State:** waiting for CI
+- **Next:** Report the head and the Build debug app run once GitHub finishes.
