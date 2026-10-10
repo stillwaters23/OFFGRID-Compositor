@@ -6,5 +6,5 @@ import { resolve } from "./test_alias_hooks.mjs";
 if (typeof nodeModule.registerHooks === "function") {
   nodeModule.registerHooks({ resolve });
 } else {
-  nodeModule.register("./test_alias_hooks.mjs", import.meta.url);
+  await nodeModule.register("./test_alias_hooks.mjs", import.meta.url);
 }

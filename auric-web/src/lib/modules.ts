@@ -8,6 +8,7 @@ export type ModuleId =
   | "icons"
   | "alarm-sounds"
   | "timer-sounds"
+  | "clicker-sounds"
   | "haptics"
   | "heartbeat"
   | "heartbeat-log"
@@ -39,6 +40,7 @@ export const MODULES: ModuleSpec[] = [
   { id: "icons", name: "Icons", pkg: "icons", hint: "House mark and cuts.", preview: "The Auric lockup lives here. The tile is never the only label.", tier: "paid", accent: "green", glyph: "nest" },
   { id: "alarm-sounds", name: "Alarm Sounds", pkg: "alarm-sounds", hint: "Wake previews.", preview: "Pick a family. Preview, then apply.", tier: "paid", accent: "green", glyph: "wave" },
   { id: "timer-sounds", name: "Timer Sounds", pkg: "timer-sounds", hint: "Click and lock-in.", preview: "Two clean pulses. The click is the whole point.", tier: "paid", accent: "green", glyph: "pulses" },
+  { id: "clicker-sounds", name: "Clicker Sounds", pkg: "clicker-sounds", hint: "539 wheel ticks. Seven styles.", preview: "Choose the sound for every wheel notch.", tier: "free", accent: "green", glyph: "pulses" },
   { id: "haptics", name: "Haptics", pkg: "haptics", hint: "Notch ticks and lock-in.", preview: "Concentric rings. Every notch is a tick.", tier: "paid", accent: "green", glyph: "rings" },
   { id: "heartbeat", name: "Heartbeat", pkg: "heartbeat", hint: "Pulse while Auric is open.", preview: "Crown module. Interval wheel, 1 second to 24 hours. Billing is not live on this web demo.", tier: "paid", accent: "green", glyph: "ecg" },
   { id: "heartbeat-log", name: "Heartbeat Log", pkg: "heartbeat-log", hint: "Pulses you kept.", preview: "Crown module. The same pulse, behind stacked sheets.", tier: "paid", accent: "green", glyph: "ecg-log" },
