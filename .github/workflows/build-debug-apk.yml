@@ -120,9 +120,10 @@ jobs:
         run: ./gradlew testDebugUnitTest --stacktrace
 
       # Royalty approved the mic and Send to PC. CAMERA, RECORD_AUDIO, and INTERNET
-      # are allowed. ACCESS_NETWORK_STATE stays banned, and so do Wi-Fi, notifications,
-      # overlay, and foreground-service permissions. androidx.core adds one package
-      # permission; that exact name is accepted. The person mask still has no server call.
+      # are allowed. The floating live controls also need the overlay, a notification,
+      # and a foreground service typed for the camera and the mic. ACCESS_NETWORK_STATE
+      # and Wi-Fi permissions stay banned. androidx.core adds one package permission;
+      # that exact name is accepted. The person mask still has no server call.
       - name: Check the built app only asks for allowed permissions
         run: |
           set -euo pipefail
@@ -135,6 +136,12 @@ jobs:
               "CAMERA",
               "RECORD_AUDIO",
               "INTERNET",
+              "SYSTEM_ALERT_WINDOW",
+              "POST_NOTIFICATIONS",
+              "FOREGROUND_SERVICE",
+              "FOREGROUND_SERVICE_SPECIAL_USE",
+              "FOREGROUND_SERVICE_CAMERA",
+              "FOREGROUND_SERVICE_MICROPHONE",
           }
           banned = {
               "android.permission.ACCESS_NETWORK_STATE",
