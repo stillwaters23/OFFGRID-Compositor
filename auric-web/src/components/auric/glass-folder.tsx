@@ -1,10 +1,10 @@
 import type { ModuleSpec } from "@/lib/modules";
 import { cn } from "@/lib/utils";
 
-function Glyph({ kind, lit, fadeId }: { kind: ModuleSpec["glyph"]; lit: boolean; fadeId: string }) {
-  const stroke = lit ? "#3BE87B" : "#6A7370";
-  const fill = lit ? "#3BE87B" : "#6A7370";
-  const o = lit ? 1 : 0.32;
+function Glyph({ kind, lit, fadeId, etched }: { kind: ModuleSpec["glyph"]; lit: boolean; fadeId: string; etched: boolean }) {
+  const stroke = etched ? "currentColor" : lit ? "#3BE87B" : "#6A7370";
+  const fill = etched ? "currentColor" : lit ? "#3BE87B" : "#6A7370";
+  const o = etched ? 0.94 : lit ? 1 : 0.32;
   switch (kind) {
     case "clock":
       return (
@@ -31,9 +31,9 @@ function Glyph({ kind, lit, fadeId }: { kind: ModuleSpec["glyph"]; lit: boolean;
     case "chips":
       return (
         <g opacity={o}>
-          <rect x="48" y="50" width="12" height="16" rx="1.6" fill={lit ? "#5CE1FF" : fill} />
-          <rect x="57" y="47" width="12" height="16" rx="1.6" fill={lit ? "#3BE87B" : fill} />
-          <rect x="66" y="52" width="12" height="16" rx="1.6" fill={lit ? "#E6EFF5" : fill} />
+          <rect x="48" y="50" width="12" height="16" rx="1.6" fill={etched ? fill : lit ? "#5CE1FF" : fill} />
+          <rect x="57" y="47" width="12" height="16" rx="1.6" fill={etched ? fill : lit ? "#3BE87B" : fill} />
+          <rect x="66" y="52" width="12" height="16" rx="1.6" fill={etched ? fill : lit ? "#E6EFF5" : fill} />
         </g>
       );
     case "type":
@@ -48,7 +48,7 @@ function Glyph({ kind, lit, fadeId }: { kind: ModuleSpec["glyph"]; lit: boolean;
         </g>
       );
     case "fade":
-      return <rect x="46" y="51" width="32" height="16" rx="2" fill={`url(#${fadeId})`} opacity={lit ? 0.9 : 0.25} />;
+      return <rect x="46" y="51" width="32" height="16" rx="2" fill={etched ? fill : `url(#${fadeId})`} opacity={etched ? 0.94 : lit ? 0.9 : 0.25} />;
     case "nest":
       return (
         <g stroke={stroke} fill="none" strokeWidth="1.3" opacity={o}>
@@ -143,20 +143,22 @@ export function GlassFolder({
   spec,
   on,
   glowZero,
+  etched = false,
 }: {
   spec: ModuleSpec;
   on: boolean;
   glowZero?: boolean;
+  etched?: boolean;
 }) {
   const open = on;
-  const lit = on && !glowZero;
+  const lit = on && !glowZero && !etched;
   const locked = !on;
   const uid = spec.id;
   const rim = locked ? "#C45A5A" : "#CFF6FF";
   const glow = locked ? "#E8102A" : "#3BE87B";
 
   return (
-    <svg viewBox="0 0 120 112" className={cn("tx-folder-art", open && "is-open", lit && "is-lit", locked && "is-locked")} aria-hidden>
+    <svg viewBox="0 0 120 112" className={cn("tx-folder-art", open && "is-open", lit && "is-lit", locked && "is-locked", etched && "is-etched")} aria-hidden>
       <defs>
         <linearGradient id={`glass-${uid}`} x1="0.1" y1="0" x2="0.9" y2="1">
           <stop offset="0%" stopColor={locked ? "#F4C8C8" : "#F7FCFF"} stopOpacity={locked ? 0.26 : 0.22} />
@@ -218,7 +220,7 @@ export function GlassFolder({
         </>
       )}
 
-      <Glyph kind={spec.glyph} lit={lit} fadeId={`fade-sq-${uid}`} />
+      <Glyph kind={spec.glyph} lit={lit} fadeId={`fade-sq-${uid}`} etched={etched} />
     </svg>
   );
 }
