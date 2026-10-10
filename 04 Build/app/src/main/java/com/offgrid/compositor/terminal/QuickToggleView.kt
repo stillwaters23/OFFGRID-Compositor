@@ -6,6 +6,7 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.view.View
 import android.view.animation.PathInterpolator
+import com.offgrid.compositor.R
 
 /**
  * Camera and microphone controls in the top bar.
@@ -26,6 +27,7 @@ internal class QuickToggleView(
     private val disc = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     private val stamp = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private var on = initialOn
+    private var blocked = false
     private var slashProgress = if (initialOn) 0f else 1f
     private var slashAnimator: ValueAnimator? = null
     private var accent = NeonPalette.CYAN_GLOW
@@ -38,7 +40,13 @@ internal class QuickToggleView(
         isFocusable = true
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES
         updateDescription()
-        setOnClickListener { setOn(!on, notify = true) }
+        setOnClickListener {
+            if (blocked) {
+                onChanged?.invoke(false)
+            } else {
+                setOn(!on, notify = true)
+            }
+        }
     }
 
     fun applyAccent(edge: Int, haloColor: Int) {
@@ -47,7 +55,21 @@ internal class QuickToggleView(
         invalidate()
     }
 
+    fun setBlocked(value: Boolean) {
+        blocked = value
+        if (value) {
+            on = false
+            slashProgress = 1f
+            contentDescription = context.getString(R.string.mic_toggle_blocked)
+            invalidate()
+        } else {
+            updateDescription()
+            invalidate()
+        }
+    }
+
     fun setOn(value: Boolean, notify: Boolean = false) {
+        if (blocked && value) return
         if (on == value && slashProgress == if (value) 0f else 1f) return
         on = value
         updateDescription()
@@ -97,7 +119,11 @@ internal class QuickToggleView(
         val radius = size * BioluminescentPowerIcon.DISC_SHARE
         disc.color = Hud.INK
         canvas.drawCircle(centerX, centerY, radius, disc)
-        line.color = if (on) BioluminescentPowerIcon.hotCore(accent) else Hud.withAlpha(Hud.WHITE, 0.45f)
+        line.color = when {
+            blocked -> 0xFFFF4545.toInt()
+            on -> BioluminescentPowerIcon.hotCore(accent)
+            else -> Hud.withAlpha(Hud.WHITE, 0.45f)
+        }
         line.strokeWidth = radius * 0.16f
         val unit = radius / 18f
         if (microphone) drawMicrophone(canvas, centerX, centerY, unit) else drawCamera(canvas, centerX, centerY, unit)

@@ -95,7 +95,11 @@ internal fun MainActivity.onMicPermission(granted: Boolean) {
 internal fun MainActivity.applyCapture() {
         val settings = effects.engine.settings
         val cameraWanted = settings.on(MicKeys.CAM_ON, true)
-        val micToggle = settings.on(MicKeys.MIC_ON)
+        val blocked = settings.on(FxKeys.MIC_BLOCKED)
+        if (blocked && settings.on(MicKeys.MIC_ON)) {
+            terminalPanel.setMicSettings(false, true, notify = false)
+        }
+        val micToggle = settings.on(MicKeys.MIC_ON) && !blocked
         if (micToggle && capture.micDenied) {
             capture.clearMicDenial()
             micProblem = 0
@@ -110,9 +114,11 @@ internal fun MainActivity.applyCapture() {
             when (action) {
                 CaptureAction.UNBIND_CAMERA -> unbindCamera()
                 CaptureAction.BIND_CAMERA -> if (hasCameraPermission()) startCamera()
-                CaptureAction.START_MIC -> if (!mic.start()) {
-                    capture.micFailed()
-                    micProblem = R.string.mic_failed
+                CaptureAction.START_MIC -> if (blocked || !mic.start()) {
+                    if (!blocked) {
+                        capture.micFailed()
+                        micProblem = R.string.mic_failed
+                    }
                 }
                 CaptureAction.RELEASE_MIC -> mic.stop()
             }

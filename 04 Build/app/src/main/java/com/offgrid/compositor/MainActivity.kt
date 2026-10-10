@@ -47,11 +47,12 @@ import com.offgrid.compositor.audio.MicKeys
 import com.offgrid.compositor.audio.MicPipeline
 import com.offgrid.compositor.effects.EffectEngine
 import com.offgrid.compositor.effects.EffectLayers
-import com.offgrid.compositor.effects.FxKeys
+import com.offgrid.compositor.audio.voice.VoiceAudioOutput
 import com.offgrid.compositor.terminal.TerminalPanel
 
 /**
  * Step 1. Shows the painted camera picture, records, and plays it back.
+ * The mic stays off until Microphone Effects turns it on. A hard block keeps it closed.
  * Step 2. The floating terminal panel sits on top. It is not painted into the video.
  * Step 2.1. The yellow test diamond is off unless Panel settings turns it on.
  * Final build. The effects, the no-face camera modes, and the face finder are baked into the
@@ -106,6 +107,9 @@ class MainActivity : AppCompatActivity() {
     internal lateinit var effects: EffectsController
 
     internal fun effectsReady(): Boolean = ::effects.isInitialized
+
+    /** Processed voice for another lane. The recording itself still comes from the same mic engine. */
+    fun addVoiceAudioOutput(output: VoiceAudioOutput): AutoCloseable = mic.addVoiceAudioOutput(output)
 
     /** True when the effects could not start on this phone. The camera screen says why it is black. */
     internal var effectsBroken = false

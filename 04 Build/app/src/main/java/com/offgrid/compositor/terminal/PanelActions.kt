@@ -245,6 +245,10 @@ internal fun TerminalPanel.saveToggle(folder: PanelFolder, item: ToggleItem, on:
         say(context.getString(message, item.label))
         return
     }
+    if (item.key == FxKeys.MIC_ON && on && store.toggle(FxKeys.MIC_BLOCKED)) {
+        say(context.getString(R.string.mic_toggle_blocked))
+        return
+    }
     if (item.key == FxKeys.CAMERA_ON || item.key == FxKeys.MIC_ON) {
         setToggleSetting(item.key, on)
         val message = if (on) R.string.terminal_toggle_on else R.string.terminal_toggle_off

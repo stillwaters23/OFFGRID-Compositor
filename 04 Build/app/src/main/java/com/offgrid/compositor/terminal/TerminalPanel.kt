@@ -31,6 +31,8 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.isVisible
 import com.offgrid.compositor.R
 import com.offgrid.compositor.audio.clicker.ClickerSoundEngine
+import com.offgrid.compositor.audio.voice.MicState
+import com.offgrid.compositor.effects.FxKeys
 import kotlin.math.roundToInt
 
 /**
@@ -185,6 +187,9 @@ class TerminalPanel @JvmOverloads constructor(
     /** Called with a setting's key whenever any setting is saved, so the camera screen can follow it. */
     var onSettingChanged: ((String) -> Unit)? = null
 
+    /** Top-bar mic control. Capture permission and source state remain owned by the activity. */
+    var onMicControl: (() -> Unit)? = null
+
     /** Called when the Test diamond toggle changes. The camera screen passes it to the video painter. */
     var onTestDiamond: ((Boolean) -> Unit)? = null
 
@@ -202,6 +207,10 @@ class TerminalPanel @JvmOverloads constructor(
 
     /** Updates an effect toggle from its owner and keeps the visible panel row in sync. */
     fun setToggleSetting(key: String, on: Boolean) {
+        if (key == FxKeys.MIC_ON && on && store.toggle(FxKeys.MIC_BLOCKED)) {
+            if (::topBar.isInitialized) topBar.setMicBlocked(true)
+            return
+        }
         val changed = store.toggle(key) != on
         store.setToggle(key, on)
         if (::topBar.isInitialized) topBar.setQuickToggle(key, on)
@@ -214,6 +223,56 @@ class TerminalPanel @JvmOverloads constructor(
         if (changed) {
             settingChanged(key)
             onToggled?.invoke(key, on)
+        }
+    }
+
+    fun micEnabledSetting(): Boolean = store.toggle(FxKeys.MIC_ON)
+
+    fun micBlockedSetting(): Boolean = store.toggle(FxKeys.MIC_BLOCKED)
+
+    fun micToggleSetting(key: String): Boolean = store.toggle(key)
+
+    fun micNumberSetting(key: String): Int = store.number(key)
+
+    fun setMicVisualState(state: MicState) {
+        if (!::topBar.isInitialized) return
+        when (state) {
+            MicState.BLOCKED -> topBar.setMicBlocked(true)
+            MicState.ON -> {
+                topBar.setMicBlocked(false)
+                topBar.setQuickToggle(FxKeys.MIC_ON, true)
+            }
+            MicState.OFF -> {
+                topBar.setMicBlocked(false)
+                topBar.setQuickToggle(FxKeys.MIC_ON, false)
+            }
+        }
+    }
+
+    fun setMicSettings(enabled: Boolean, blocked: Boolean, notify: Boolean = true) {
+        val safeEnabled = enabled && !blocked
+        val micChanged = store.toggle(FxKeys.MIC_ON) != safeEnabled
+        val blockChanged = store.toggle(FxKeys.MIC_BLOCKED) != blocked
+        store.setToggle(FxKeys.MIC_ON, safeEnabled)
+        store.setToggle(FxKeys.MIC_BLOCKED, blocked)
+        if (::topBar.isInitialized) {
+            topBar.setMicBlocked(blocked)
+            topBar.setQuickToggle(FxKeys.MIC_ON, safeEnabled)
+        }
+        openFolder?.takeIf { folder ->
+            folder.items.any { it is ToggleItem && (it.key == FxKeys.MIC_ON || it.key == FxKeys.MIC_BLOCKED) }
+        }?.let { folder ->
+            val scroll = detailScroll.scrollY
+            buildDetail(folder)
+            detailScroll.post { detailScroll.scrollTo(0, scroll) }
+        }
+        if (notify && micChanged) {
+            settingChanged(FxKeys.MIC_ON)
+            onToggled?.invoke(FxKeys.MIC_ON, safeEnabled)
+        }
+        if (notify && blockChanged) {
+            settingChanged(FxKeys.MIC_BLOCKED)
+            onToggled?.invoke(FxKeys.MIC_BLOCKED, blocked)
         }
     }
 
@@ -666,8 +725,13 @@ class TerminalPanel @JvmOverloads constructor(
             backOrb = backOrb,
             onShrink = { showMinimized(true, animate = true) },
             onToggle = { key, on, label ->
-                setToggleSetting(key, on)
-                say(context.getString(if (on) R.string.terminal_toggle_on else R.string.terminal_toggle_off, label))
+                if (key == FxKeys.MIC_ON && store.toggle(FxKeys.MIC_BLOCKED)) {
+                    topBar.setMicBlocked(true)
+                    say(context.getString(R.string.mic_toggle_blocked))
+                } else {
+                    setToggleSetting(key, on)
+                    say(context.getString(if (on) R.string.terminal_toggle_on else R.string.terminal_toggle_off, label))
+                }
             },
             onDimensionChanged = { key, value -> setSizePercent(key, value, announce = false) },
             onNotch = ::playWheelClick,

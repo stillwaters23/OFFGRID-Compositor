@@ -38,6 +38,15 @@ object FxKeys {
     const val MIC_GATE = "fx.mic.gate"
     const val MIC_SOUNDS_IN_VIDEO = "fx.mic.sounds_in_video"
     const val MIC_BEAT_GLOW = "fx.mic.beat_glow"
+    const val MIC_BLOCKED = "fx.mic.blocked"
+    const val MIC_VOICE_SWAP = "fx.mic.voice_swap"
+    const val MIC_BYPASS = "fx.mic.bypass"
+    const val MIC_WET = "fx.mic.wet"
+    const val MIC_REX_PITCH = "fx.mic.rex.pitch"
+    const val MIC_FORMANT = "fx.mic.formant"
+    const val MIC_LOW_EQ = "fx.mic.eq.low"
+    const val MIC_MID_EQ = "fx.mic.eq.mid"
+    const val MIC_HIGH_EQ = "fx.mic.eq.high"
 
     // 📁 Camera: the no-face modes (features 9, 10, 11).
     const val CAMERA_MODE = "fx.camera.mode"

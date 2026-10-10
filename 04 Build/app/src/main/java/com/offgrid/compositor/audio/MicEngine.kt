@@ -46,6 +46,14 @@ class MicEngine private constructor(
 
     val isRunning: Boolean get() = running
 
+    /** Runs on the mic thread after the raw samples become floats, before Microphone Effects. */
+    @Volatile
+    var beforeVoice: ((FloatArray, Int) -> Unit)? = null
+
+    /** Runs on the mic thread after Microphone Effects, with the same float block the recording uses. */
+    @Volatile
+    var afterVoice: ((FloatArray, Int) -> Unit)? = null
+
     fun addSink(sink: PcmSink) {
         sinks += sink
     }
@@ -107,7 +115,9 @@ class MicEngine private constructor(
                     return
                 }
                 for (i in 0 until read) work[i] = raw[i] / SCALE
+                beforeVoice?.invoke(work, read)
                 voice.process(work, read)
+                afterVoice?.invoke(work, read)
                 for (i in 0 until read) {
                     raw[i] = (work[i] * SCALE).toInt().coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
                 }

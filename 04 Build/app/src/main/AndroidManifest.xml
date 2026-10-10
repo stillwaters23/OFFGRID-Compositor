@@ -3,9 +3,9 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.CAMERA" />
-    <!-- Royalty approved the mic. Lane B records with it. -->
+    <!-- Royalty approved the mic. Lane B records with it. The hard block can still close it. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
-    <!-- A video library asks for this one. The app does not use it. -->
+    <!-- A video library asks for network state. The app does not use it. -->
     <uses-permission
         android:name="android.permission.ACCESS_NETWORK_STATE"
         tools:node="remove" />

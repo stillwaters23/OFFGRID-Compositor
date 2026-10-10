@@ -144,6 +144,10 @@ internal class TopBar(
         }
     }
 
+    fun setMicBlocked(blocked: Boolean) {
+        microphone.setBlocked(blocked)
+    }
+
     override fun applyLook(look: PanelLook) {
         titleView.setTextColor(look.text)
         widthInput.setTextColor(look.text)

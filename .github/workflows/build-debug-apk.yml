@@ -83,11 +83,19 @@ jobs:
           print("No saved secrets found.")
           PY
 
-      - name: Check voice stays paused
+      - name: Check capture uses the processed mic path
+        run: |
+          set -euo pipefail
+          if grep -R -n -E "\.withAudioEnabled|AudioSource\.(MIC|CAMCORDER)" "04 Build/app/src/main/java"; then
+            echo "The video recorder must not capture raw microphone audio."
+            exit 1
+          fi
+
+      - name: Check voice conversion stays on device
         run: |
           set -euo pipefail
           if grep -R -n -E "TextToSpeech|SpeechRecognizer|android\.speech" "04 Build"/*/src; then
-            echo "Voice is paused until Royalty says go."
+            echo "Voice processing must stay on this phone. Cloud speech stays off."
             exit 1
           fi
 
@@ -196,10 +204,10 @@ jobs:
         run: |
           set -euo pipefail
           cat > /tmp/release-notes.txt << 'EOF'
-          This is the FINAL build test version of OFFGRID: everything except voice.
+          This is the FINAL build test version of OFFGRID.
           It is not merged yet. Rex reviews it first.
-          The camera and the mic are the permissions this build asks for.
-          The mic is used for videos only. Voice reading and listening stay paused.
+          Camera permission is required. Microphone permission is used for videos when Mic is on.
+          The mic starts off and can be hard-blocked. Rex voice swap stays on the phone.
 
           Sign in to GitHub in your phone browser first. This project is private.
 
