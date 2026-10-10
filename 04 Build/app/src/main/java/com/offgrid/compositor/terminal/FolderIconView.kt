@@ -18,7 +18,7 @@ import android.view.View
  * screen. The number on the screen is how many items are inside, in laser bright letters.
  * Royalty's folder picture from chat guided the look. Her final folder art can replace it later.
  *
- * [compact] draws a small one with no words, for the side list and the small tag.
+ * [compact] draws a small one with no words, for the small tag.
  * [special] folders (Panel settings and the theme office) use the special folder color.
  */
 internal class FolderIconView(

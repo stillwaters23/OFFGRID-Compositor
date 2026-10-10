@@ -314,6 +314,54 @@ States: passed, waiting for review, blocked, or waiting for Royalty's phone test
 - **State:** waiting for review
 - **Next:** CI on this head must be green. Phone checks stay with Royalty: lip sync, a 20 second Robot plus Echo clip, and camera-off and mic-off in one recording.
 
+## 2026-10-09 8:41 AM CT — Lane A base sync
+
+- **Bootloader step:** Lane A. Panel UI
+- **What was done:** Integrated the current `final-build` history into the Lane A branch and kept the final-build files and existing features. The PR had been forked from the Step 2 ancestor, so this is a merge commit rather than a rewritten rebase. Follow-up work is removing the side drawer and stale mic notes, adding layout tests, and verifying CI.
+- **PR / commit:** Pull request #15, draft, targeting `final-build`.
+- **State:** in progress
+- **Next:** Resolve the remaining panel UI requests, run tests and build, and keep the PR unmerged for Rex's review.
+
+## 2026-10-09 9:05 AM CT — Lane A review follow-up
+
+- **What was done:** Removed side-panel navigation and its saved settings, corrected the recording notes, restored full-bleed sizing and the visible Back control/scroll thumb in the final-build panel, and added sizing/layout tests.
+- **Validation:** The latest `final-build` Actions build passed. Local targeted Gradle tests could not start because Android Gradle Plugin 8.13.2 could not be resolved.
+- **PR / commit:** Pull request #15, draft, targeting `final-build`.
+- **State:** merge resolution and validation in progress
+- **Next:** Finish final review, commit the merge, and keep the PR unmerged for Rex's review.
+
+## 2026-10-09 9:10 AM CT — Lane A merge complete
+
+- **What was done:** Published merge commit `77beeb9` with `final-build` as its second parent. The side panel is removed; full-bleed sizing, insets-aware border geometry, Back navigation, custom scroll thumbs, and sizing/layout tests are retained in the final-build panel.
+- **Validation:** Secret scan and CodeQL reported no findings. The latest `final-build` Actions run passed. No Actions build ran for this PR head because the workflow's pull-request branch filter excludes `final-build`; local Gradle tests could not resolve Android Gradle Plugin 8.13.2.
+- **Requests for other lanes:** Add `final-build` to the build workflow's pull-request branch filter so this PR can receive a CI run.
+- **PR / commit:** Pull request #15, draft, targeting `final-build`.
+- **State:** open and unmerged for Rex's review
+
+## 2026-10-09 9:43 AM CT: Lane A round 2 fixes
+
+- **What was done:** Restored the panel top bar and camera/microphone quick toggles, added the `fx.cam.on` and `fx.mic.*` rows, corrected the recording audio notes, removed the resize grip, added bottom-edge resize zones, strengthened the high-glow bloom, and split panel behavior into focused files. `TerminalPanel.kt` is under 1,000 lines.
+- **Tests added:** Full-bleed measurement, panel geometry and resize zones, border inset, glow curve, scroll thumb geometry, responsive top-bar layout, microphone contract coverage, and toggle persistence/UI refresh.
+- **Validation:** `git diff --check` passes and no grip, slider, TODO, FIXME, or em-dash matches remain in owned panel sources. Local Gradle tests cannot configure because Android Gradle Plugin 8.13.2 is unavailable from the configured repositories. The latest successful PR build is from the earlier head, not these round 2 changes. The older failed `final-build` run stopped while downloading Android SDK command-line tools.
+- **Device evidence:** No screenshot or `dumpsys gfxinfo` result is available from this environment.
+- **Validation follow-up:** Commit `f88aed9` is published. Code review reported no findings; CodeQL had no analyzable code in scope. No build has run for this head.
+- **PR:** Pull request #15 remains draft, based on `final-build`, and unmerged.
+- **State:** published for CI and Rex review
+
+## 2026-10-09 11:10 PM CT: Lane A panel finish
+
+- **What was done:** Camera, microphone, settings, and Back controls are drawn in code as bioluminescent power buttons. Glow layers are cached bitmaps, so frames do not blur again. Width and height 100 fill the window. Content padding clears the status bar, camera cutout, gesture bar, and 30 percent of the corner radius. The top bar is 56 dp with 8 dp gaps and 40 dp controls. Width and height fields use tabular digits. The bottom resize edge is a 6 dp cached glow. The side drawer source is archived at `04 Build/archive/side_drawer.kt` and is not in the view tree. Night theme text is white on black. Day theme text is black on white. The debug workflow pull request filter now includes `final-build` so this pull request can run CI. Android Gradle Plugin stays at 8.13.2.
+- **Tests:** `./gradlew assembleDebug testDebugUnitTest --offline` from `04 Build` with `ANDROID_HOME` set. BUILD SUCCESSFUL in 14s. 71 unit tests, 0 failures, 0 errors, 0 skipped. Classes: EffectPanelTest 6, PanelGeometryTest 14, PanelUiTest 12, PanelFinishTest 3, PanelSettingsTest 9, StageTest 9, RainbowMixTest 12, CameraToolsTest 5, EffectLayersTest 1.
+- **PR:** Pull request #15 remains draft, based on `final-build`, and unmerged.
+- **State:** local build and tests passed. CI result is recorded in the next entry.
+
+## 2026-10-09 11:15 PM CT: Lane A CI for the panel finish
+
+- **Validation:** GitHub Actions run 38023174944 on commit `4a9637b` completed with conclusion success. Job "Build the debug app" passed. `assembleDebug` printed `BUILD SUCCESSFUL in 2m 32s`. `testDebugUnitTest` printed `BUILD SUCCESSFUL in 36s`. The run also printed `No saved secrets found.` and `Mic permission is not in the app.` The slider, voice, and secret steps succeeded. The pull request stays draft and unmerged.
+- **PR:** https://github.com/stillwaters23/OFFGRID-Compositor/pull/15
+- **Run:** https://github.com/stillwaters23/OFFGRID-Compositor/actions/runs/38023174944
+- **State:** open for Rex's review
+
 ## 2026-10-09 11:13 PM CT — Lane E
 
 - **Bootloader step:** Lane E. Person segmentation. Not a new Bootloader step. Voice stays paused.
@@ -337,3 +385,10 @@ States: passed, waiting for review, blocked, or waiting for Royalty's phone test
 - **PR / commit:** Pull request #13 on `copilot/lane-c-live-remote`. Not merged.
 - **State:** waiting for CI
 - **Next:** Report the new head and the Build debug app run once GitHub finishes.
+
+## 2026-10-10 6:20 PM UTC: Lane A merged final-build
+
+- **What was done:** Merged `origin/final-build` into `copilot/lane-a-panel-ui` with a regular merge commit. Lane E person segmentation, the QA reports, and P1's drum reels and clicker stay. Width and Height drum wheels sit in the top bar. The Size folder keeps the paired reels and the typed fallback. The side panel stays archived. System remains the only theme in the picker. Android Gradle Plugin stays 8.13.2.
+- **Tests:** `./gradlew assembleDebug testDebugUnitTest` from `04 Build`. BUILD SUCCESSFUL in 19s. 103 unit tests, 0 failures, 0 errors, 0 skipped.
+- **PR:** Pull request #15 stays open. It is not merged from this branch.
+- **State:** local build and tests passed. CI is the next check.

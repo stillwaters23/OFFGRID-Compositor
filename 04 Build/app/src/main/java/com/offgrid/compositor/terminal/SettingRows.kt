@@ -59,7 +59,7 @@ internal class ChoiceGroup(
 
     override fun applyLook(look: PanelLook) {
         title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12.5f * look.fontScale)
-        title.setTextColor(look.sideText)
+        title.setTextColor(look.secondaryText)
     }
 }
 

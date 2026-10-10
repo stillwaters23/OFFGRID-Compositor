@@ -25,6 +25,7 @@ internal class ColorEditorView(
 ) : LinearLayout(context) {
     private val swatch = SwatchView(context)
     private val hexBox = HexBox(context, ::onHex, say)
+    private lateinit var neonColors: NeonColorRow
     private val systemRow: ToggleRow
     private val boxes = ArrayList<NumberBox>(RainbowMix.NAMES.size)
 
@@ -47,6 +48,9 @@ internal class ColorEditorView(
             marginStart = Hud.dpi(context, 8f)
         })
         addView(top, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+        addView(label(R.string.terminal_color_swatches))
+        neonColors = NeonColorRow(context, store.color(part), ::onSwatch)
+        addView(neonColors, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
 
         val systemItem = ToggleItem(
             key = "system_color",
@@ -117,6 +121,7 @@ internal class ColorEditorView(
     private fun refresh() {
         val color = store.color(part)
         swatch.color = color
+        neonColors.setSelected(color)
         hexBox.show(RainbowMix.hex(color))
         systemRow.toggle.setOn(store.part(part).system)
         val mix = store.mix(part)
@@ -128,6 +133,13 @@ internal class ColorEditorView(
             rejectNumberColor()
             return
         }
+        store.setCustom(part, color, RainbowMix.split(color))
+        refresh()
+        onLookChanged()
+        say(context.getString(R.string.terminal_color_saved, part.title, RainbowMix.hex(color)))
+    }
+
+    private fun onSwatch(color: Int) {
         store.setCustom(part, color, RainbowMix.split(color))
         refresh()
         onLookChanged()

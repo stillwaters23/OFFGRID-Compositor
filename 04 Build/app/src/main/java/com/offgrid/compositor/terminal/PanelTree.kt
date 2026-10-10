@@ -98,6 +98,7 @@ internal enum class PanelAction {
     REMOTE_OPEN_PAIRING,
     REMOTE_OPEN_PREVIEW,
     LIVE_SEND_TO_PC,
+    OPEN_EFFECT_LINK,
 }
 
 /** Final build: the saved looks (theme, colors, glow, cursor, toggle style, size), with save, load, rename, delete. */
@@ -228,7 +229,7 @@ internal object PanelTree {
         val top = listOf(
             settingsFolder(),
             EffectFolders.camera(),
-            MicrophoneEffectsFolder.folder(),
+            EffectFolders.microphone(),
             EffectFolders.effects(),
             EffectFolders.record(),
             // Lane C hook
@@ -255,7 +256,7 @@ internal object PanelTree {
             auricWheelFolder(),
             clickerSoundsFolder(),
             themesFolder(),
-            presetsFolder(),
+            effectLinksFolder(),
             resetFolder(),
         ),
         notes = listOf(
@@ -274,6 +275,20 @@ internal object PanelTree {
         items = listOf(
             NumberItem(LookKeys.WIDTH, "Width", "0 is the narrowest panel. 100 fills the screen from side to side."),
             NumberItem(LookKeys.HEIGHT, "Height", "0 is the shortest panel. 100 fills the screen from top to bottom."),
+            ToggleItem(
+                LookKeys.FULL_SCREEN,
+                "Full screen",
+                "Fills the whole screen edge to edge.",
+                false,
+                isTest = false,
+            ),
+            ToggleItem(
+                LookKeys.SEE_THROUGH_FULL_SIZE,
+                "See-through at full size",
+                "Show the camera through the full-screen panel.",
+                false,
+                isTest = false,
+            ),
             ActionItem(PanelAction.CENTER_PANEL, "Center panel", "Moves the panel to the middle of the screen."),
             NumberItem(LookKeys.OPACITY, "Opacity", "How solid the panel looks. 0 is clear. 50 is half see-through. 100 is solid."),
             NumberItem(LookKeys.FONT_SIZE, "Font size", "How big the words are. 50 is normal."),
@@ -288,8 +303,8 @@ internal object PanelTree {
             ),
         ),
         notes = listOf(
-            "Width and Height are also at the top of the panel.",
-            "Turn the drum wheel to pick a whole number. Pinch or drag the corner lines to resize too.",
+            "Width and Height are also on the drum wheels at the top of the panel.",
+            "Turn a drum wheel to pick a whole number. Pinch, or drag the bottom edge, to resize.",
             "Type the number under a wheel if you cannot turn it. The laser is one line across both wheels.",
         ),
     )
@@ -338,6 +353,7 @@ internal object PanelTree {
                 false,
                 isTest = false,
             ),
+            NumberItem(LookKeys.BORDER_THICKNESS, "Border thickness", "0 is 2 dp. 50 is 3 dp. 100 is 6 dp.", 50),
         ),
         notes = listOf(
             "These change what the panel shows.",
@@ -406,14 +422,14 @@ internal object PanelTree {
     /** Final build: save the look you have now and bring it back later. */
     private fun presetsFolder() = PanelFolder(
         id = "presets",
-        title = "📁 Presets",
+        title = "📁 Profiles",
         tag = null,
         kind = FolderKind.OFFICE,
         items = listOf(PresetsItem()),
         notes = listOf(
-            "A preset keeps your look: theme, colors, glow, cursor, toggle style, and size.",
-            "Type a name, then tap Save. Tap a preset to load, rename, or delete it.",
-            "Effects and the camera mode are not in presets.",
+            "Profiles save the look, position, camera mode, and effect settings.",
+            "Type a name, then tap Save. Existing names ask before overwrite.",
+            "Archive profiles to keep them without showing them in the active list.",
         ),
     )
 
@@ -436,12 +452,64 @@ internal object PanelTree {
         title = "📁 Themes",
         tag = null,
         kind = FolderKind.OFFICE,
-        folders = listOf(toggleStyleFolder()),
-        items = Theme.entries.map { ThemeItem(it) },
+        folders = listOf(themeModeFolder(), toggleStyleFolder(), presetsFolder()),
+        items = listOf(ThemeItem(Theme.SYSTEM)),
         notes = listOf(
-            "Tap a theme to use it.",
-            "You can still change every setting after.",
-            "OLED means the screen's black parts turn fully off.",
+            "System is the only built-in theme.",
+            "Its black and white colors follow Auto, Day, or Night.",
+        ),
+    )
+
+    private fun effectLinksFolder() = PanelFolder(
+        id = "effects_library",
+        title = "📁 Effects Library",
+        tag = null,
+        kind = FolderKind.OFFICE,
+        folders = EffectLinks.categories.mapIndexed { categoryIndex, category ->
+            PanelFolder(
+                id = "effect_links_$categoryIndex",
+                title = "📁 ${category.title}",
+                tag = null,
+                kind = FolderKind.OFFICE,
+                items = category.links.mapIndexed { linkIndex, link ->
+                    ActionItem(
+                        PanelAction.OPEN_EFFECT_LINK,
+                        link.title,
+                        link.note,
+                        "$categoryIndex:$linkIndex",
+                    )
+                },
+            )
+        },
+        notes = listOf(EffectLinks.LICENSE_NOTE),
+    )
+
+    private fun themeModeFolder() = PanelFolder(
+        id = "theme_mode",
+        title = "📁 Theme mode",
+        tag = null,
+        kind = FolderKind.OFFICE,
+        items = listOf(
+            ChoiceItem(
+                LookKeys.THEME_MODE,
+                "Theme mode",
+                ThemeMode.entries.map { mode ->
+                    Choice(
+                        mode.key,
+                        when (mode) {
+                            ThemeMode.AUTO -> "Auto"
+                            ThemeMode.DAY -> "Day"
+                            ThemeMode.NIGHT -> "Night"
+                        },
+                        when (mode) {
+                            ThemeMode.AUTO -> "Follow the phone's light setting."
+                            ThemeMode.DAY -> "Use a white panel and black text."
+                            ThemeMode.NIGHT -> "Use a black panel and white text."
+                        },
+                    )
+                },
+                ThemeMode.AUTO.key,
+            ),
         ),
     )
 
@@ -515,7 +583,6 @@ internal object PanelTree {
         ColorPart.TEXT to "This colors the typed guidance text.",
         ColorPart.CURSOR to "This colors the laser cursor. It is one solid color.",
         ColorPart.FOLDER to "This colors the folder icons.",
-        ColorPart.SIDE_TEXT to "This colors the folder names.",
         ColorPart.STATUS to "This colors the status line at the top.",
     )
 

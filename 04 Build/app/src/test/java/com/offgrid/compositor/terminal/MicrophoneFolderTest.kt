@@ -44,8 +44,8 @@ class MicrophoneFolderTest {
         val context = RuntimeEnvironment.getApplication()
         context.getSharedPreferences("terminal_panel", Context.MODE_PRIVATE).edit().clear().commit()
         val panel = TerminalPanel(context)
-        val cameraBlock = findBlock(panel, "Camera block")
-        val micBlock = findBlock(panel, "Mic block")
+        val cameraBlock = findQuick(panel, "Camera")
+        val micBlock = findQuick(panel, "Microphone")
         assertTrue(cameraBlock.isOn)
         assertFalse(micBlock.isOn)
         assertTrue(panel.effectSnapshot().on(MicKeys.CAM_ON))
@@ -67,14 +67,14 @@ class MicrophoneFolderTest {
         assertTrue(panel.effectSnapshot().on(MicKeys.CAM_ON))
     }
 
-    private fun findBlock(root: View, description: String): PowerToggleView =
-        findBlockOrNull(root, description) ?: throw AssertionError("Missing $description")
+    private fun findQuick(root: View, description: String): QuickToggleView =
+        findQuickOrNull(root, description) ?: throw AssertionError("Missing $description")
 
-    private fun findBlockOrNull(root: View, description: String): PowerToggleView? {
-        if (root.contentDescription?.toString() == description && root is PowerToggleView) return root
+    private fun findQuickOrNull(root: View, description: String): QuickToggleView? {
+        if (root is QuickToggleView && root.contentDescription?.startsWith(description) == true) return root
         if (root is ViewGroup) {
             for (index in 0 until root.childCount) {
-                findBlockOrNull(root.getChildAt(index), description)?.let { return it }
+                findQuickOrNull(root.getChildAt(index), description)?.let { return it }
             }
         }
         return null
