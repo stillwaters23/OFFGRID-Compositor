@@ -19,6 +19,10 @@ test("Laser & Numbers drafts, applies, discards, persists, and fits all target w
     await page.waitForFunction(() => window.__auric?.getState().hydrated);
     await openStudio(page);
     await page.getByText("Laser color", { exact: true }).waitFor();
+    assert.equal(
+      await page.locator(".reel-look-drum").first().evaluate((item) => getComputedStyle(item).fontSize),
+      "24px",
+    );
     const presetNames = await page.locator(".reel-look-preset").evaluateAll((items) =>
       items.map((item) => item.textContent.trim()),
     );
