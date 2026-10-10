@@ -1,10 +1,11 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { committedPalette, previewPalette } from "@/lib/appearance";
 import { hexToRgb, isValidHex, normalizeHex } from "@/lib/color";
-import { LASER_PRESETS, checkNumberColor, laserVars, resolveReelNumberColor } from "@/lib/contrast-guard";
+import { LASER_PRESETS, checkNumberColor, laserVars, resolveReelNumberColor } from "@/lib/contrast_guard";
 import { useAuric } from "@/lib/store";
+import { LaserStrip } from "@/components/auric/laser_strip";
 import { OrbToggle } from "@/components/auric/switch";
-import "@/styles/reel-look.css";
+import "@/styles/reel_look.css";
 
 export function ReelLookFolder() {
   const draft = useAuric((state) => state.appearanceDraft);
@@ -81,13 +82,7 @@ export function ReelLookFolder() {
             <span className="font-digits text-base" style={{ color: readout }}>:</span>
             <span className="reel-look-drum">16</span>
           </div>
-          <span className="reel-look-hairline" data-laser-hairline="" aria-hidden />
-          <span className="reel-look-beam" data-laser-beam="" aria-hidden>
-            <span className="reel-look-beam-shimmer">
-              <span className="reel-look-beam-bloom" />
-              <span className="reel-look-beam-core" />
-            </span>
-          </span>
+          <LaserStrip />
         </div>
       </div>
 

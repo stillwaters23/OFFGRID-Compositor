@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { LASER_PRESETS, checkNumberColor, laserSpreadPx, laserVars, resolveReelNumberColor, wheelBackgroundSamples } from "../src/lib/contrast-guard.ts";
+import { LASER_PRESETS, checkNumberColor, laserSpreadPx, laserVars, resolveReelNumberColor, wheelBackgroundSamples } from "../src/lib/contrast_guard.ts";
 import { committedPalette } from "../src/lib/appearance.ts";
 import { BLUE_DIAMOND, CURATED } from "../src/lib/palettes.ts";
 import type { Palette } from "../src/lib/types.ts";

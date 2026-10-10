@@ -1,4 +1,4 @@
-/* Retired from src/styles/reel-look.css. See README.md in this folder. */
+/* Retired from src/styles/reel_look.css. See README.md in this folder. */
 :root .digit-cut,
 :root .reel-time-plaque .digit-cut {
   color: var(--reel-number, var(--digit));

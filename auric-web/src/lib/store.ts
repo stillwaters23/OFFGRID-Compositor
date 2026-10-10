@@ -44,7 +44,7 @@ import type {
 import { canApplyAppearance, committedPalette, draftsDiffer, makeReadable, SAFE_DARK, previewPalette, boundedPercent } from "@/lib/appearance";
 import type { HourCycle } from "@/lib/clock";
 import { FREE_MODULE_IDS, MODULES, withFreeModules, type ModuleId } from "@/lib/modules";
-import { LASER_DEFAULT, checkNumberColor } from "@/lib/contrast-guard";
+import { LASER_DEFAULT, checkNumberColor } from "@/lib/contrast_guard";
 
 
 const DEFAULT_SECTIONS: VaultSectionId[] = [

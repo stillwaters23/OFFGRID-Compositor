@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Palette, Sparkles, Type, Droplets, Shapes, Zap } from "lucide-react";
 import { DrumReel } from "@/components/auric/drum-reel";
-import { ReelLookFolder } from "@/components/auric/reel-look-folder";
+import { ReelLookFolder } from "@/components/auric/reel_look_folder";
 import { PitButton } from "@/components/auric/pit-button";
 import {
   PARTS,
@@ -14,7 +14,7 @@ import {
   previewPalette,
   type AppearanceMode,
 } from "@/lib/appearance";
-import { checkNumberColor } from "@/lib/contrast-guard";
+import { checkNumberColor } from "@/lib/contrast_guard";
 import { hexToHsl, hexToRgb, hslToHex, isValidHex, normalizeHex, rgbToHex } from "@/lib/color";
 import { CURATED, ROYGBIV } from "@/lib/palettes";
 import { FLOORS, readFloorFile, floorSrc } from "@/lib/floors";

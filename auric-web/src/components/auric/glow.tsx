@@ -4,8 +4,8 @@ import { useFace } from "@/lib/use-face";
 import { floorSrc } from "@/lib/floors";
 import { useAuric } from "@/lib/store";
 import { canApplyAppearance, SAFE_DARK, boundedPercent, committedPalette, type AppearanceMode } from "@/lib/appearance";
-import { laserVars, resolveReelNumberColor } from "@/lib/contrast-guard";
-import "@/styles/reel-look.css";
+import { laserVars, resolveReelNumberColor } from "@/lib/contrast_guard";
+import "@/styles/reel_look.css";
 
 const useIsoLayoutEffect = typeof document === "undefined" ? useEffect : useLayoutEffect;
 

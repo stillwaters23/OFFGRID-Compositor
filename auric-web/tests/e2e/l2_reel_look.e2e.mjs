@@ -137,9 +137,9 @@ test("Laser & Numbers drafts, applies, discards, persists, and fits all target w
     await page.evaluate(() => window.__auric.setState({ toasts: [] }));
     await page.setViewportSize({ width: 390, height: 844 });
     await page.getByText("Laser color", { exact: true }).scrollIntoViewIfNeeded();
-    await page.screenshot({ path: join(screenshotDir, "laser-settings.png") });
+    await page.screenshot({ path: join(screenshotDir, "laser_settings.png") });
     await page.getByText("Number color", { exact: true }).scrollIntoViewIfNeeded();
-    await page.screenshot({ path: join(screenshotDir, "number-contrast.png") });
+    await page.screenshot({ path: join(screenshotDir, "number_contrast.png") });
     await page.evaluate(() => {
       const state = window.__auric.getState();
       state.setDraftLaserColor("#FF0000");
