@@ -392,3 +392,10 @@ States: passed, waiting for review, blocked, or waiting for Royalty's phone test
 - **Tests:** `./gradlew assembleDebug testDebugUnitTest` from `04 Build`. BUILD SUCCESSFUL in 19s. 103 unit tests, 0 failures, 0 errors, 0 skipped.
 - **PR:** Pull request #15 stays open. It is not merged from this branch.
 - **State:** local build and tests passed. CI is the next check.
+
+## 2026-10-10 6:55 PM UTC: Integration of Lanes A, B, and P2
+
+- **What was done:** Merged Lane B, Lane A, and P2 into `integration_final_lanes` from `final-build` with regular merge commits. Camera and mic toggles, recording, RECORD_AUDIO, live and remote, Send to PC, INTERNET, the panel with drum reels, the mic hard block, Rex voice swap, and the person mask all stay. Rex pitch is stored as `fx.mic.rex.pitch` so the microphone effect pitch stays at 50. One mic capture serves recording and the voice swap. Wi-Fi Direct calls catch a missing permission and report that discovery did not start.
+- **Tests:** `./gradlew assembleDebug testDebugUnitTest lintDebug` from `04 Build`. BUILD SUCCESSFUL in 37s. 218 unit tests, 0 failures, 0 errors, 0 skipped. Lint passed.
+- **PR:** One pull request into `final-build`. Not merged from this branch.
+- **State:** local build, tests, and lint passed. CI is the next check.
