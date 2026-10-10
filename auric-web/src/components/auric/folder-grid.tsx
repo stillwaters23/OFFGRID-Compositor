@@ -127,21 +127,77 @@ export function FolderGrid({ preferences, beforeRects, onChangePreferences }: Fo
         button?.getAnimations().forEach((animation) => animation.cancel());
       }
       if (!reducedMotion()) {
+        const flips: { button: HTMLButtonElement; dx: number; dy: number }[] = [];
+        const scrollClip = gridRef.current?.closest<HTMLElement>(".tx-scroll")?.getBoundingClientRect();
+        const clip = {
+          left: Math.max(0, scrollClip?.left ?? 0),
+          top: Math.max(0, scrollClip?.top ?? 0),
+          right: Math.min(window.innerWidth, scrollClip?.right ?? window.innerWidth),
+          bottom: Math.min(window.innerHeight, scrollClip?.bottom ?? window.innerHeight),
+        };
         for (const [id, item] of tileRefs.current) {
           const button = item.querySelector<HTMLButtonElement>(".tx-folder-tile");
           const old = beforeRects.current.get(id);
           if (!button || !old) continue;
-          if (old.bottom <= 0 || old.top >= window.innerHeight) continue;
+          if (old.right <= clip.left || old.left >= clip.right || old.bottom <= clip.top || old.top >= clip.bottom) continue;
           const next = button.getBoundingClientRect();
-          if (next.bottom <= 0 || next.top >= window.innerHeight) continue;
+          if (
+            next.right <= clip.left ||
+            next.left >= clip.right ||
+            next.bottom <= clip.top ||
+            next.top >= clip.bottom
+          ) continue;
           const dx = old.left - next.left;
           const dy = old.top - next.top;
           if (dx || dy) {
-            button.animate(
-              [{ transform: `translate(${dx}px, ${dy}px)`, opacity: 0.78 }, { transform: "translate(0, 0)", opacity: 1 }],
-              { duration: 320, easing: "cubic-bezier(.2,.8,.2,1)" },
-            );
+            flips.push({ button, dx, dy });
           }
+        }
+        let restoreDecorations = () => {};
+        if (flips.length) {
+          const root = document.querySelector(".tx-root");
+          const competingAnimations = root?.getAnimations({ subtree: true }).filter((animation) =>
+            !flips.some(({ button }) => button.getAnimations().includes(animation)),
+          ) ?? [];
+          competingAnimations.forEach((animation) => animation.pause());
+          const rows = flips
+            .map(({ button }) => button.querySelector<HTMLElement>(".tx-folder-row"))
+            .filter((row): row is HTMLElement => row !== null);
+          const previousBackdrops = rows.map((row) => row.style.backdropFilter);
+          rows.forEach((row) => {
+            row.style.backdropFilter = "none";
+          });
+          restoreDecorations = () => {
+            rows.forEach((row, index) => {
+              row.style.backdropFilter = previousBackdrops[index];
+            });
+            competingAnimations.forEach((animation) => {
+              if (animation.playState === "paused") animation.play();
+            });
+          };
+        }
+        let remaining = flips.length;
+        for (const { button, dx, dy } of flips) {
+          button.dataset.flipping = "true";
+          const animation = button.animate(
+            [{ transform: `translate(${dx}px, ${dy}px)`, opacity: 0.78 }, { transform: "translate(0, 0)", opacity: 1 }],
+            { duration: 320, easing: "cubic-bezier(.2,.8,.2,1)" },
+          );
+          let released = false;
+          const releaseLayer = (defer = false) => {
+            if (released) return;
+            released = true;
+            const cleanup = () => {
+              delete button.dataset.flipping;
+              remaining -= 1;
+              if (remaining === 0) restoreDecorations();
+            };
+            if (defer) window.requestAnimationFrame(() => window.requestAnimationFrame(cleanup));
+            else cleanup();
+          };
+          animation.finished.then(() => releaseLayer(true), () => releaseLayer());
+          animation.addEventListener("finish", () => releaseLayer(true), { once: true });
+          animation.addEventListener("cancel", () => releaseLayer(), { once: true });
         }
       }
     }

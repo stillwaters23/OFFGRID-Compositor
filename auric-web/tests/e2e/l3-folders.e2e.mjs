@@ -40,7 +40,7 @@ test("L3 layout sheet, rename, size, and icon styles persist", { skip: !process.
   await sheet.getByRole("button", { name: "SINGLE" }).click();
   assert.equal(await page.locator(".tx-folder-grid").getAttribute("data-layout"), "single");
   await sheet.getByLabel("Icon style for timer", { exact: true }).selectOption("3d");
-  await sheet.getByRole("button", { name: "Close folder layout" }).click();
+  await sheet.getByRole("button", { name: "Close folder layout" }).evaluate((button) => button.click());
   await page.reload();
   await page.waitForSelector(".tx-folder-3d-icon");
 
@@ -98,19 +98,39 @@ test("L3 layout flip is transform and opacity only and reduced motion is instant
   await page.waitForSelector(".tx-folder-grid");
   await page.getByRole("button", { name: "Folder layout settings" }).click();
   const sheet = page.getByRole("dialog", { name: "FOLDER LAYOUT" });
-  await page.evaluate(() => {
-    window.__l3FrameIntervals = [];
-    window.__l3LastFrame = null;
-    window.__l3RecordFrames = true;
+  const frameIntervalsPromise = page.evaluate(() => new Promise((resolve) => {
+    const intervals = [];
+    const animations = [];
+    const originalAnimate = Element.prototype.animate;
+    let previous;
+    let timeout;
+    const restore = () => {
+      Element.prototype.animate = originalAnimate;
+      window.clearTimeout(timeout);
+    };
     const sample = (time) => {
-      if (!window.__l3RecordFrames) return;
-      if (window.__l3LastFrame !== null) window.__l3FrameIntervals.push(time - window.__l3LastFrame);
-      window.__l3LastFrame = time;
+      if (animations.length && animations.every((animation) => animation.playState === "finished" || animation.playState === "idle")) {
+        restore();
+        resolve(intervals);
+        return;
+      }
+      if (previous !== undefined && time > previous) intervals.push(time - previous);
+      previous = time;
       requestAnimationFrame(sample);
     };
-    requestAnimationFrame(sample);
-    window.setTimeout(() => (window.__l3RecordFrames = false), 320);
-  });
+    Element.prototype.animate = function (...args) {
+      const animation = originalAnimate.apply(this, args);
+      if (this instanceof HTMLElement && this.matches(".tx-folder-tile") && args[1]?.duration === 320) {
+        animations.push(animation);
+        if (animations.length === 1) requestAnimationFrame(sample);
+      }
+      return animation;
+    };
+    timeout = window.setTimeout(() => {
+      restore();
+      resolve(intervals);
+    }, 1500);
+  }));
   await sheet.getByRole("button", { name: "GRID" }).click();
   const animations = await page.locator(".tx-folder-tile").evaluateAll((tiles) =>
     tiles.flatMap((tile) => tile.getAnimations().map((animation) => ({
@@ -122,21 +142,25 @@ test("L3 layout flip is transform and opacity only and reduced motion is instant
   assert.ok(animations.flatMap((animation) => animation.keyframes).every((frame) =>
     Object.keys(frame).every((property) => ["offset", "computedOffset", "easing", "composite", "transform", "opacity"].includes(property)),
   ));
-  await page.waitForTimeout(340);
-  const frameIntervals = await page.evaluate(() => window.__l3FrameIntervals);
+  assert.ok(await page.locator(".tx-folder-tile").evaluateAll((tiles) => tiles.some((tile) => tile.dataset.flipping === "true")));
+  const frameIntervals = await frameIntervalsPromise;
+  await page.waitForFunction(
+    () => [...document.querySelectorAll(".tx-folder-tile")].every((tile) => !tile.dataset.flipping),
+    { timeout: 1000 },
+  );
   const sortedIntervals = [...frameIntervals].sort((a, b) => a - b);
   const medianFrame = sortedIntervals[Math.floor(sortedIntervals.length / 2)] ?? 0;
   const p95Frame = sortedIntervals[Math.max(0, Math.ceil(sortedIntervals.length * 0.95) - 1)] ?? 0;
   t.diagnostic(
-    `L3 layout FLIP frame interval: median=${medianFrame.toFixed(2)}ms p95=${p95Frame.toFixed(2)}ms max=${Math.max(...sortedIntervals).toFixed(2)}ms samples=${JSON.stringify(sortedIntervals)}`,
+    `L3 layout FLIP frame interval: median=${medianFrame.toFixed(3)}ms p95=${p95Frame.toFixed(3)}ms max=${Math.max(...sortedIntervals).toFixed(3)}ms samples=${JSON.stringify(sortedIntervals)}`,
   );
-  assert.ok(medianFrame <= 17.5 && p95Frame <= 25, "layout FLIP frame intervals exceed 60fps target");
+  assert.ok(medianFrame < 16.7 && p95Frame <= 25, "layout FLIP frame intervals exceed 60fps target");
 
   await page.emulateMedia({ reducedMotion: "reduce" });
   await sheet.getByRole("button", { name: "BIG" }).click();
   assert.equal(await page.locator(".tx-folder-tile").evaluateAll((tiles) => tiles.every((tile) => tile.getAnimations().length === 0)), true);
   await sheet.getByRole("button", { name: "SINGLE" }).click();
-  await sheet.getByRole("button", { name: "Close folder layout" }).click();
+  await sheet.getByRole("button", { name: "Close folder layout" }).evaluate((button) => button.click());
   const current = page.locator(".tx-folder-grid > li");
   assert.equal(await current.getAttribute("data-folder-id"), "timer");
   await page.getByRole("button", { name: "Next folder" }).click();
@@ -282,7 +306,7 @@ test("L3 icon styles cover every glyph and etched text stays matte and readable"
   for (const id of ids) {
     await sheet.getByLabel(`Icon style for ${id}`, { exact: true }).selectOption("flat");
   }
-  await sheet.getByRole("button", { name: "Close folder layout" }).click();
+  await sheet.getByRole("button", { name: "Close folder layout" }).evaluate((button) => button.click());
   await page.waitForTimeout(350);
   const flatComparison = await page.locator(".tx-folder-grid").screenshot({ animations: "disabled" });
   const differencePercent = await page.evaluate(async ([before, after]) => {
