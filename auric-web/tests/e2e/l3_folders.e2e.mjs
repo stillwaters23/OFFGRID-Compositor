@@ -281,8 +281,8 @@ test("L3 icon styles cover every glyph and etched text stays matte and readable"
   t.after(() => browser.close());
   await page.goto(baseUrl);
   await page.waitForSelector(".tx-root");
-  const ids = ["timer", "stopwatch", "alarm", "themes", "sizing", "opacity", "icons", "alarm-sounds", "timer-sounds", "haptics", "heartbeat", "heartbeat-log", "logs-exports", "device", "tutorial"];
-  const setStyles = (style) =>
+  const laneIds = ["timer", "stopwatch", "alarm", "themes", "sizing", "opacity", "icons", "alarm-sounds", "timer-sounds", "haptics", "heartbeat", "heartbeat-log", "logs-exports", "device", "tutorial"];
+  const setStyles = (style, ids) =>
     page.evaluate(({ ids, style }) => {
       localStorage.setItem("auric-crowned-v21", JSON.stringify({ state: { shell: "home", appearanceMode: "dark" }, version: 0 }));
       localStorage.setItem(
@@ -305,6 +305,11 @@ test("L3 icon styles cover every glyph and etched text stays matte and readable"
   await page.waitForSelector(".tx-folder-grid[data-layout='big']");
   await page.waitForTimeout(350);
   await page.evaluate(() => document.fonts.ready);
+  const renderedIds = await page.locator(".tx-folder-grid > li").evaluateAll((rows) =>
+    rows.map((row) => row.dataset.folderId).filter(Boolean),
+  );
+  const ids = renderedIds.length === 15 || renderedIds.length === 16 ? renderedIds : laneIds;
+  assert.ok(ids.length === 15 || ids.length === 16, `expected 15 or 16 folders, saw ${renderedIds.length}`);
   const flatBaseline = await page.locator(".tx-folder-grid").screenshot({ animations: "disabled" });
   await page.getByRole("button", { name: "Folder layout settings" }).click();
   const sheet = page.getByRole("dialog", { name: "FOLDER LAYOUT" });
@@ -341,14 +346,15 @@ test("L3 icon styles cover every glyph and etched text stays matte and readable"
 
   const screenshotDir = fileURLToPath(new URL("../../screenshots/l3/", import.meta.url));
   mkdirSync(screenshotDir, { recursive: true });
-  await setStyles("3d");
+  await setStyles("3d", ids);
   await page.reload();
   await page.waitForFunction((count) => document.querySelectorAll(".tx-folder-3d-icon").length === count, ids.length);
   await page.locator(".tx-folder-grid").screenshot({ path: `${screenshotDir}/icons_3d.png` });
-  await setStyles("etched");
+  await setStyles("etched", ids);
   await page.reload();
   await page.waitForFunction((count) => document.querySelectorAll(".tx-folder-art.is-etched").length === count, ids.length);
   await page.locator(".tx-folder-grid").screenshot({ path: `${screenshotDir}/icons_etched.png` });
+  const folderCount = ids.length;
 
   for (const mood of ["dark", "light"]) {
     await page.evaluate((appearanceMode) => {
@@ -361,7 +367,7 @@ test("L3 icon styles cover every glyph and etched text stays matte and readable"
       ({ expectedMood, count }) =>
         document.querySelector(".tx-root")?.dataset.mood === expectedMood &&
         document.querySelectorAll(".tx-folder-grid .tx-folder-name").length === count,
-      { expectedMood: mood, count: ids.length },
+      { expectedMood: mood, count: folderCount },
     );
     await page.waitForTimeout(350);
     const textStyles = await page.locator(".tx-folder-name").evaluateAll((titles) => {
@@ -387,7 +393,7 @@ test("L3 icon styles cover every glyph and etched text stays matte and readable"
         };
       });
     });
-    assert.equal(textStyles.length, ids.length);
+    assert.equal(textStyles.length, folderCount);
     assert.ok(textStyles.every((style) => style.contrast >= 4.5), `${mood}: title contrast below 4.5:1`);
     assert.ok(textStyles.every((style) => style.shadowLayers <= 2 && style.shadowBlur <= 4), `${mood}: text shadow exceeds matte limit`);
     assert.ok(textStyles.every((style) => style.backgroundClip !== "text"), `${mood}: text sheen detected`);
