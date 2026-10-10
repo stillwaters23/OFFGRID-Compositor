@@ -1,5 +1,6 @@
 package com.offgrid.compositor.terminal
 
+import com.offgrid.compositor.audio.MicKeys
 import com.offgrid.compositor.effects.Fire
 import com.offgrid.compositor.effects.FxKeys
 
@@ -84,6 +85,7 @@ internal object EffectFolders {
             mirrorScan(),
         ),
         items = listOf(
+            ToggleItem(MicKeys.CAM_ON, "Camera", "Turn the camera on or off. It starts on.", true, isTest = false),
             ChoiceItem(
                 FxKeys.CAMERA_MODE,
                 "Camera mode",
@@ -230,7 +232,7 @@ internal object EffectFolders {
         ),
         notes = listOf(
             "Pick Ghost in Camera mode to turn it on. GHOST ON shows on your screen.",
-            "This app has no mic, so no sound ever goes out.",
+            "Video audio uses the mic when Mic is on, with Microphone Effects applied.",
             "If ghost was already on when the app opened, the box stays blank.",
         ),
     )
@@ -444,7 +446,7 @@ internal object EffectFolders {
         fire(Fire.TIME_FREEZE, "Freeze now", "Holds your video still, then picks back up like a glitch."),
         notes = listOf(
             "Viewers see a paused picture, not a dropped stream.",
-            "This app has no mic, so no sound goes out during the freeze.",
+            "Video audio uses the mic when Mic is on. Microphone Effects stay on the phone.",
         ),
     )
 
@@ -590,7 +592,7 @@ internal object EffectFolders {
         ),
         notes = listOf(
             "Sounds play from your phone's speaker only.",
-            "This app has no mic, so the sounds are not added to the video.",
+            "Sounds in video, in Microphone Effects, also puts these sounds in the recording.",
         ),
     )
 
@@ -611,7 +613,7 @@ internal object EffectFolders {
         ),
         notes = listOf(
             "Videos have your effects in them. The panel is never in them.",
-            "There is no sound, because this app never uses the mic.",
+            "The replay keeps audio while the mic is on. The radar ping is mixed into the video.",
             "Videos stay on your phone. Nothing uploads.",
         ),
     )

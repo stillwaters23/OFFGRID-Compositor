@@ -9,11 +9,11 @@ It runs only on Android phones: the Galaxy S25 Ultra and the Galaxy A37. Nothing
 1. Uninstall the old OFFGRID app first.
 2. Open the `step-2-preview` release on GitHub on your phone.
 3. Download **OFFGRID Preview.apk** and open it to install.
-4. Allow the camera when the app asks. It never asks for the mic.
+4. Allow the camera when the app asks. The mic is asked for only when you turn the mic toggle on.
 
 ## Rules this app keeps
 
-- **The camera is the only permission.** No mic, no voice, no speech, no network.
+- **The camera and the mic are the only permissions the app itself needs.** The mic is used for your videos only. No voice, no speech.
 - **No sliders.** Every number is typed from 0 to 100. Every switch is a toggle.
 - **The panel is never in the video.** Only the effects are.
 - **Your face can stay hidden.** The face diamond starts on. The no-face camera modes never show your face, and no reset ever changes the camera mode.
@@ -40,13 +40,18 @@ Emoji rain, Drawing (draw on the camera picture with a finger), Glow border, Fir
 
 Effects with a **Fire now** button run once when you tap it, like Shatter now or Freeze now. **Quiet mode** can fire another effect the moment its light comes back on.
 
-**📁 Soundboard** gives each effect its own sound. Sounds play on your phone's speaker only. They are not in the video, because the app has no mic.
+**📁 Soundboard** gives each effect its own sound. Sounds play on your phone's speaker. With **Sounds in video** on, they are also mixed into the recorded audio.
+
+### 📁 Camera and mic toggles, and 📁 Microphone Effects
+
+The camera toggle lets go of the camera when it is off. Viewers then see black with your effects drawn over it, never a frozen face. The mic toggle starts and releases the mic. Every video is recorded with the app's own recorder (H.264 video, AAC audio). When the mic is off the video has a silent audio track. Microphone Effects change the voice on the phone only: pitch, robot, echo, radio, cave, volume, and a noise gate. The mic is not played through the speaker.
 
 ### 📁 Record
 
 - **Record length:** seconds per video. 0 records until you tap **Stop**.
 - **Save to gallery:** each video also goes to your gallery, in Movies › OFFGRID.
-- **Replay buffer:** keeps the last moments of your video. Tap **Save replay** to keep a clip.
+- **Replay buffer:** keeps the last moments of your video. While the mic is on, that clip keeps the audio too. Tap **Save replay** to keep a clip.
+- **📁 Microphone Effects:** the mic toggle, pitch, robot, echo, radio, cave, volume, and the noise gate. The radar ping is mixed into the video while the radar is on.
 
 Tap **Record** on the bar at the bottom. Tap **Play last video** to watch it.
 
@@ -71,8 +76,8 @@ Each one has:
 ## Not built, and why
 
 - **Typed-to-speech, Rex's voice, speaking as Rex, and the read-aloud button (8, 38, 39):** voice is paused (Step 7). See `05 Docs/Step 7 Voice Paused.md`.
-- **Audio-reactive panel (16), and a border synced to heartbeat or sound (part of 17):** these need the mic, which stays off.
-- **IP leak check (25):** it needs the internet permission, and the camera is the only permission.
+- **Audio-reactive panel (16):** the panel's own glow does not follow sound yet. The glow border in the video does follow the mic beat.
+- **IP leak check (25):** it needs the internet permission, which is not allowed yet.
 - **OFFGRID-to-OFFGRID calls (part of 14 and 34):** these need a server. The handshake codes are built.
 - **Seeing a gift or a kick by itself:** another app's screen can't be read. Use the **Fire now** and **I got kicked** buttons.
 
@@ -86,4 +91,4 @@ Each one has:
 
 ## Building
 
-GitHub builds the app on every push. Unit tests run on the build computer. The guards check that the build has no saved secrets, mic code, voice code, or sliders, and that the camera is the only permission.
+GitHub builds the app on every push. Unit tests run on the build computer. The guards check that the build has no saved secrets, voice code, or sliders, and that the merged manifest asks only for permissions on the allowed list. The list is printed in the build log.

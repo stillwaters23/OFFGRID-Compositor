@@ -13,6 +13,7 @@ on:
     branches:
       - final-build
       - main
+      - final-build
       - ccr-c441a76e-hgt5wa
       - step-2-2-premium-panel
       - step-2-4-presets-layouts
@@ -82,18 +83,10 @@ jobs:
           print("No saved secrets found.")
           PY
 
-      - name: Check the mic stays off
-        run: |
-          set -euo pipefail
-          if grep -R -n -E "RECORD_AUDIO|withAudioEnabled" "04 Build/app/src/main/java"; then
-            echo "This step must not use the mic."
-            exit 1
-          fi
-
       - name: Check voice stays paused
         run: |
           set -euo pipefail
-          if grep -R -n -E "TextToSpeech|SpeechRecognizer|AudioRecord|android\.speech" "04 Build/app/src/main/java"; then
+          if grep -R -n -E "TextToSpeech|SpeechRecognizer|android\.speech" "04 Build"/*/src; then
             echo "Voice is paused until Royalty says go."
             exit 1
           fi
@@ -101,7 +94,7 @@ jobs:
       - name: Check there are no sliders
         run: |
           set -euo pipefail
-          if grep -R -n -E "SeekBar|RangeSlider|material\.slider|<Slider|Slider\(" "04 Build/app/src"; then
+          if grep -R -n -E "SeekBar|RangeSlider|material\.slider|<Slider|Slider\(" "04 Build"/*/src; then
             echo "Every number is typed. Sliders are not allowed."
             exit 1
           fi
@@ -110,24 +103,67 @@ jobs:
         working-directory: 04 Build
         run: chmod +x ./gradlew && ./gradlew testDebugUnitTest assembleDebug --stacktrace
 
+      - name: Run Android lint
+        working-directory: 04 Build
+        run: ./gradlew lintDebug --stacktrace
+
       - name: Check the color mix math
         working-directory: 04 Build
         run: ./gradlew testDebugUnitTest --stacktrace
 
-      - name: Check the built app has no mic permission
+      # Royalty approved the mic and Send to PC. CAMERA, RECORD_AUDIO, and INTERNET
+      # are allowed. ACCESS_NETWORK_STATE stays banned, and so do Wi-Fi, notifications,
+      # overlay, and foreground-service permissions. androidx.core adds one package
+      # permission; that exact name is accepted. The person mask still has no server call.
+      - name: Check the built app only asks for allowed permissions
         run: |
           set -euo pipefail
           merged="$(find "04 Build/app/build" -path "*merged_manifest*" -name AndroidManifest.xml | head -n 1)"
           test -n "$merged"
-          if grep -q "android.permission.RECORD_AUDIO" "$merged"; then
-            echo "This step must not use the mic."
-            exit 1
-          fi
-          echo "Mic permission is not in the app."
-          if ! grep -q "android.permission.INTERNET" "$merged"; then
-            echo "Send to PC and the direct phone link need INTERNET."
-            exit 1
-          fi
+          python3 - "$merged" << 'PY'
+          import sys
+          import xml.etree.ElementTree as ET
+          allowed = {
+              "CAMERA",
+              "RECORD_AUDIO",
+              "INTERNET",
+          }
+          banned = {
+              "android.permission.ACCESS_NETWORK_STATE",
+          }
+          name = "{http://schemas.android.com/apk/res/android}name"
+          root = ET.parse(sys.argv[1]).getroot()
+          found = sorted(
+              node.get(name)
+              for tag in ("uses-permission", "uses-permission-sdk-23")
+              for node in root.iter(tag)
+          )
+          print("Permissions in the built app:")
+          for permission in found:
+              print("  " + permission)
+          if "android.permission.RECORD_AUDIO" not in found:
+              print("RECORD_AUDIO is approved and must stay in the app.")
+              sys.exit(1)
+          print("RECORD_AUDIO is allowed.")
+          if "android.permission.INTERNET" not in found:
+              print("Send to PC and the direct phone link need INTERNET.")
+              sys.exit(1)
+          print("INTERNET is only for local Send to PC and the direct phone link.")
+          exact = {"com.offgrid.compositor.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"}
+          extra = [
+              p for p in found
+              if p in banned
+              or (
+                  p not in exact
+                  and (p.rsplit(".", 1)[-1] not in allowed or not p.startswith("android.permission."))
+              )
+          ]
+          if extra:
+              print("These permissions are not allowed:")
+              print("\n".join(extra))
+              sys.exit(1)
+          print("Every permission is on the allowed list.")
+          PY
           if grep -R -n -E "https?://" "04 Build/app/src/main/java/com/offgrid/compositor/person_segmenter.kt"; then
             echo "Camera frames must stay on the phone."
             exit 1
@@ -136,7 +172,7 @@ jobs:
             echo "Public addresses must stay refused."
             exit 1
           fi
-          echo "INTERNET is only for local Send to PC and the direct phone link. The person mask stays on the phone."
+          echo "The person mask stays on the phone. Public addresses stay refused."
 
       - name: Name the app file
         run: |
@@ -162,7 +198,8 @@ jobs:
           cat > /tmp/release-notes.txt << 'EOF'
           This is the FINAL build test version of OFFGRID: everything except voice.
           It is not merged yet. Rex reviews it first.
-          The camera is the only permission. The mic stays off.
+          The camera and the mic are the permissions this build asks for.
+          The mic is used for videos only. Voice reading and listening stay paused.
 
           Sign in to GitHub in your phone browser first. This project is private.
 
@@ -173,6 +210,7 @@ jobs:
           3. If your phone asks, allow this browser to install apps.
           4. Tap Install. If Play Protect warns you, tap More details, then Install anyway.
           5. Open OFFGRID. Tap Allow so the front camera can turn on.
+          6. The mic asks only when you turn the mic toggle on. Videos then carry your voice.
 
           What to check
           1. Toggles: every toggle is a circle with a power symbol. Lit means on, dim means off.

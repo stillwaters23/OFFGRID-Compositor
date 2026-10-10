@@ -228,6 +228,7 @@ internal object PanelTree {
         val top = listOf(
             settingsFolder(),
             EffectFolders.camera(),
+            MicrophoneEffectsFolder.folder(),
             EffectFolders.effects(),
             EffectFolders.record(),
             // Lane C hook

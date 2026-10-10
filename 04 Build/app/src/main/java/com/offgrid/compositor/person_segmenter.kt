@@ -5,6 +5,8 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.os.Looper
 import android.util.Log
+import androidx.annotation.OptIn
+import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import com.google.mediapipe.framework.image.ByteBufferExtractor
@@ -101,6 +103,7 @@ internal class PersonSegmenter(
         }
     }
 
+    @OptIn(ExperimentalGetImage::class)
     private fun analyze(image: ImageProxy) {
         try {
             if (onUiThread()) {

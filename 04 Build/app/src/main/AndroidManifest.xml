@@ -3,12 +3,9 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.CAMERA" />
-    <!-- This step does not use the mic. Keep the permission out even if a library asks. -->
-    <uses-permission
-        android:name="android.permission.RECORD_AUDIO"
-        tools:node="remove" />
-    <!-- Final build: the camera is the only permission. A video library asks for this one,
-         but the app never goes online, so it is taken out. -->
+    <!-- Royalty approved the mic. Lane B records with it. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- A video library asks for this one. The app does not use it. -->
     <uses-permission
         android:name="android.permission.ACCESS_NETWORK_STATE"
         tools:node="remove" />

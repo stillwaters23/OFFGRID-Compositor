@@ -38,6 +38,7 @@ import androidx.core.animation.doOnStart
 import androidx.core.view.ViewCompat
 import androidx.core.view.isVisible
 import com.offgrid.compositor.R
+import com.offgrid.compositor.audio.MicKeys
 import com.offgrid.compositor.audio.clicker.ClickerSoundEngine
 import com.offgrid.compositor.audio.clicker.ClickerSoundSynth
 import com.offgrid.compositor.effects.FxKeys
@@ -113,6 +114,8 @@ class TerminalPanel @JvmOverloads constructor(
     private val body = LinearLayout(context)
     private val drawer = SideDrawer(context)
     private val moreButton = MoreButton(context)
+    private lateinit var cameraBlock: PowerToggleView
+    private lateinit var micBlock: PowerToggleView
     private val menu: PanelMenu
     private var sideMode = folderSettings.side
 
@@ -206,6 +209,21 @@ class TerminalPanel @JvmOverloads constructor(
 
     /** Every effect setting right now, for the camera's effects. */
     fun effectSnapshot(): com.offgrid.compositor.effects.EffectSnapshot = EffectSettings.snapshot(store)
+
+    /** Saves a toggle from outside the panel, such as turning the mic off after a denial. */
+    fun setToggleSetting(key: String, on: Boolean) {
+        syncCaptureBlocks(key, on)
+        if (store.toggle(key) == on) return
+        store.setToggle(key, on)
+        refreshLook()
+        val folder = openFolder
+        if (folder != null && folder.items.any { it is ToggleItem && it.key == key }) {
+            val scroll = detailScroll.scrollY
+            buildDetail(folder)
+            detailScroll.post { detailScroll.scrollTo(0, scroll) }
+        }
+        settingChanged(key)
+    }
 
     /** The panel's glow color, for effects that follow the panel's look. */
     val glowColor: Int get() = look.outerGlow
@@ -786,6 +804,27 @@ class TerminalPanel @JvmOverloads constructor(
         return false
     }
 
+    /** The top bar's camera and mic blocks. They save the same keys the mic engine reads. */
+    private fun captureBlock(key: String, label: String, description: String) = PowerToggleView(context).apply {
+        contentDescription = description
+        setOn(store.toggle(key))
+        onToggled = { on ->
+            setToggleSetting(key, on)
+            this@TerminalPanel.onToggled?.invoke(key, on)
+            val message = if (on) R.string.terminal_toggle_on else R.string.terminal_toggle_off
+            say(context.getString(message, label))
+        }
+    }
+
+    private fun syncCaptureBlocks(key: String, on: Boolean) {
+        val block = when (key) {
+            MicKeys.CAM_ON -> if (::cameraBlock.isInitialized) cameraBlock else return
+            MicKeys.MIC_ON -> if (::micBlock.isInitialized) micBlock else return
+            else -> return
+        }
+        if (block.isOn != on) block.setOn(on)
+    }
+
     private fun buildHeader(): View {
         header.apply {
             orientation = LinearLayout.HORIZONTAL
@@ -807,6 +846,10 @@ class TerminalPanel @JvmOverloads constructor(
             styled(TextRole.TITLE, 12.5f)
         }
         header.addView(title, LinearLayout.LayoutParams(0, WRAP, 1f))
+        cameraBlock = captureBlock(MicKeys.CAM_ON, "Camera", "Camera block")
+        micBlock = captureBlock(MicKeys.MIC_ON, "Mic", "Mic block")
+        header.addView(cameraBlock, LinearLayout.LayoutParams(dpi(TARGET_DP), dpi(TARGET_DP)).apply { marginStart = dpi(4f) })
+        header.addView(micBlock, LinearLayout.LayoutParams(dpi(TARGET_DP), dpi(TARGET_DP)).apply { marginStart = dpi(2f) })
         header.addView(widthBox, LinearLayout.LayoutParams(WRAP, WRAP).apply { marginStart = dpi(4f) })
         header.addView(heightBox, LinearLayout.LayoutParams(WRAP, WRAP).apply { marginStart = dpi(4f) })
         moreButton.contentDescription = context.getString(R.string.terminal_menu_button)
@@ -2195,6 +2238,7 @@ class TerminalPanel @JvmOverloads constructor(
         }
         store.setToggle(item.key, on)
         refreshLook()
+        syncCaptureBlocks(item.key, on)
         settingChanged(item.key)
         onToggled?.invoke(item.key, on)
         if (item.key == LookKeys.TEST_DIAMOND) {

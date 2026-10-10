@@ -285,6 +285,35 @@ States: passed, waiting for review, blocked, or waiting for Royalty's phone test
 - **State:** waiting for CI
 - **Next:** Update the checklist comment with the GitHub log once the workflow finishes, and keep the 35 Lane C hook lines in the pull request description.
 
+## 2026-10-09 8:05 AM CT — Lane B, Copilot
+- **Bootloader step:** Lane B: Camera, Mic and Recording.
+- **What was done:**
+  - B0: CI runs on pull requests into `final-build`, checks the merged manifest against the permission allowlist, and bans only voice code.
+  - B1: RECORD_AUDIO is in the manifest. The mic is asked for only when the mic toggle goes on.
+  - B2: the camera and mic toggles bind and release the camera and the mic. Black with effects shows while the camera is off.
+  - B3: a new `audio/` package has the mic, the voice effects, the beat finder, and the recorder that writes MP4 with video and audio.
+  - B4: the glow border pulses with the mic beat, at most 3 times a second.
+  - B5: the replay buffer uses one 64 MB block, and the recording function was renamed.
+  - The local sandbox cannot reach Google's Maven, so Gradle, lint, Robolectric tests, and on-device checks were not run there. CI must confirm them.
+- **PR / commit:** Lane B pull request into `final-build`, not merged.
+- **State:** waiting for review
+- **Next:** read the CI log, fix anything it finds, then run the phone checks: a 20 second Robot plus Echo clip, camera off and mic off during a recording, and frame times.
+
+## 2026-10-09 11:00 PM CT — Lane B finisher
+
+- **Bootloader step:** Lane B round 2 on pull request #11. Base stays `final-build`. Not merged.
+- **What was done:**
+  - Restored the manifest removal of ACCESS_NETWORK_STATE. The allowlist accepts the AndroidX dynamic receiver permission by its exact name, and lint runs in CI.
+  - A mic read error releases AudioRecord once, and stop is safe to call again. The mic is released when the app is hidden.
+  - A denied mic turns the panel toggle off and leaves the Settings line on the record bar.
+  - MainActivity.kt is under 400 lines. The camera, playback, recording, and status pieces live in their own files. The new output and denial hooks are under 40 lines.
+  - The radar ping is mixed into the video audio. The replay buffer keeps an audio track while the mic is on.
+  - 📁 Microphone Effects is in the panel. The old "no mic" sentences are archived, not deleted.
+  - Unit tests cover the mic release, the denied capture state, the saved mic toggle, the replay audio track, the radar ping, and extra output bookkeeping.
+- **PR / commit:** Pull request #11, not merged.
+- **State:** waiting for review
+- **Next:** CI on this head must be green. Phone checks stay with Royalty: lip sync, a 20 second Robot plus Echo clip, and camera-off and mic-off in one recording.
+
 ## 2026-10-09 11:13 PM CT — Lane E
 
 - **Bootloader step:** Lane E. Person segmentation. Not a new Bootloader step. Voice stays paused.
