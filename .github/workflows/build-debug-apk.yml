@@ -10,6 +10,7 @@ on:
   pull_request:
     branches:
       - main
+      - auric-base
       - ccr-c441a76e-hgt5wa
       - step-2-2-premium-panel
       - step-2-4-presets-layouts
