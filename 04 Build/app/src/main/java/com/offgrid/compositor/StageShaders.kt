@@ -233,6 +233,63 @@ internal object StageShaders {
         }
     """
 
+    /**
+     * The person mask inside the video box (Lane E). [sMask] is the person, 0 to 1 in alpha.
+     * [uKind] 1 cuts the body out, 2 replaces it, 3 cloaks the silhouette, 4 draws a hologram.
+     * The camera colors of the person are never kept. The room around the person stays.
+     * Motion stays under 3 flashes a second.
+     */
+    const val BODY_FRAGMENT = """
+        #ifdef GL_FRAGMENT_PRECISION_HIGH
+        precision highp float;
+        #else
+        precision mediump float;
+        #endif
+        varying vec2 vTexCoord;
+        uniform sampler2D sPicture;
+        uniform sampler2D sMask;
+        uniform float uKind;
+        uniform float uPlate;
+        uniform float uCut;
+        uniform float uTime;
+        uniform float uAspect;
+
+        void main() {
+            vec3 cam = texture2D(sPicture, vTexCoord).rgb;
+            float person = texture2D(sMask, vTexCoord).a;
+            float body = smoothstep(uCut - 0.08, uCut + 0.02, person);
+            vec3 outc = cam;
+            if (uKind < 1.5) {
+                outc = mix(cam, vec3(0.0), body);
+            } else if (uKind < 2.5) {
+                vec3 plate = vec3(0.0);
+                if (uPlate > 0.5) {
+                    vec2 p = (vTexCoord - 0.5) * vec2(uAspect, 1.0);
+                    float r = length(p);
+                    float swirl = fract(sin(dot(vec2(r, uTime * 0.2), vec2(127.1, 311.7))) * 43758.5453);
+                    plate = vec3(0.012, 0.02, 0.045) + vec3(0.03, 0.07, 0.12) * swirl;
+                }
+                outc = mix(cam, plate, body);
+            } else if (uKind < 3.5) {
+                vec2 p = (vTexCoord - 0.5) * vec2(uAspect, 1.0);
+                float r = length(p);
+                float swirl = fract(sin(dot(vec2(r * 6.0, uTime * 0.25), vec2(127.1, 311.7))) * 43758.5453);
+                vec3 voidc = vec3(0.008, 0.016, 0.04) + vec3(0.04, 0.09, 0.15) * swirl;
+                float edge = smoothstep(0.18, 0.0, abs(person - uCut));
+                voidc += vec3(0.35, 0.62, 0.9) * edge * (0.25 + 0.15 * sin(uTime * 6.0));
+                outc = mix(cam, voidc, body);
+            } else {
+                float scan = 0.62 + 0.38 * sin(vTexCoord.y * 80.0 - uTime * 2.2);
+                float glow = 0.84 + 0.16 * sin(uTime * 3.0);
+                vec3 holo = vec3(0.12, 0.72, 0.95) * scan * glow;
+                float edge = smoothstep(0.2, 0.0, abs(person - uCut));
+                holo += vec3(0.45, 0.9, 1.0) * edge * 0.45;
+                outc = mix(cam, holo, body);
+            }
+            gl_FragColor = vec4(outc, 1.0);
+        }
+    """
+
     /** One flat color. Used for crack lines, frame lines, and shadows. Premultiplied. */
     const val SHAPE_VERTEX = """
         attribute vec2 aPosition;

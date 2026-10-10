@@ -38,6 +38,8 @@ import androidx.core.animation.doOnStart
 import androidx.core.view.ViewCompat
 import androidx.core.view.isVisible
 import com.offgrid.compositor.R
+import com.offgrid.compositor.audio.clicker.ClickerSoundEngine
+import com.offgrid.compositor.audio.clicker.ClickerSoundSynth
 import com.offgrid.compositor.audio.voice.MicState
 import com.offgrid.compositor.effects.FxKeys
 import com.offgrid.compositor.audio.voice.MicKeys
@@ -68,6 +70,7 @@ class TerminalPanel @JvmOverloads constructor(
 
     private val prefs = PanelPrefs(context)
     private val store = ThemeStore(context, prefs)
+    private val clickerSounds = ClickerSoundEngine()
     private val home = PanelTree.build()
     private val density = resources.displayMetrics.density
 
@@ -103,6 +106,10 @@ class TerminalPanel @JvmOverloads constructor(
     private val resizeGrip = ResizeGrip(context)
     private val widthBox: SizeBox
     private val heightBox: SizeBox
+    private var clickerEnabled = store.toggle(PanelTree.CLICKER_ENABLED)
+    private var clickerStyle = CLICKER_STYLES.indexOf(store.choice(PanelTree.CLICKER_STYLE)).coerceAtLeast(0)
+    private var clickerVariant = store.number(PanelTree.CLICKER_VARIANT)
+    private var clickerVolume = store.number(PanelTree.CLICKER_VOLUME)
 
     private val listRows = HashMap<String, SideRow>()
 
@@ -134,8 +141,9 @@ class TerminalPanel @JvmOverloads constructor(
     private var stableHeight = 0
     private val themeRows = ArrayList<ThemeRow>()
 
-    /** Width and Height boxes inside the open Size folder, kept in step with the top boxes. */
-    private val sizeRows = ArrayList<Pair<String, NumberBox>>()
+    /** Width and Height reels inside the open Size folder, kept in step with the top number boxes. */
+    private val sizeReels = ArrayList<Pair<String, WheelNumberRow>>()
+    private var sizeBank: SizeReelBank? = null
     private var headingRing: HoloRingView? = null
     private var guidance: LaserTypeView? = null
     private var openFolder: PanelFolder? = null
@@ -710,11 +718,13 @@ class TerminalPanel @JvmOverloads constructor(
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
+        clickerSounds.activate()
         viewTreeObserver.addOnGlobalFocusChangeListener(focusWatcher)
     }
 
     override fun onDetachedFromWindow() {
         viewTreeObserver.removeOnGlobalFocusChangeListener(focusWatcher)
+        clickerSounds.deactivate()
         shownOnScreen = false
         refreshClock()
         stopCentering()
@@ -1122,8 +1132,10 @@ class TerminalPanel @JvmOverloads constructor(
         }
         show(widthBox.box, widthPercent)
         show(heightBox.box, heightPercent)
-        for ((key, box) in sizeRows) {
-            show(box, if (key == LookKeys.WIDTH) widthPercent else heightPercent)
+        sizeBank?.show(LookKeys.WIDTH, widthPercent)
+        sizeBank?.show(LookKeys.HEIGHT, heightPercent)
+        for ((key, row) in sizeReels) {
+            row.show(if (key == LookKeys.WIDTH) widthPercent else heightPercent)
         }
     }
 
@@ -1353,6 +1365,10 @@ class TerminalPanel @JvmOverloads constructor(
     /** Reads the saved theme settings again, then repaints the whole panel. */
     private fun refreshLook() {
         look = store.look()
+        clickerEnabled = store.toggle(PanelTree.CLICKER_ENABLED)
+        clickerStyle = CLICKER_STYLES.indexOf(store.choice(PanelTree.CLICKER_STYLE)).coerceAtLeast(0)
+        clickerVariant = store.number(PanelTree.CLICKER_VARIANT)
+        clickerVolume = store.number(PanelTree.CLICKER_VOLUME)
         applyLook()
     }
 
@@ -1715,7 +1731,8 @@ class TerminalPanel @JvmOverloads constructor(
         guidance = null
         headingRing = null
         themeRows.clear()
-        sizeRows.clear()
+        sizeReels.clear()
+        sizeBank = null
         subFolders = null
     }
 
@@ -1799,7 +1816,8 @@ class TerminalPanel @JvmOverloads constructor(
     private fun buildDetail(folder: PanelFolder) {
         detailContent.removeAllViews()
         themeRows.clear()
-        sizeRows.clear()
+        sizeReels.clear()
+        sizeBank = null
         subFolders = null
         headingRing = null
         detailContent.addView(pathBar(folder), LinearLayout.LayoutParams(MATCH, WRAP))
@@ -1826,8 +1844,32 @@ class TerminalPanel @JvmOverloads constructor(
         }
         if (folder.items.isNotEmpty()) {
             detailContent.addView(sectionLabel(sectionFor(folder)))
-            for (item in folder.items) {
-                detailContent.addView(itemView(folder, item), LinearLayout.LayoutParams(MATCH, WRAP))
+            var index = 0
+            val items = folder.items
+            while (index < items.size) {
+                val item = items[index]
+                val next = items.getOrNull(index + 1)
+                if (item is NumberItem && next is NumberItem &&
+                    item.key == LookKeys.WIDTH && next.key == LookKeys.HEIGHT
+                ) {
+                    val bank = SizeReelBank(
+                        context,
+                        item,
+                        next,
+                        store.number(item.key),
+                        store.number(next.key),
+                        laserSource = { auricLaserColor() to store.number(PanelTree.AURIC_LASER_DIMMER) },
+                        onChange = { key, number, announce -> setSizePercent(key, number, announce) },
+                        onNotch = ::playWheelClick,
+                        onProblem = { say(it) },
+                    )
+                    sizeBank = bank
+                    detailContent.addView(bank, LinearLayout.LayoutParams(MATCH, WRAP))
+                    index += 2
+                } else {
+                    detailContent.addView(itemView(folder, item), LinearLayout.LayoutParams(MATCH, WRAP))
+                    index += 1
+                }
             }
         }
         // Final build: every folder with settings has its own Reset at the bottom.
@@ -1855,13 +1897,18 @@ class TerminalPanel @JvmOverloads constructor(
 
     private fun itemView(folder: PanelFolder, item: PanelItem): View = when (item) {
         is NumberItem -> if (item.key == LookKeys.WIDTH || item.key == LookKeys.HEIGHT) {
-            NumberRow(
+            WheelNumberRow(
                 context,
                 item,
                 store.number(item.key),
+                laserSource = { auricLaserColor() to store.number(PanelTree.AURIC_LASER_DIMMER) },
                 onChange = { value, announce -> setSizePercent(item.key, value, announce) },
+                onNotch = ::playWheelClick,
                 onProblem = { say(it) },
-            ).also { sizeRows += item.key to it.box }
+            ).also { row ->
+                sizeReels += item.key to row
+                row.applyLook(look)
+            }
         } else {
             NumberRow(
                 context,
@@ -1906,6 +1953,21 @@ class TerminalPanel @JvmOverloads constructor(
         refreshLook()
         settingChanged(item.key)
         say(context.getString(R.string.terminal_choice_saved, item.label, choice.label))
+    }
+
+    private fun auricLaserColor(): Int {
+        val rgb = store.choice(PanelTree.AURIC_LASER_COLOR).toLongOrNull(16)?.toInt()
+            ?: return look.edge
+        return 0xFF000000.toInt() or rgb
+    }
+
+    private fun playWheelClick(value: Int) {
+        if (!clickerEnabled) return
+        clickerSounds.play(
+            clickerStyle.coerceIn(0, ClickerSoundSynth.STYLE_COUNT - 1),
+            ClickerSoundSynth.mixTone(clickerVariant, value),
+            clickerVolume,
+        )
     }
 
     /** A typed text setting changed. It is saved and used at once. */
@@ -2230,6 +2292,8 @@ class TerminalPanel @JvmOverloads constructor(
     private fun dpi(value: Float): Int = (value * density + 0.5f).toInt()
 
     private companion object {
+        val CLICKER_STYLES = listOf("soft", "wood", "digital", "rubber", "glass", "metal", "muted")
+
         /** Told to the camera screen when many settings changed at once, like Reset all. */
         const val ALL_SETTINGS = "*"
 

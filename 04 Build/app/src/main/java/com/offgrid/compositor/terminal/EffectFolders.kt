@@ -23,6 +23,7 @@ internal object EffectFolders {
         kind = FolderKind.EFFECTS,
         folders = listOf(
             faceDiamond(),
+            bodyMask(),
             cloak(),
             statusLabel(),
             ghost(),
@@ -46,7 +47,50 @@ internal object EffectFolders {
         notes = listOf(
             "Pick what viewers see. It is baked into the video.",
             "Blackout, Cloak void, Status label, and Ghost never show your face.",
-            "Reset never changes the camera mode, so your face never shows by surprise.",
+            "Body mask can cut your body out of the box. If the mask drops, the box goes black.",
+            "Reset never changes the camera mode or the body look, so your face never shows by surprise.",
+        ),
+    )
+
+    private fun bodyMask() = PanelFolder(
+        id = "camera.body",
+        title = "📁 Body mask",
+        tag = null,
+        kind = FolderKind.EFFECTS,
+        items = listOf(
+            ChoiceItem(
+                FxKeys.BODY_MODE,
+                "Body look",
+                listOf(
+                    Choice(FxKeys.BODY_OFF, "Off", "Viewers see you, with your other effects."),
+                    Choice(FxKeys.BODY_SEE, "See-through", "Your body is cut out of the box. The room around you stays."),
+                    Choice(FxKeys.BODY_REPLACE, "Replace", "Your body is swapped for black, or for the void."),
+                    Choice(FxKeys.BODY_CLOAK, "Body cloak", "The void covers your silhouette. The room stays."),
+                    Choice(FxKeys.BODY_HOLO, "Hologram", "Your silhouette becomes light. Your face colors are not shown."),
+                ),
+                default = FxKeys.BODY_OFF,
+            ),
+            ChoiceItem(
+                FxKeys.BODY_PLATE,
+                "Replacement",
+                listOf(
+                    Choice(FxKeys.BODY_PLATE_BLACK, "Black", "Replace fills your body with black."),
+                    Choice(FxKeys.BODY_PLATE_VOID, "Void", "Replace fills your body with the empty void."),
+                ),
+                default = FxKeys.BODY_PLATE_BLACK,
+            ),
+            NumberItem(
+                FxKeys.BODY_EDGE,
+                "Edge",
+                "How sharp the cut is. 0 is soft. 100 is a hard edge.",
+                40,
+            ),
+        ),
+        notes = listOf(
+            "Your phone finds your body with MediaPipe. The picture stays on the phone.",
+            "Inside the video box, your body can be see-through or replaced.",
+            "If the mask is missing or too old, the whole box goes black, so your face never shows.",
+            "Reset does not turn the body look off.",
         ),
     )
 

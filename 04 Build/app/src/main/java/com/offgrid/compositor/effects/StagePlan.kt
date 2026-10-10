@@ -1,5 +1,7 @@
 package com.offgrid.compositor.effects
 
+import com.offgrid.compositor.MaskGate
+
 /**
  * What the camera stage does to one picture, worked out from the time and the settings
  * (final build, M4). It is plain math with no drawing, so tests can check it, and the GPU
@@ -49,6 +51,20 @@ class StagePlan {
     /** Ghost mode shows the last picture viewers saw (true) or a blank box (false). */
     var ghostFrozen = true
         private set
+
+    /** How the person mask changes the body inside the video box. Off leaves the camera alone. */
+    var bodyMode = FxKeys.BODY_OFF
+        private set
+    var bodyPlate = FxKeys.BODY_PLATE_BLACK
+        private set
+
+    /** How sure a pixel must be before it counts as the person, 0 to 1. */
+    var bodyCut = 0.4f
+        private set
+
+    /** True when the body look is on, so a missing mask must hide the picture. */
+    val bodyOn: Boolean
+        get() = MaskGate.hidesFace(bodyMode)
 
     var echoOn = false
         private set
@@ -105,7 +121,7 @@ class StagePlan {
     /** True when the camera picture goes out exactly as it came in, with nothing done to it. */
     val plain: Boolean
         get() = !mirror && holdId == 0L && brightness >= 1f && mode == FxKeys.MODE_LIVE && modeMix >= 1f &&
-            !echoOn && !takeoverOn && depth <= 0f && depthFrame <= 0f && shatterId == 0L
+            !echoOn && !takeoverOn && depth <= 0f && depthFrame <= 0f && shatterId == 0L && !bodyOn
 
     /**
      * Works out the plan for the picture at [time]. [face] is where the camera sees the face
@@ -138,6 +154,9 @@ class StagePlan {
         ghostFrozen = !s.chose(FxKeys.GHOST_STYLE, FxKeys.GHOST_BLANK)
         cloakStrength = s.value(FxKeys.CLOAK_STRENGTH)
         cloakShimmer = s.value(FxKeys.CLOAK_SHIMMER)
+        bodyMode = s.choice(FxKeys.BODY_MODE).ifEmpty { FxKeys.BODY_OFF }
+        bodyPlate = s.choice(FxKeys.BODY_PLATE).ifEmpty { FxKeys.BODY_PLATE_BLACK }
+        bodyCut = s.value(FxKeys.BODY_EDGE)
     }
 
     private fun planHold(time: Float, s: EffectSnapshot, fired: List<Fired>) {

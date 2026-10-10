@@ -68,6 +68,7 @@
     <string name="terminal_resize_hint">Drag this corner to make the panel bigger or smaller.</string>
     <string name="terminal_size_saved">Size saved. Width is %1$d. Height is %2$d.</string>
     <string name="terminal_width">Width</string>
+    <string name="terminal_reel_value">%1$s, %2$d. Turn the wheel, or type a number from 0 to 100.</string>
     <string name="terminal_height">Height</string>
     <string name="terminal_width_caption">WIDTH</string>
     <string name="terminal_height_caption">HEIGHT</string>
@@ -87,6 +88,7 @@
     <string name="terminal_color_reset">Reset</string>
     <string name="terminal_color_reset_description">Reset %1$s to the theme color.</string>
     <string name="terminal_color_saved">%1$s is now %2$s.</string>
+    <string name="terminal_color_low_contrast">%1$s needs at least 4.5 to 1 contrast for that theme. Nothing changed.</string>
     <string name="terminal_mix_saved">%1$s is now %2$d. The color is %3$s.</string>
     <string name="terminal_color_system_on">%1$s now follows your phone\'s colors.</string>
     <string name="terminal_color_system_off">%1$s is now your own color.</string>
