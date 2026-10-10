@@ -108,6 +108,9 @@ jobs:
         working-directory: 04 Build
         run: ./gradlew testDebugUnitTest --stacktrace
 
+      # Royalty, Oct 9 2026: the mic is approved. The old guard failed when RECORD_AUDIO
+      # was present and printed "Mic permission is not in the app." RECORD_AUDIO is allowed.
+      # ACCESS_NETWORK_STATE stays banned, and so does every permission not on this list.
       - name: Check the built app only asks for allowed permissions
         run: |
           set -euo pipefail
@@ -131,6 +134,7 @@ jobs:
               "NEARBY_WIFI_DEVICES",
               "CHANGE_WIFI_MULTICAST_STATE",
           }
+          banned = {"android.permission.ACCESS_NETWORK_STATE"}
           name = "{http://schemas.android.com/apk/res/android}name"
           root = ET.parse(sys.argv[1]).getroot()
           found = sorted(
@@ -141,11 +145,18 @@ jobs:
           print("Permissions in the built app:")
           for permission in found:
               print("  " + permission)
+          print("RECORD_AUDIO is allowed.")
+          if "android.permission.RECORD_AUDIO" in found:
+              print("The mic permission is in the app, and that is allowed.")
+          print("ACCESS_NETWORK_STATE stays banned.")
           exact = {"com.offgrid.compositor.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"}
           extra = [
               p for p in found
-              if p not in exact
-              and (p.rsplit(".", 1)[-1] not in allowed or not p.startswith("android.permission."))
+              if p in banned
+              or (
+                  p not in exact
+                  and (p.rsplit(".", 1)[-1] not in allowed or not p.startswith("android.permission."))
+              )
           ]
           if extra:
               print("These permissions are not allowed:")

@@ -1,5 +1,6 @@
 package com.offgrid.compositor.terminal
 
+import com.offgrid.compositor.audio.MicKeys
 import com.offgrid.compositor.effects.Fire
 import com.offgrid.compositor.effects.FxKeys
 
@@ -28,6 +29,7 @@ internal object EffectFolders {
             mirrorScan(),
         ),
         items = listOf(
+            ToggleItem(MicKeys.CAM_ON, "Camera", "Turn the camera on or off. It starts on.", true, isTest = false),
             ChoiceItem(
                 FxKeys.CAMERA_MODE,
                 "Camera mode",
