@@ -1,5 +1,9 @@
 # Lane 5 integration QA
 
+The first run is the section below and is unchanged. [Run 2](#run-2) is the rerun on the fixed lane heads. Run 2 verdict: **FAIL**.
+
+## Run 1
+
 **Verdict: FAIL**
 
 The four lane heads combine and the wheel, laser, reel look, folders, and clicker sounds run together. The combined `npm test` gate is 1 failure and 0 skipped. Two Playwright end-to-end tests fail. Those three failures are the blockers.
@@ -2411,3 +2415,341 @@ Timer row bands with more than 8 changed pixels:
 The reel block is y 288-579. Masking every changed band leaves 0.1073% elsewhere. That mask is wider than the laser row, so it is not the L2-11 exclusion.
 ```
 
+
+## Run 2
+
+**Verdict: FAIL**
+
+The three test blockers from Run 1 are fixed. `npm test` is 296 pass, 0 fail, 0 skipped. Every Playwright end-to-end file passes, including the FLIP gate. The default folder list versus `auric-base` is still **2.5939%** changed pixels (8538/329160). The gate is 1%.
+
+The 0.6662% figure measured by L3+L4 is the chrome band above the list (the new menu button plus the `folders 5` to `folders 6` digit). That band is under 1%. The rest of the diff is folder-title ink on the two visible rows, and that ink is what crosses the gate.
+
+Scratch integration (local only, not pushed): `8c3aa931cbe95a91d6dfffe5c618cf9288b94773`
+
+Built fresh on `origin/auric-base` `e39aa55c73ba85939f488cf649e2f085df111d2a`, then:
+
+| Lane | PR | Head | Scratch merge |
+|---|---|---|---|
+| L1 | #27 | `142ef18497a82a89c5f1a6f7f6b583db3a8590ce` | fast-forward |
+| L2 | #29 | `a79ba616d593ece0f30d6dfb8b4118317e40b45a` | `5980b0e` |
+| L3 | #31 | `e35cb9a5b22af896c4b18bca93fc36d29bae83fc` | `0b5e69c` |
+| L4 | #33 | `2f46d38096c4af3c2cdd45461d79a75ad871015e` | `8c3aa93` |
+
+### Lane verdicts
+
+| Lane | Verdict | This run |
+|---|---|---|
+| L1 | PASS | Acceptance test allows `styles/folders.css` and `styles/clicker.css`. `test:l1` is 11/11. Wheel end-to-end passes at median and p95 16.7 ms. |
+| L2 | PASS | Head unchanged. Unit coverage and the reel-look Playwright test pass. Settings screenshots still move because the beam shimmer is not frozen. |
+| L3 | FAIL | End-to-end is 7/7 and FLIP passes. Default folder list versus `auric-base` is 2.5939%. The blocking pixels are the light-mood title color in `styles/folders.css`. |
+| L4 | PASS | End-to-end opens Clicker Sounds with `[data-folder-id="clicker-sounds"]` and passes. The status digit `folders 6` is 61 pixels (0.0185%) and does not cross the 1% gate on its own. |
+
+### What works together
+
+On the integration server the folder grid has 16 tiles, `data-layout="big"`, and two `.laser-strip` elements at `#FF0000` after opening timer. Lane 2's Playwright test applied `#AABBCC` to the beam in 1 frame. Lane 4's Playwright test listed, selected, and previewed a click (latency hint 0.01, output 0.032, twice). Lane 3's icon test accepted the rendered id list. No test was skipped: `AURIC_E2E_URL` and `L3_E2E` were set.
+
+FLIP from the passing L3 test: mean **16.660 ms**, median **16.700 ms**, p95 **16.700 ms**, max **16.700 ms**. Mean is under 16.7 ms and p95 is under 25 ms.
+
+### Merge conflicts resolved in the scratch tree
+
+1. `auric-web/src/components/auric/laser_strip.tsx` was the same add/add as Run 1. Refs render the Lane 1 wheel strip. A call with no props renders the Lane 2 witness. Archived at `qa/archive/v2_laser_strip_add_add_conflict.tsx` and `qa/archive/v2_laser_strip_resolution.tsx`.
+2. `auric-web/scripts/test-aliases.mjs` again differed by `await` on `module.register()`. Node v22.14.0 has no `registerHooks`, so the resolution keeps the `await`. Archived at `qa/archive/v2_test_aliases_content_conflict.mjs` and `qa/archive/v2_test_aliases_resolution.mjs`.
+3. `folder-grid.tsx` was a content conflict. Lane 4's one-line `data-folder-id` was written against the pre-Lane-3 list, and git tried to splice that old `<ul>` into Lane 3's grid. The resolution keeps Lane 3's file. That grid already sets `data-folder-id={spec.id}` on each `<li>` (line 354), which is the selector Lane 4's test clicks. Archived at `qa/archive/v2_folder_grid_content_conflict.tsx`.
+
+No conflict markers remain. `npm ci --ignore-scripts` on this scratch tree exited 0.
+
+### Check results
+
+| Check | Exit | Result |
+|---|---|---|
+| `npm ci --ignore-scripts` on the scratch tree | 0 | PASS |
+| `npm run typecheck` | 0 | PASS |
+| `npm run lint` | 0 | PASS, one existing warning in `termux-chrome.tsx:169` |
+| `npm run build` | 0 | PASS. `db:migrate` skipped because `DATABASE_URL` is unset |
+| `npm test` | 0 | PASS, 296 tests, 0 fail, 0 skipped |
+| Lane 2/3/4 unit tests (not wired into `npm test`) | 0 | PASS, 34 tests, 0 fail, 0 skipped |
+| `node --test scripts/l4_click_voice.test.mjs` | 0 | PASS, 1 test, 0 skipped |
+| `node tests/e2e/l1_reels.e2e.mjs` | 0 | PASS |
+| `AURIC_E2E_URL=http://127.0.0.1:8080 node --test tests/e2e/l2_reel_look.e2e.mjs` | 0 | PASS, 1 test, 0 skipped |
+| `L3_E2E=1 AURIC_E2E_URL=http://127.0.0.1:8080 node --test tests/e2e/l3_*.e2e.mjs` | 0 | PASS, 7 tests, 0 skipped |
+| `AURIC_E2E_URL=http://127.0.0.1:8080 node --test tests/e2e/l4_clicker_sounds.e2e.mjs` | 0 | PASS, 1 test, 0 skipped |
+| FLIP 60fps gate | n/a (inside the L3 test) | PASS, mean 16.660 ms, p95 16.700 ms |
+| Pixel diff versus lane screenshot files | n/a | L1 strip and light 0%. L1 demo 0.1884%. L2 settings 4.19–7.37% (shimmer). L3 icon shots grew 1469px to 1567px. L4 file was not rewritten by its test. |
+| Pixel diff versus `auric-base` default captures | n/a | Folder list **2.5939% FAIL**. Timer 25.0149% (Lane 1 strips). |
+
+`npm test` runner totals, in order: scripts 199/199, app-data and auth 55/55, `test:auric` 31/31, `test:l1` 11/11.
+
+### Pixel diff by region
+
+Method: pngjs, RGBA channels must match exactly. Viewport 390×844 = 329160 pixels. Animations disabled. `auric-base` at `http://127.0.0.1:8090` (`e39aa55`). Integration at `http://127.0.0.1:8080` (scratch `8c3aa93`). Shots: `qa/shots/v2_base_folder_list.png`, `qa/shots/v2_integration_folder_list.png`, `qa/shots/v2_diff_folder_list.png`.
+
+Folder list: **8538/329160 = 2.5939%**. Four changed regions, and they sum to 8538. Nothing else in the viewport changed.
+
+| Region | Box | Pixels | Percent | Cause |
+|---|---|---|---|---|
+| Status digit | x 281–288, y 202–213 (8×12) | 61 | 0.0185% | L4. `.tx-ok` reads `[ok] session started · folders 5 · no accounts` on base and `folders 6` on the integration. `clicker-sounds` is a free module. |
+| Layout menu | x 309–356, y 346–393 (48×48) | 2132 | 0.6477% | L3. `<button class="tx-folder-menu-button">` text `⋯`, box x=309 y=346 w=48 h=48. The same point on base is the prompt `~ $ ls folders`. Base has no menu button. |
+| Timer title | x 101–183, y 428–472 (83×45) | 3046 | 0.9254% | L3. `.tx-folder-name` "timer". See the ink rule below. |
+| Stopwatch title | x 101–200, y 525–561 (100×37) | 3299 | 1.0022% | L3. `.tx-folder-name` "stopwatch". Same ink rule. |
+
+Chrome band y 0–396 is 61+2132 = **2193 pixels = 0.6662%**. That is the number L3+L4 reported. It is the menu plus the digit, and it is under 1% by itself.
+
+Title ink is 3046+3299 = **6345 pixels = 1.9276%**. Dropping the digit still leaves 2.5753%. Dropping the menu still leaves 1.9462%. The ink alone is over 1%.
+
+Rows from y 562 through y 843 are **0 changed pixels**. That is not because those titles match. `.tx-actions` (HOME / CLOSE SESSION / MINIMIZE) sits at x=33 y=574.109 w=324 h=194 and covers them. `elementFromPoint(140, 631)` hits the HOME button. The alarm name is at y=630.875 and `clicker-sounds` is at y=728.875. Both compute to the same dark ink, and both are under the action bar in this viewport, so they add no pixels. Device at y=826.875 is the same.
+
+#### Why the titles change
+
+Both pages have `.tx-root[data-mood="light"]` and `--tx-ink: #161816` (rgb 22, 24, 22). The grid is `data-layout="big"`. Title font stays 14px with `text-transform: none`, so the grid-layout 16px uppercase rules do not apply.
+
+Matched `color` rules on the first `.tx-folder-name`, from Chrome's CSS agent:
+
+Base (`8090`):
+
+- `.tx-folder-name` → `var(--tx-ink)`
+- `.tx-folder-name` → `#f7fcff`
+
+The second rule wins. Computed color is `rgb(247, 252, 255)`. Computed shadow is the dark shadow from that same rule in `styles.css`.
+
+Integration (`8080`) has those two rules plus:
+
+```css
+.tx-root[data-mood="light"] .tx-folder-row .tx-folder-name,
+.tx-root[data-mood="light"] .tx-folder-row .tx-folder-state {
+  color: var(--tx-ink);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.62), 0 0 3px rgba(255, 255, 255, 0.18);
+}
+```
+
+That selector is in Lane 3's `src/styles/folders.css` (lines 163–167). Specificity beats the one-class `#f7fcff` rule. Computed color is `rgb(22, 24, 22)`. Computed shadow is `rgba(255, 255, 255, 0.62) 0px 1px 0px, rgba(255, 255, 255, 0.18) 0px 0px 3px`, which is that rule. The dirty boxes are taller than the 16px text line because the shadow changes with the fill.
+
+The page was already in light mood on `auric-base`. Lane 3's selector is what repaints the titles.
+
+#### Other pixel numbers
+
+Timer viewport: **82339/329160 = 25.0149%**, the same count as Run 1. Base timer has 0 strips and an empty `--laser-color`. Integration timer has 2 strips and `--laser-color: #FF0000`. The largest cluster is x 33–356, y 288–629, 78429 pixels (23.8270%), the reel block where the Lane 1 banks land. This is the strip, not a Lane 2 settings failure.
+
+Lane file diffs after the end-to-end run rewrote screenshots, versus the copies taken before that run:
+
+| File | Result |
+|---|---|
+| `app-builder-built-mobile.png` | 390×844, 0/329160 = 0.0000% |
+| `l1/laser_light.png` | 1280×3846, 0/4922880 = 0.0000% |
+| `l1/laser_strip.png` | 332×49, 0/16268 = 0.0000% |
+| `l1/laser_demo.png` | 1280×3846, 9275/4922880 = 0.1884% |
+| `l2/beam_on_dark.png` | 390×844, 24250/329160 = 7.3672% |
+| `l2/laser_settings.png` | 390×844, 22923/329160 = 6.9641% |
+| `l2/number_contrast.png` | 390×844, 13801/329160 = 4.1928% |
+| `l3/icons_3d.png` | size 324×1469 → 324×1567 |
+| `l3/icons_etched.png` | size 324×1469 → 324×1567 |
+| `l4/clicker_folder.png` | byte-identical to the committed file |
+
+The Lane 2 percentages move with the unfrozen `reel-look-breathe` phase. Lane 3's icon files are one row taller because `clicker-sounds` is in the grid. Lane 4's end-to-end file does not write `screenshots/l4/clicker_folder.png`, so the 0% result is the untouched committed file.
+
+### Raw output
+
+Full logs are under `auric-web/qa/logs/` with the `v2_` prefix. The blocks below are the complete short logs and the summary lines of the long ones.
+
+#### npm ci
+
+Command: `cd /tmp/auric_l5_scratch_v2/auric-web && npm ci --ignore-scripts`
+
+Exit: 0
+
+```
+npm warn deprecated recharts@2.15.4: 1.x and 2.x branches are no longer active. Bump to Recharts v3 to receive latest features and bugfixes. See https://github.com/recharts/recharts/wiki/3.0-migration-guide
+npm warn deprecated eslint@9.39.5: This version is no longer supported. Please see https://eslint.org/version-support for other options.
+
+added 425 packages, and audited 426 packages in 4s
+
+94 packages are looking for funding
+  run `npm fund` for details
+
+2 high severity vulnerabilities
+
+To address all issues, run:
+  npm audit fix
+
+Run `npm audit` for details.
+```
+
+#### typecheck
+
+Command: `npm run typecheck`
+
+Exit: 0
+
+```
+> typecheck
+> tsc --noEmit
+```
+
+#### lint
+
+Command: `npm run lint`
+
+Exit: 0
+
+```
+> lint
+> eslint .
+
+
+/tmp/auric_l5_scratch_v2/auric-web/src/components/auric/termux-chrome.tsx
+  169:17  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+✖ 1 problem (0 errors, 1 warning)
+```
+
+#### build
+
+Command: `npm run build`
+
+Exit: 0. Full log: `qa/logs/v2_build.txt`. Closing lines:
+
+```
+✓ built in 1.03s
+ℹ Generated .vercel/output/nitro.json
+
+[nitro] ✔ You can preview this build using npx vite preview
+[nitro] ✔ You can deploy this build using npx nitro deploy --prebuilt
+
+> db:migrate
+> node scripts/migrate.mjs
+
+[migrate] DATABASE_URL not set — skipping (the PGLite fallback migrates itself).
+```
+
+#### npm test
+
+Command: `npm test`
+
+Exit: 0. Full TAP: `qa/logs/v2_npm_test.txt`.
+
+```
+# tests 199
+# pass 199
+# fail 0
+# skipped 0
+
+# tests 55
+# pass 55
+# fail 0
+# skipped 0
+
+# tests 31
+# pass 31
+# fail 0
+# skipped 0
+
+# tests 11
+# pass 11
+# fail 0
+# skipped 0
+```
+
+#### Lane unit tests
+
+Command: the Lane 2, 3, and 4 unit files that `npm test` does not run.
+
+Exit: 0. Full TAP: `qa/logs/v2_lane_unit.txt`.
+
+```
+# tests 34
+# pass 34
+# fail 0
+# skipped 0
+```
+
+#### L4 script test
+
+Command: `node --test scripts/l4_click_voice.test.mjs`
+
+Exit: 0
+
+```
+TAP version 13
+# Subtest: L4 click voice, folder prefs, and catalog tests pass
+ok 1 - L4 click voice, folder prefs, and catalog tests pass
+1..1
+# tests 1
+# pass 1
+# fail 0
+# skipped 0
+```
+
+#### L1 end to end
+
+Command: `node tests/e2e/l1_reels.e2e.mjs`
+
+Exit: 0
+
+```
+{"perfNormal":{"medianMs":16.69999999999891,"p95Ms":16.700000000000728},"perfThrottled":{"medianMs":16.69999999999891,"p95Ms":16.700000000000728}}
+```
+
+#### L2 end to end
+
+Command: `AURIC_E2E_URL=http://127.0.0.1:8080 node --test tests/e2e/l2_reel_look.e2e.mjs`
+
+Exit: 0
+
+```
+TAP version 13
+# L2 motion median=16.70ms p95=16.70ms frames=61
+# L2 apply frames=1 css=\#AABBCC beam=\#AABBCC
+# Subtest: Laser & Numbers drafts, applies, discards, persists, and fits all target widths
+ok 1 - Laser & Numbers drafts, applies, discards, persists, and fits all target widths
+1..1
+# tests 1
+# pass 1
+# fail 0
+# skipped 0
+```
+
+#### L3 end to end
+
+Command: `L3_E2E=1 AURIC_E2E_URL=http://127.0.0.1:8080 node --test tests/e2e/l3_*.e2e.mjs`
+
+Exit: 0. Full TAP: `qa/logs/v2_l3_e2e.txt`.
+
+```
+# L3 layout FLIP frame interval: mean=16.660ms median=16.700ms p95=16.700ms max=16.700ms samples=[16.567999999999984,16.59999999999991,16.59999999999991,16.59999999999991,16.59999999999991,16.59999999999991,16.59999999999991,16.600000000000136,16.699999999999818,16.700000000000045,16.700000000000045,16.700000000000045,16.700000000000045,16.700000000000045,16.700000000000045,16.700000000000045,16.700000000000045,16.700000000000045,16.700000000000045,16.700000000000045,16.700000000000045]
+ok 4 - L3 icon styles cover every glyph and etched text stays matte and readable
+# tests 7
+# pass 7
+# fail 0
+# skipped 0
+```
+
+#### L4 end to end
+
+Command: `AURIC_E2E_URL=http://127.0.0.1:8080 node --test tests/e2e/l4_clicker_sounds.e2e.mjs`
+
+Exit: 0
+
+```
+TAP version 13
+# L4 click latency [{"hint":0.01,"output":0.032},{"hint":0.01,"output":0.032}]
+# Subtest: Clicker Sounds lists, selects, previews, and stays within the viewport
+ok 1 - Clicker Sounds lists, selects, previews, and stays within the viewport
+1..1
+# tests 1
+# pass 1
+# fail 0
+# skipped 0
+```
+
+#### Folder-list pixel compare
+
+```
+folder_list 390x844 changed=8538/329160 percent=2.5939
+  x=101-200 y=525-561 100x37 px=3299 pct=1.0022
+  x=101-183 y=428-472 83x45 px=3046 pct=0.9254
+  x=309-356 y=346-393 48x48 px=2132 pct=0.6477
+  x=281-288 y=202-213 8x12 px=61 pct=0.0185
+  clusterSum 8538 unclustered 0
+timer 390x844 changed=82339/329160 percent=25.0149
+```
+
+Mood and matched-style JSON: `qa/logs/v2_mood_base.json`, `qa/logs/v2_mood_integration.json`. Region boxes: `qa/logs/v2_regions_base.json`, `qa/logs/v2_regions_integration.json`. Cluster dump: `qa/logs/v2_pixel_regions.json`.

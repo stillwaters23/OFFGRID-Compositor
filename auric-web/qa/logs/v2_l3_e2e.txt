@@ -1,0 +1,46 @@
+TAP version 13
+# Subtest: L3 layout sheet, rename, size, and icon styles persist
+ok 1 - L3 layout sheet, rename, size, and icon styles persist
+  ---
+  duration_ms: 4832.484242
+  ...
+# Subtest: L3 layout flip is transform and opacity only and reduced motion is instant
+ok 2 - L3 layout flip is transform and opacity only and reduced motion is instant
+  ---
+  duration_ms: 2673.431865
+  ...
+# L3 layout FLIP frame interval: mean=16.660ms median=16.700ms p95=16.700ms max=16.700ms samples=[16.567999999999984,16.59999999999991,16.59999999999991,16.59999999999991,16.59999999999991,16.59999999999991,16.59999999999991,16.600000000000136,16.699999999999818,16.700000000000045,16.700000000000045,16.700000000000045,16.700000000000045,16.700000000000045,16.700000000000045,16.700000000000045,16.700000000000045,16.700000000000045,16.700000000000045,16.700000000000045,16.700000000000045]
+# Subtest: L3 body long-press opens size and label long-press handles rename and keyboard parity
+ok 3 - L3 body long-press opens size and label long-press handles rename and keyboard parity
+  ---
+  duration_ms: 6270.357319
+  ...
+# Subtest: L3 icon styles cover every glyph and etched text stays matte and readable
+ok 4 - L3 icon styles cover every glyph and etched text stays matte and readable
+  ---
+  duration_ms: 6159.464126
+  ...
+# Subtest: L3 overflow matrix keeps folder controls within the viewport
+ok 5 - L3 overflow matrix keeps folder controls within the viewport
+  ---
+  duration_ms: 98606.275783
+  ...
+# Subtest: L3 drag snap-back stays in the viewport at every sampled frame
+ok 6 - L3 drag snap-back stays in the viewport at every sampled frame
+  ---
+  duration_ms: 15621.13614
+  ...
+# Subtest: L3 reorder persists and reduced-motion snap-back is immediate
+ok 7 - L3 reorder persists and reduced-motion snap-back is immediate
+  ---
+  duration_ms: 3169.067944
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 99003.744953

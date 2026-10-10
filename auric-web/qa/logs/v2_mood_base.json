@@ -1,0 +1,85 @@
+{
+  "url": "http://127.0.0.1:8090",
+  "info": {
+    "rootMood": "light",
+    "rootGlow": "on",
+    "htmlDataset": {},
+    "bodyDataset": {},
+    "ink": "#161816",
+    "docInk": "",
+    "gridLayout": null,
+    "gridCount": 15,
+    "names": [
+      {
+        "text": "timer",
+        "className": "tx-folder-name",
+        "color": "rgb(247, 252, 255)",
+        "fontSize": "14px",
+        "fontFamily": "\"Courier Prime\", \"Courier New\", ui-monospace, monospace",
+        "textTransform": "none",
+        "textShadow": "rgba(0, 0, 0, 0.92) 0px 1px 2px, rgba(0, 0, 0, 0.7) 0px 0px 8px",
+        "parentClass": "tx-folder-copy"
+      },
+      {
+        "text": "stopwatch",
+        "className": "tx-folder-name",
+        "color": "rgb(247, 252, 255)",
+        "fontSize": "14px",
+        "fontFamily": "\"Courier Prime\", \"Courier New\", ui-monospace, monospace",
+        "textTransform": "none",
+        "textShadow": "rgba(0, 0, 0, 0.92) 0px 1px 2px, rgba(0, 0, 0, 0.7) 0px 0px 8px",
+        "parentClass": "tx-folder-copy"
+      },
+      {
+        "text": "alarm",
+        "className": "tx-folder-name",
+        "color": "rgb(247, 252, 255)",
+        "fontSize": "14px",
+        "fontFamily": "\"Courier Prime\", \"Courier New\", ui-monospace, monospace",
+        "textTransform": "none",
+        "textShadow": "rgba(0, 0, 0, 0.92) 0px 1px 2px, rgba(0, 0, 0, 0.7) 0px 0px 8px",
+        "parentClass": "tx-folder-copy"
+      },
+      {
+        "text": "device",
+        "className": "tx-folder-name",
+        "color": "rgb(247, 252, 255)",
+        "fontSize": "14px",
+        "fontFamily": "\"Courier Prime\", \"Courier New\", ui-monospace, monospace",
+        "textTransform": "none",
+        "textShadow": "rgba(0, 0, 0, 0.92) 0px 1px 2px, rgba(0, 0, 0, 0.7) 0px 0px 8px",
+        "parentClass": "tx-folder-copy"
+      },
+      {
+        "text": "tutorial",
+        "className": "tx-folder-name",
+        "color": "rgb(247, 252, 255)",
+        "fontSize": "14px",
+        "fontFamily": "\"Courier Prime\", \"Courier New\", ui-monospace, monospace",
+        "textTransform": "none",
+        "textShadow": "rgba(0, 0, 0, 0.92) 0px 1px 2px, rgba(0, 0, 0, 0.7) 0px 0px 8px",
+        "parentClass": "tx-folder-copy"
+      },
+      {
+        "text": "themes",
+        "className": "tx-folder-name is-locked",
+        "color": "rgb(255, 208, 212)",
+        "fontSize": "14px",
+        "fontFamily": "\"Courier Prime\", \"Courier New\", ui-monospace, monospace",
+        "textTransform": "none",
+        "textShadow": "rgba(0, 0, 0, 0.92) 0px 1px 2px, rgba(80, 0, 8, 0.7) 0px 0px 8px",
+        "parentClass": "tx-folder-copy"
+      }
+    ]
+  },
+  "colorRules": [
+    {
+      "selector": ".tx-folder-name",
+      "value": "var(--tx-ink)"
+    },
+    {
+      "selector": ".tx-folder-name",
+      "value": "#f7fcff"
+    }
+  ]
+}
