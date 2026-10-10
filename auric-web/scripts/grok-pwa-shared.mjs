@@ -4,7 +4,10 @@
  * and the Nitro bundler can both consume it.
  */
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const WORKSPACE_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 export const DEFAULT_APP_NAME = "Grok App";
 export const OG_SERVICE_URL_DEFAULT = "https://og.grok.me";
@@ -151,31 +154,71 @@ export function stripInstallParams(url) {
   return rest ? `${path}?${rest}` : path;
 }
 
-export function renderInstallPageHtml(template, { host, url } = {}) {
+const FALLBACK_MANIFEST_ICONS = [
+  {
+    src: "/__grok/icon-180.png",
+    sizes: "180x180",
+    type: "image/png",
+  },
+];
+
+/**
+ * Installed identity from `public/brand/brand.json`. A published host slug is
+ * only a fallback for a workspace that has not shipped that file.
+ */
+export function readBrandIdentity(root = WORKSPACE_ROOT) {
+  try {
+    const parsed = JSON.parse(readFileSync(join(root, "public/brand/brand.json"), "utf8"));
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+    const name = typeof parsed.name === "string" ? parsed.name.trim() : "";
+    const shortName = typeof parsed.shortName === "string" ? parsed.shortName.trim() : "";
+    const icons = Array.isArray(parsed.icons)
+      ? parsed.icons
+          .filter(
+            (icon) =>
+              icon &&
+              typeof icon.src === "string" &&
+              typeof icon.sizes === "string" &&
+              typeof icon.type === "string",
+          )
+          .map((icon) => {
+            const entry = { src: icon.src, sizes: icon.sizes, type: icon.type };
+            if (typeof icon.purpose === "string" && icon.purpose) entry.purpose = icon.purpose;
+            return entry;
+          })
+      : [];
+    if (!name && !shortName && icons.length === 0) return null;
+    return { name, shortName, icons };
+  } catch {
+    return null;
+  }
+}
+
+export function renderInstallPageHtml(template, { host, url, root = WORKSPACE_ROOT } = {}) {
+  const identity = readBrandIdentity(root);
+  const appName = identity?.name || appNameFromHost(host);
   return String(template)
-    .replaceAll("{{APP_NAME}}", escapeHtml(appNameFromHost(host)))
+    .replaceAll("{{APP_NAME}}", escapeHtml(appName))
     .replaceAll("{{APP_URL}}", escapeHtml(stripInstallParams(url)));
 }
 
-export function renderWebManifest(hostHeader) {
-  const name = appNameFromHost(hostHeader);
+export function renderWebManifest(hostHeader, root = WORKSPACE_ROOT) {
+  const identity = readBrandIdentity(root);
+  const fallback = appNameFromHost(hostHeader);
+  const name = identity?.name || fallback;
+  const shortName = identity?.shortName || name;
+  const icons = identity?.icons?.length ? identity.icons : FALLBACK_MANIFEST_ICONS;
   return JSON.stringify(
     {
       name,
-      short_name: name,
+      short_name: shortName,
       id: "/",
       start_url: "/",
       scope: "/",
       display: "standalone",
       background_color: "#000000",
       theme_color: "#000000",
-      icons: [
-        {
-          src: "/__grok/icon-180.png",
-          sizes: "180x180",
-          type: "image/png",
-        },
-      ],
+      icons,
     },
     null,
     2,

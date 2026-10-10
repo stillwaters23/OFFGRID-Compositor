@@ -1,5 +1,6 @@
 import { useState, type CSSProperties } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { DrumReel } from "@/components/auric/drum-reel";
 import { SpanReels } from "@/components/auric/span-reels";
 import { LASER_PRESETS, laserVariables } from "@/lib/laser";
 import type { Span } from "@/lib/format";
@@ -108,7 +109,30 @@ function LaserDemo() {
           )),
         )}
       </section>
+      <ApertureWitness />
     </main>
+  );
+}
+
+function ApertureWitness() {
+  const [value, setValue] = useState(0);
+  return (
+    <section className="mx-auto mt-8 w-full max-w-6xl" aria-label="Default reel witness">
+      <h2 className="mb-2 text-sm font-semibold">Default selector</h2>
+      <p className="mb-3 text-sm text-muted">
+        Pavilion SoundDeck uses this same default. The aperture and its arrows stay.
+      </p>
+      <div className="flex justify-center" data-l1-aperture-witness>
+        <DrumReel
+          size="plaque"
+          count={3}
+          value={value}
+          labels={["House", "Click", "Cut"]}
+          pad={0}
+          onChange={setValue}
+        />
+      </div>
+    </section>
   );
 }
 

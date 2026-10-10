@@ -57,7 +57,7 @@ def main():
     assert outside==0,'Maskable identity escapes safe circle'
     manifest=json.loads(subprocess.check_output(['node','--input-type=module','-e',
         'import {renderWebManifest} from "./scripts/grok-pwa-shared.mjs"; process.stdout.write(renderWebManifest("auric.example"));'],cwd=ROOT,text=True))
-    assert manifest['short_name']=='AURIC' and len(manifest['icons'])==3
+    assert manifest['short_name']=='Auric' and len(manifest['icons'])==3
     for icon in manifest['icons']:
         path=PUBLIC/icon['src'].lstrip('/')
         with Image.open(path) as image: assert icon['sizes']==f'{image.width}x{image.height}' and icon['type']=='image/png'

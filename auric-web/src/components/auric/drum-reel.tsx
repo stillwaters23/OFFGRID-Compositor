@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { controlById } from "@/lib/controls";
-import { reelGeometry } from "@/lib/reel-geometry";
+import { reelGeometry, rowsCrossed } from "@/lib/reel-geometry";
 import { useAuric } from "@/lib/store";
 import { cn, wrapIndex } from "@/lib/utils";
 
@@ -98,12 +98,16 @@ export function DrumReel({
     }
   }, [value, paint]);
 
+  function setSettled(settled: boolean) {
+    wrapRef.current?.setAttribute("data-reel-settled", settled ? "1" : "0");
+  }
+
   function emitIfNeeded() {
+    const steps = rowsCrossed(lastTickPosition.current, pos.current);
+    if (steps === 0) return;
     const target = Math.round(pos.current);
-    const crossed = target - lastTickPosition.current;
-    if (crossed === 0) return;
-    const direction = Math.sign(crossed);
-    for (let step = 1; step <= Math.abs(crossed); step += 1) {
+    const direction = Math.sign(target - lastTickPosition.current);
+    for (let step = 1; step <= steps; step += 1) {
       lastTick.current = wrapIndex(lastTickPosition.current + direction, config.current.count);
       lastTickPosition.current += direction;
       onTickRef.current?.();
@@ -120,6 +124,7 @@ export function DrumReel({
       pos.current = Math.round(pos.current);
       emitIfNeeded();
       paint();
+      setSettled(true);
       return;
     }
     vel.current *= 0.94;
@@ -132,18 +137,21 @@ export function DrumReel({
         vel.current = 0;
         emitIfNeeded();
         paint();
+        setSettled(true);
         return;
       }
       pos.current += diff * 0.22;
     }
     emitIfNeeded();
     paint();
+    setSettled(false);
     raf.current = requestAnimationFrame(loop);
   }
 
   function onPointerDown(e: React.PointerEvent) {
     if (disabled) return;
     dragging.current = true;
+    setSettled(false);
     lastY.current = e.clientY;
     lastT.current = performance.now();
     vel.current = 0;
@@ -180,6 +188,7 @@ export function DrumReel({
     if (disabled) return;
     e.preventDefault();
     if (e.deltaY === 0) return;
+    setSettled(false);
     pos.current += e.deltaY > 0 ? 0.35 : -0.35;
     emitIfNeeded();
     paint();
@@ -199,7 +208,10 @@ export function DrumReel({
       cancelAnimationFrame(raf.current);
     };
   }, []);
-  useEffect(() => { paint(); }, [count, radius, labels, pad, paint]);
+  useEffect(() => {
+    paint();
+    setSettled(true);
+  }, [count, radius, labels, pad, paint]);
   useEffect(() => {
     const barrel = barrelRef.current;
     if (!barrel || typeof ResizeObserver === "undefined") return;
@@ -277,6 +289,7 @@ export function DrumReel({
             pos.current = lastTick.current;
             lastTickPosition.current = pos.current;
             paint();
+            setSettled(true);
           }}
           tabIndex={disabled ? -1 : 0}
           onKeyDown={(event) => {
@@ -289,6 +302,7 @@ export function DrumReel({
             pos.current = event.key === "Home" ? 0 : event.key === "End" ? count - 1 : Math.round(pos.current) + steps[event.key]!;
             emitIfNeeded();
             paint();
+            setSettled(true);
           }}
           role="slider"
           aria-valuemin={0}

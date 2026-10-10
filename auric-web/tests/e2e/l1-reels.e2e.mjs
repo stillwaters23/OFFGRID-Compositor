@@ -21,6 +21,21 @@ await page.route("https://grok.com/grok-app-builder/extensions.js", (route) =>
   route.fulfill({ status: 200, contentType: "text/javascript", body: "" }),
 );
 
+async function waitForSettledValue(page, slider) {
+  const handle = await slider.elementHandle();
+  await page
+    .waitForFunction((element) => element.getAttribute("data-reel-settled") === "0", handle, {
+      timeout: 1000,
+    })
+    .catch(() => undefined);
+  await page.waitForFunction(
+    (element) => element.getAttribute("data-reel-settled") === "1",
+    handle,
+    { timeout: 5000 },
+  );
+  return Number(await slider.getAttribute("aria-valuenow"));
+}
+
 try {
   await page.goto(`${baseUrl}/laser-demo`, { waitUntil: "domcontentloaded" });
   await page.getByRole("heading", { name: "Laser Strip Lab" }).waitFor();
@@ -32,6 +47,8 @@ try {
   assert.equal(await page.locator(".l1-demo-sample").count(), 15);
   assert.equal(await page.locator(".laser-strip").count(), 30);
   assert.equal(await page.locator(".l1-demo-sample .aperture").count(), 0);
+  assert.equal(await page.locator("[data-l1-aperture-witness] .aperture").count(), 1);
+  assert.equal(await page.locator("[data-l1-aperture-witness] .barrel").count(), 1);
   assert.equal(await page.locator('a[href="/laser-demo"]').count(), 0);
 
   mkdirSync(resolve("screenshots/l1"), { recursive: true });
@@ -114,6 +131,43 @@ try {
   );
   assert.ok(bloomSaturation >= 0.6, "bloom 8px above the core must stay saturated");
   assert.ok(edgeDifference < 0.05, "bloom must fade below 5% at the spread edge");
+  const glyphShot = await page
+    .locator(
+      '.l1-demo-sample[data-laser-color="red"][data-laser-intensity="100"] [data-selected="1"]',
+    )
+    .first()
+    .screenshot();
+  const glyph = await page.evaluate(async (bytes) => {
+    const image = new Image();
+    image.src = `data:image/png;base64,${bytes}`;
+    await image.decode();
+    const canvas = document.createElement("canvas");
+    canvas.width = image.width;
+    canvas.height = image.height;
+    const context = canvas.getContext("2d");
+    context.drawImage(image, 0, 0);
+    const y0 = Math.floor(image.height * 0.35);
+    const y1 = Math.ceil(image.height * 0.65);
+    let best = [0, 0, 0];
+    let bestScore = -1;
+    for (let y = y0; y < y1; y += 1) {
+      const row = context.getImageData(0, y, image.width, 1).data;
+      for (let x = 0; x < image.width; x += 1) {
+        const index = x * 4;
+        const rgb = [row[index], row[index + 1], row[index + 2]];
+        const score = rgb[0] + rgb[1] + rgb[2];
+        if (score > bestScore) {
+          best = rgb;
+          bestScore = score;
+        }
+      }
+    }
+    return best;
+  }, glyphShot.toString("base64"));
+  assert.ok(
+    glyph.every((channel) => channel >= 240),
+    `selected glyph over the beam must stay near white, got ${glyph.join(",")}`,
+  );
   await page.getByRole("button", { name: "light mood" }).click();
   await page.screenshot({ path: "screenshots/l1/laser-light.png", fullPage: true });
   await page.getByRole("button", { name: "dark mood" }).click();
@@ -352,17 +406,35 @@ try {
     afterDrag + 5,
     "five keyboard rows must tick five times",
   );
-  const beforeWheel = Number(await tickOutput.textContent());
   const minuteReel = sample.getByRole("slider", { name: "Minutes" });
+  const minuteBefore = Number(await minuteReel.getAttribute("aria-valuenow"));
+  const beforeWheel = Number(await tickOutput.textContent());
   const minuteBox = await minuteReel.boundingBox();
   await page.mouse.move(minuteBox.x + minuteBox.width / 2, minuteBox.y + minuteBox.height / 2);
   await page.mouse.wheel(0, 120);
-  await page.waitForFunction(
-    (previous) =>
-      Number(document.querySelector(".l1-demo-sample [data-l1-ticks]")?.textContent) > previous,
-    beforeWheel,
+  const minuteAfter = await waitForSettledValue(page, minuteReel);
+  const wheelTicks = Number(await tickOutput.textContent()) - beforeWheel;
+  const minuteRows = (minuteAfter - minuteBefore + 60) % 60;
+  assert.equal(wheelTicks, minuteRows, "wheel ticks must match each changed minute row");
+  assert.ok(wheelTicks > 0, "wheel rows must emit ticks");
+
+  const secondsReel = sample.getByRole("slider", { name: "Seconds" });
+  const secondsBefore = Number(await secondsReel.getAttribute("aria-valuenow"));
+  const beforeFling = Number(await tickOutput.textContent());
+  const secondsBox = await secondsReel.boundingBox();
+  await page.mouse.move(secondsBox.x + secondsBox.width / 2, secondsBox.y + secondsBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(
+    secondsBox.x + secondsBox.width / 2,
+    secondsBox.y + secondsBox.height / 2 - 84,
+    { steps: 4 },
   );
-  assert.ok(Number(await tickOutput.textContent()) > beforeWheel, "wheel rows must emit ticks");
+  await page.mouse.up();
+  const secondsAfter = await waitForSettledValue(page, secondsReel);
+  const flingTicks = Number(await tickOutput.textContent()) - beforeFling;
+  const secondRows = (secondsAfter - secondsBefore + 60) % 60;
+  assert.equal(flingTicks, secondRows, "fling ticks must match each changed second row");
+  assert.ok(flingTicks > 0, "fling rows must emit ticks");
 
   await page.addStyleTag({
     content: ".l1-demo-sample:not(:first-child) { display: none !important; }",

@@ -35,3 +35,9 @@ export function reelGeometry({
   const radius = rowPitch / (2 * Math.sin((angle * Math.PI) / 360));
   return { fontSize, rowPitch, radius, rowCenter: safeHeight / 2 };
 }
+
+/** Integer rows a reel crosses between the last tick and the current position. */
+export function rowsCrossed(lastTickPosition: number, position: number): number {
+  if (!Number.isFinite(lastTickPosition) || !Number.isFinite(position)) return 0;
+  return Math.abs(Math.round(position) - lastTickPosition);
+}
