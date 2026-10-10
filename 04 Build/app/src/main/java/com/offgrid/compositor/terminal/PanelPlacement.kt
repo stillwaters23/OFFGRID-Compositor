@@ -4,6 +4,9 @@ import android.animation.ValueAnimator
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
+import android.view.View.IMPORTANT_FOR_ACCESSIBILITY_AUTO
+import android.view.View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+import android.view.View.VISIBLE
 import android.view.ViewConfiguration
 import android.view.View.OnTouchListener
 import android.widget.EditText

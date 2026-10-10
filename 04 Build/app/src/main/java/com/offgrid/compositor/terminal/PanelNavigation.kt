@@ -6,6 +6,10 @@ import android.animation.PropertyValuesHolder
 import android.animation.ValueAnimator
 import android.view.HapticFeedbackConstants
 import android.view.View
+import android.view.View.INVISIBLE
+import android.view.View.LAYER_TYPE_HARDWARE
+import android.view.View.LAYER_TYPE_NONE
+import android.view.View.VISIBLE
 import android.view.animation.DecelerateInterpolator
 import android.view.animation.LinearInterpolator
 import androidx.core.animation.doOnEnd

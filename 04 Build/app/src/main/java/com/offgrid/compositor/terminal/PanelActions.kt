@@ -4,6 +4,8 @@ import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import android.view.View
+import android.view.View.GONE
+import android.view.View.VISIBLE
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -282,3 +284,9 @@ internal fun TerminalPanel.markLine(folder: PanelFolder, item: ToggleItem): Stri
 }
 
 internal fun TerminalPanel.markText(mark: TestMark): String = context.getString(
+    when (mark) {
+        TestMark.NOT_TESTED -> R.string.terminal_not_tested
+        TestMark.SUCCESS -> R.string.terminal_success
+        TestMark.FAILED -> R.string.terminal_failed
+    },
+)

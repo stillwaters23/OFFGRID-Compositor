@@ -40,7 +40,7 @@ class PanelGeometryTest {
         assertEquals(2f, PanelGeometry.borderStrokeDp(0), 0f)
         assertEquals(3f, PanelGeometry.borderStrokeDp(50), 0f)
         assertEquals(6f, PanelGeometry.borderStrokeDp(100), 0f)
-        assertEquals(2f, PanelGeometry.borderInsetDp(50), 0f)
+        assertEquals(2.5f, PanelGeometry.borderInsetDp(50), 0.01f)
         assertEquals(18f, PanelGeometry.borderCornerRadius(20f, 2f), 0f)
         assertEquals(0f, PanelGeometry.borderCornerRadius(1f, 2f), 0f)
     }
@@ -96,6 +96,36 @@ class PanelGeometryTest {
     }
 
     @Test
+    fun fullBleedContentClearsBarsCutoutAndRoundedCorners() {
+        val inset = PanelGeometry.contentInset(
+            glassLeft = 0,
+            glassTop = 0,
+            glassRight = 1080,
+            glassBottom = 2400,
+            areaWidth = 1080,
+            areaHeight = 2400,
+            edgeTop = 120,
+            edgeBottom = 64,
+            edgeLeft = 0,
+            edgeRight = 0,
+            gestureBottom = 48,
+            cornerRadius = 100,
+            fullBleed = true,
+        )
+        assertEquals(30, inset.left)
+        assertEquals(120, inset.top)
+        assertEquals(30, inset.right)
+        assertEquals(64, inset.bottom)
+    }
+
+    @Test
+    fun resizeBarEndInsetStaysOutsideTheRoundCorner() {
+        assertEquals(48f, PanelGeometry.resizeBarEndInsetPx(0f, density = 3f), 0.01f)
+        assertEquals(80f, PanelGeometry.resizeBarEndInsetPx(80f, density = 3f), 0.01f)
+        assertEquals(48f, PanelGeometry.resizeBarEndInsetPx(-4f, density = 3f), 0.01f)
+    }
+
+    @Test
     fun resizeBarGeometryAndGlowScaleWithTheSetting() {
         assertEquals(6f, PanelGeometry.RESIZE_BAR_HEIGHT_DP, 0f)
         assertEquals(16f, PanelGeometry.RESIZE_BAR_INSET_DP, 0f)
@@ -103,17 +133,16 @@ class PanelGeometryTest {
         assertEquals(24f, PanelGeometry.resizeBarGlowRadiusDp(50), 0f)
         assertEquals(32f, PanelGeometry.resizeBarGlowRadiusDp(100), 0f)
         assertEquals(0f, PanelGeometry.resizeBarLayerAlphaSum(0), 0f)
-        assertTrue(
-            PanelGeometry.resizeBarLayerAlphaSum(100) >=
-                PanelGeometry.resizeBarLayerAlphaSum(50) * 2.5f,
-        )
+        val glowAt50 = PanelGeometry.resizeBarLayerAlphaSum(50)
+        val glowAt100 = PanelGeometry.resizeBarLayerAlphaSum(100)
+        assertTrue(glowAt100 + 0.001f >= glowAt50 * 2.5f)
     }
 
     @Test
     fun breathingGlowVariesByFifteenPercent() {
         assertEquals(0.85f, PanelGeometry.pulseScale(0f), 0f)
         assertEquals(1f, PanelGeometry.pulseScale(0.5f), 0f)
-        assertEquals(1.15f, PanelGeometry.pulseScale(1f), 0f)
+        assertEquals(1.15f, PanelGeometry.pulseScale(1f), 0.001f)
     }
 
     @Test

@@ -37,6 +37,10 @@ internal class TopBar(
     private val microphone = QuickToggleView(context, true, prefs.toggle(FxKeys.MIC_ON, false))
     private val moreButton: View
     private val shrinkButton: View
+    private val widthCaption: TextView
+    private val heightCaption: TextView
+    private val widthPlate: GradientDrawable
+    private val heightPlate: GradientDrawable
     private var currentWidth = width
     private var currentHeight = height
     private var laidOutWidth = 0
@@ -73,14 +77,18 @@ internal class TopBar(
         addControl(microphone, controlWidth)
 
         widthInput = dimensionInput(context, "Width", width) { onDimensionChanged(LookKeys.WIDTH, it) }
-        widthControl = dimensionControl(context, "W", widthInput)
+        widthCaption = dimensionCaption(context, "W")
+        widthPlate = dimensionPlate(context)
+        widthControl = dimensionControl(context, widthCaption, widthPlate, widthInput)
         addControl(widthControl, controlWidth)
         heightInput = dimensionInput(context, "Height", height) { onDimensionChanged(LookKeys.HEIGHT, it) }
-        heightControl = dimensionControl(context, "H", heightInput)
+        heightCaption = dimensionCaption(context, "H")
+        heightPlate = dimensionPlate(context)
+        heightControl = dimensionControl(context, heightCaption, heightPlate, heightInput)
         addControl(heightControl, controlWidth)
 
         moreButton = MoreButton(context).apply {
-            contentDescription = context.getString(R.string.terminal_view_options)
+            contentDescription = context.getString(R.string.terminal_menu_button)
             setOnClickListener { showViewMenu(this, onViewModeChanged) }
         }
         addControl(moreButton, controlWidth)
@@ -129,6 +137,15 @@ internal class TopBar(
         titleView.setTextColor(look.text)
         widthInput.setTextColor(look.text)
         heightInput.setTextColor(look.text)
+        widthCaption.setTextColor(look.text)
+        heightCaption.setTextColor(look.text)
+        widthPlate.setColor(look.skin)
+        heightPlate.setColor(look.skin)
+        val stroke = Hud.dpi(context, 1f).coerceAtLeast(1)
+        widthPlate.setStroke(stroke, look.edge)
+        heightPlate.setStroke(stroke, look.edge)
+        camera.applyAccent(look.edge, look.outerGlow)
+        microphone.applyAccent(look.edge, look.outerGlow)
     }
 
     private fun showViewMenu(anchor: View, onViewModeChanged: (Int) -> Unit) {
@@ -152,7 +169,7 @@ internal class TopBar(
         fontFeatureSettings = "tnum"
         includeFontPadding = false
         textSize = 11f
-        setTextColor(NeonPalette.BLACKLIGHT_WHITE)
+        setTextColor(Hud.WHITE)
         gravity = Gravity.CENTER
         inputType = InputType.TYPE_CLASS_NUMBER
         filters = arrayOf(InputFilter.LengthFilter(3))
@@ -178,26 +195,35 @@ internal class TopBar(
         }
     }
 
-    private fun dimensionControl(context: Context, caption: String, field: EditText) =
-        FrameLayout(context).apply {
-            foreground = InsetDrawable(GradientDrawable().apply {
-                setColor(Hud.INK)
-                cornerRadius = Hud.dp(context, 4f)
-                setStroke(Hud.dpi(context, 1f), NeonPalette.UV_VIOLET)
-            }, Hud.dpi(context, 4f), Hud.dpi(context, 4f), Hud.dpi(context, 4f), Hud.dpi(context, 4f))
-            addView(TextView(context).apply {
-                text = caption
-                typeface = Hud.monoBold(context)
-                textSize = 9f
-                includeFontPadding = false
-                setTextColor(NeonPalette.CYAN_GLOW)
-                gravity = Gravity.CENTER
-                importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
-            }, FrameLayout.LayoutParams(Hud.dpi(context, 12f), ViewGroup.LayoutParams.MATCH_PARENT, Gravity.START))
-            addView(field, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT).apply {
-                marginStart = Hud.dpi(context, 12f)
-            })
-        }
+    private fun dimensionCaption(context: Context, caption: String) = TextView(context).apply {
+        text = caption
+        typeface = Hud.monoBold(context)
+        textSize = 9f
+        includeFontPadding = false
+        setTextColor(Hud.WHITE)
+        gravity = Gravity.CENTER
+        importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
+    }
+
+    private fun dimensionPlate(context: Context) = GradientDrawable().apply {
+        setColor(Hud.INK)
+        cornerRadius = Hud.dp(context, 4f)
+        setStroke(Hud.dpi(context, 1f).coerceAtLeast(1), NeonPalette.CYAN_GLOW)
+    }
+
+    private fun dimensionControl(
+        context: Context,
+        caption: TextView,
+        plate: GradientDrawable,
+        field: EditText,
+    ) = FrameLayout(context).apply {
+        val inset = Hud.dpi(context, 4f)
+        foreground = InsetDrawable(plate, inset, inset, inset, inset)
+        addView(caption, FrameLayout.LayoutParams(Hud.dpi(context, 12f), ViewGroup.LayoutParams.MATCH_PARENT, Gravity.START))
+        addView(field, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT).apply {
+            marginStart = Hud.dpi(context, 12f)
+        })
+    }
 
     private companion object {
         const val CONTROL_HEIGHT_DP = 40f

@@ -27,7 +27,7 @@ internal class GlowScrollBar(context: Context, private val scrollView: ScrollVie
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
         alpha = 0f
         visibility = INVISIBLE
-        scrollView.setOnScrollChangeListener { _, _, _, _, _ -> reveal() }
+        scrollView.setOnScrollChangeListener { _, _, _, _, _ -> noteScroll() }
     }
 
     override fun onDraw(canvas: Canvas) {
@@ -38,12 +38,17 @@ internal class GlowScrollBar(context: Context, private val scrollView: ScrollVie
         val thumbWidth = Hud.dp(context, 8f)
         val left = if (layoutDirection == LAYOUT_DIRECTION_RTL) 0f else width - thumbWidth
         trackRect.set(left + (thumbWidth - trackWidth) / 2f, 0f, left + (thumbWidth + trackWidth) / 2f, height.toFloat())
-        val thumbHeight = PanelGeometry.scrollThumbHeight(height, total, Hud.dp(context, 32f))
+        val thumbHeight = PanelGeometry.scrollThumbHeight(height, total, Hud.dpi(context, 32f))
         val top = PanelGeometry.scrollThumbTop(height, total, scrollView.scrollY, thumbHeight)
         thumbRect.set(left, top, left + thumbWidth, top + thumbHeight)
         canvas.drawRoundRect(trackRect, trackWidth, trackWidth, track)
         canvas.drawRoundRect(thumbRect, thumbWidth / 2f, thumbWidth / 2f, bloom)
         canvas.drawRoundRect(thumbRect, thumbWidth / 2f, thumbWidth / 2f, thumb)
+    }
+
+    /** The scroll listener calls this. A test can call it too, because Robolectric may not. */
+    internal fun noteScroll() {
+        if ((scrollView.getChildAt(0)?.height ?: 0) > scrollView.height) reveal()
     }
 
     private fun reveal() {
@@ -85,7 +90,7 @@ internal class GlowScrollBar(context: Context, private val scrollView: ScrollVie
             }
             MotionEvent.ACTION_MOVE -> if (dragging) {
                 val childHeight = scrollView.getChildAt(0)?.height ?: height
-                val thumbHeight = PanelGeometry.scrollThumbHeight(height, childHeight, Hud.dp(context, 32f))
+                val thumbHeight = PanelGeometry.scrollThumbHeight(height, childHeight, Hud.dpi(context, 32f))
                 val trackTravel = (height - thumbHeight).coerceAtLeast(1f)
                 val top = (event.y - touchOffset).coerceIn(0f, trackTravel)
                 scrollView.scrollTo(0, ((childHeight - height) * top / trackTravel).toInt())

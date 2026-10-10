@@ -7,6 +7,12 @@ import android.graphics.Paint
 import android.view.View
 import android.view.animation.PathInterpolator
 
+/**
+ * Camera and microphone controls in the top bar.
+ *
+ * Each one is a coded power button: a black disc, a glowing ring, and a white symbol.
+ * The symbol says which control it is. Nothing is loaded from a picture.
+ */
 internal class QuickToggleView(
     context: Context,
     private val microphone: Boolean,
@@ -16,11 +22,14 @@ internal class QuickToggleView(
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
         strokeJoin = Paint.Join.ROUND
-        strokeWidth = Hud.dp(context, 2f)
     }
+    private val disc = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+    private val stamp = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private var on = initialOn
     private var slashProgress = if (initialOn) 0f else 1f
     private var slashAnimator: ValueAnimator? = null
+    private var accent = NeonPalette.CYAN_GLOW
+    private var halo = NeonPalette.ELECTRIC_PURPLE
     var onChanged: ((Boolean) -> Unit)? = null
 
     init {
@@ -28,28 +37,32 @@ internal class QuickToggleView(
         isFocusable = true
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES
         updateDescription()
-        updateAppearance()
         setOnClickListener { setOn(!on, notify = true) }
+    }
+
+    fun applyAccent(edge: Int, haloColor: Int) {
+        accent = edge
+        halo = haloColor
+        invalidate()
     }
 
     fun setOn(value: Boolean, notify: Boolean = false) {
         if (on == value && slashProgress == if (value) 0f else 1f) return
         on = value
         updateDescription()
-        updateAppearance()
         slashAnimator?.cancel()
         if (!ValueAnimator.areAnimatorsEnabled()) {
             slashProgress = if (value) 0f else 1f
             invalidate()
         } else {
             slashAnimator = ValueAnimator.ofFloat(slashProgress, if (value) 0f else 1f).apply {
-            duration = 160L
-            interpolator = PathInterpolator(0.2f, 0f, 0f, 1f)
-            addUpdateListener {
-                slashProgress = it.animatedValue as Float
-                invalidate()
-            }
-            start()
+                duration = 160L
+                interpolator = PathInterpolator(0.2f, 0f, 0f, 1f)
+                addUpdateListener {
+                    slashProgress = it.animatedValue as Float
+                    invalidate()
+                }
+                start()
             }
         }
         if (notify) onChanged?.invoke(value)
@@ -69,60 +82,69 @@ internal class QuickToggleView(
         }
     }
 
-    private fun updateAppearance() {
-        val color = if (on) 0xFF30FF7A.toInt() else 0xFFFF2D55.toInt()
-        line.color = color
-        line.setShadowLayer(if (on) Hud.dp(context, 5f) else 0f, 0f, 0f, color)
-    }
-
     override fun onDraw(canvas: Canvas) {
-        super.onDraw(canvas)
+        val size = minOf(width, height)
+        if (size <= 0) return
+        val left = (width - size) / 2f
+        val top = (height - size) / 2f
+        val layers = BioluminescentPowerIcon.layers(size, accent, halo, resources.displayMetrics.density)
+        if (layers != null) {
+            BioluminescentPowerIcon.paintLayers(canvas, left, top, layers, if (on) 1f else 0.28f, stamp)
+        }
         val centerX = width / 2f
         val centerY = height / 2f
-        val scale = Hud.dp(context, 1f)
-        if (microphone) {
-            canvas.drawRoundRect(
-                centerX - 5f * scale,
-                centerY - 12f * scale,
-                centerX + 5f * scale,
-                centerY + 5f * scale,
-                5f * scale,
-                5f * scale,
-                line,
-            )
-            canvas.drawArc(
-                centerX - 10f * scale,
-                centerY - 4f * scale,
-                centerX + 10f * scale,
-                centerY + 13f * scale,
-                0f,
-                180f,
-                false,
-                line,
-            )
-            canvas.drawLine(centerX, centerY + 13f * scale, centerX, centerY + 18f * scale, line)
-            canvas.drawLine(centerX - 6f * scale, centerY + 18f * scale, centerX + 6f * scale, centerY + 18f * scale, line)
-        } else {
-            canvas.drawRoundRect(
-                centerX - 15f * scale,
-                centerY - 10f * scale,
-                centerX + 15f * scale,
-                centerY + 10f * scale,
-                4f * scale,
-                4f * scale,
-                line,
-            )
-            canvas.drawCircle(centerX, centerY, 5f * scale, line)
-            canvas.drawCircle(centerX + 10f * scale, centerY - 6f * scale, 1.4f * scale, line)
-        }
+        val radius = size * BioluminescentPowerIcon.DISC_SHARE
+        disc.color = Hud.INK
+        canvas.drawCircle(centerX, centerY, radius, disc)
+        line.color = if (on) BioluminescentPowerIcon.hotCore(accent) else Hud.withAlpha(Hud.WHITE, 0.45f)
+        line.strokeWidth = radius * 0.16f
+        val unit = radius / 18f
+        if (microphone) drawMicrophone(canvas, centerX, centerY, unit) else drawCamera(canvas, centerX, centerY, unit)
         if (slashProgress > 0f) {
             canvas.drawLine(
-                centerX - 15f * scale,
-                centerY + 15f * scale,
-                centerX - 15f * scale + 30f * scale * slashProgress,
-                centerY + 15f * scale - 30f * scale * slashProgress,
+                centerX - 12f * unit,
+                centerY + 12f * unit,
+                centerX - 12f * unit + 24f * unit * slashProgress,
+                centerY + 12f * unit - 24f * unit * slashProgress,
                 line,
             )
         }
+    }
+
+    private fun drawMicrophone(canvas: Canvas, centerX: Float, centerY: Float, unit: Float) {
+        canvas.drawRoundRect(
+            centerX - 4f * unit,
+            centerY - 10f * unit,
+            centerX + 4f * unit,
+            centerY + 4f * unit,
+            4f * unit,
+            4f * unit,
+            line,
+        )
+        canvas.drawArc(
+            centerX - 8f * unit,
+            centerY - 3f * unit,
+            centerX + 8f * unit,
+            centerY + 10f * unit,
+            0f,
+            180f,
+            false,
+            line,
+        )
+        canvas.drawLine(centerX, centerY + 10f * unit, centerX, centerY + 14f * unit, line)
+        canvas.drawLine(centerX - 5f * unit, centerY + 14f * unit, centerX + 5f * unit, centerY + 14f * unit, line)
+    }
+
+    private fun drawCamera(canvas: Canvas, centerX: Float, centerY: Float, unit: Float) {
+        canvas.drawRoundRect(
+            centerX - 11f * unit,
+            centerY - 7f * unit,
+            centerX + 11f * unit,
+            centerY + 7f * unit,
+            3f * unit,
+            3f * unit,
+            line,
+        )
+        canvas.drawCircle(centerX, centerY, 3.5f * unit, line)
     }
 }

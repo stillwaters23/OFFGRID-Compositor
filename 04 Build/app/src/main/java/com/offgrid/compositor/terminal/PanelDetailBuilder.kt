@@ -137,10 +137,10 @@ internal fun TerminalPanel.folderHeading(folder: PanelFolder): View {
     val ringSize = dpi(60f)
     val ring = HoloRingView(context, folder.special)
     headingRing = ring
-    frame.addView(ring, LayoutParams(ringSize, ringSize, Gravity.CENTER))
+    frame.addView(ring, FrameLayout.LayoutParams(ringSize, ringSize, Gravity.CENTER))
     frame.addView(
         FolderIconView(context, folder.itemCount, folder.tag, compact = false, special = folder.special),
-        LayoutParams(dpi(42f), dpi(36f), Gravity.CENTER),
+        FrameLayout.LayoutParams(dpi(42f), dpi(36f), Gravity.CENTER),
     )
     row.addView(frame, LinearLayout.LayoutParams(ringSize, ringSize))
     val names = LinearLayout(context).apply {

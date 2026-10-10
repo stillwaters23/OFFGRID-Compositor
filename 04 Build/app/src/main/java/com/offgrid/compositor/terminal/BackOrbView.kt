@@ -3,27 +3,25 @@ package com.offgrid.compositor.terminal
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
-import com.offgrid.compositor.R
 import android.view.View
+import com.offgrid.compositor.R
 
+/**
+ * The round Back control at the top left of the panel.
+ * Black fill, a bioluminescent ring, and a left arrow, all drawn in code.
+ */
 internal class BackOrbView(context: Context) : View(context), Styled {
-    private val ring = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        strokeWidth = Hud.dp(context, 2.5f)
-        color = NeonPalette.UV_VIOLET
-        setShadowLayer(Hud.dp(context, 7f), 0f, 0f, NeonPalette.ELECTRIC_PURPLE)
-    }
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Hud.INK }
     private val arrow = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        strokeWidth = Hud.dp(context, 2f)
         strokeCap = Paint.Cap.ROUND
         strokeJoin = Paint.Join.ROUND
         color = NeonPalette.BLACKLIGHT_WHITE
     }
-    private val arrowPath = android.graphics.Path()
-    private val radius = Hud.dp(context, 19f)
-    private var look: PanelLook? = null
+    private val stamp = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+    private var accent = NeonPalette.CYAN_GLOW
+    private var halo = NeonPalette.ELECTRIC_PURPLE
+    private var glowOn = true
     var breath = 0.5f
         set(value) {
             if (field == value) return
@@ -43,34 +41,41 @@ internal class BackOrbView(context: Context) : View(context), Styled {
         isFocusable = true
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES
         contentDescription = context.getString(R.string.terminal_back_label)
-        arrowPath.moveTo(Hud.dp(context, 16f), Hud.dp(context, 24f))
-        arrowPath.lineTo(Hud.dp(context, 24f), Hud.dp(context, 16f))
-        arrowPath.moveTo(Hud.dp(context, 16f), Hud.dp(context, 24f))
-        arrowPath.lineTo(Hud.dp(context, 32f), Hud.dp(context, 24f))
-        arrowPath.lineTo(Hud.dp(context, 24f), Hud.dp(context, 32f))
     }
 
     override fun onDraw(canvas: Canvas) {
-        super.onDraw(canvas)
+        val size = minOf(width, height)
+        if (size <= 0) return
         val cx = width / 2f
         val cy = height / 2f
-        fill.color = if (isPressed) Hud.withAlpha(NeonPalette.UV_VIOLET, 0.35f) else Hud.INK
+        val radius = size * BioluminescentPowerIcon.DISC_SHARE
+        if (glowOn) {
+            val layers = BioluminescentPowerIcon.layers(size, accent, halo, resources.displayMetrics.density)
+            if (layers != null) {
+                val pulse = 0.85f + 0.3f * breath
+                BioluminescentPowerIcon.paintLayers(
+                    canvas,
+                    (width - size) / 2f,
+                    (height - size) / 2f,
+                    layers,
+                    pulse,
+                    stamp,
+                )
+            }
+        }
+        fill.color = if (isPressed) Hud.withAlpha(accent, 0.35f) else Hud.INK
         canvas.drawCircle(cx, cy, radius, fill)
-        val current = look
-        val pulse = if (current?.pulse == true) 0.85f + 0.3f * breath else 1f
-        ring.alpha = (255f * pulse).toInt()
-        canvas.drawCircle(cx, cy, radius, ring)
-        ring.alpha = 255
-        canvas.save()
-        canvas.translate((width - Hud.dpi(context, 48f)) / 2f, 0f)
-        canvas.drawPath(arrowPath, arrow)
-        canvas.restore()
+        arrow.strokeWidth = radius * 0.16f
+        arrow.color = if (glowOn) BioluminescentPowerIcon.hotCore(accent) else Hud.WHITE
+        val arm = radius * 0.46f
+        canvas.drawLine(cx + arm * 0.2f, cy - arm, cx - arm * 0.55f, cy, arrow)
+        canvas.drawLine(cx - arm * 0.55f, cy, cx + arm * 0.2f, cy + arm, arrow)
     }
 
     override fun applyLook(look: PanelLook) {
-        this.look = look
-        ring.color = look.edge
-        ring.setShadowLayer(Hud.dp(context, 7f) * (0.85f + 0.3f * breath), 0f, 0f, look.outerGlow)
+        accent = look.edge
+        halo = look.outerGlow
+        glowOn = look.glowStrength > 0f
         arrow.color = look.text
         invalidate()
     }

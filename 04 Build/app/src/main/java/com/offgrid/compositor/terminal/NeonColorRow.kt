@@ -18,6 +18,7 @@ internal class NeonColorRow(
 ) : LinearLayout(context) {
     private val swatchViews = ArrayList<NeonSwatchView>(NeonPalette.swatches.size)
     private val selected = selectedColor
+    private val chooseColor = onColorChanged
 
     init {
         orientation = VERTICAL
@@ -46,7 +47,7 @@ internal class NeonColorRow(
                 swatchView.setOnClickListener {
                     swatchViews.forEach { it.isSelectedSwatch = it === swatchView }
                     it.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                    onColorChanged(swatch.color)
+                    chooseColor(swatch.color)
                 }
                 swatchView.setOnLongClickListener {
                     showMeaning(swatchView, swatch)

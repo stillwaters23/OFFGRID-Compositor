@@ -18,7 +18,6 @@ private const val RESIZE_ZONE_DP = 24f
 private const val STEP_DP = 40f
 private const val CENTER_MS = 420L
 private const val SNAP_DP = 12f
-private const val CORNER_SHARE = 0.3f
 
 /** The widths the glass may take on this screen, in pixels: smallest readable, then the whole screen. */
 internal fun TerminalPanel.widthRange(areaWidth: Int): Pair<Int, Int> {
@@ -291,19 +290,27 @@ internal fun TerminalPanel.refreshEdgeRoom() {
     val glassBottom = glassTop + height - margin * 2
     // A round screen corner cuts in about this far. The buttons stay clear of it.
     val screen = if (fullBleed) visibleWindowEdges ?: edges else edges
-    val corner = (screen.cornerRadius * CORNER_SHARE).roundToInt()
-    val topSafe = if (fullBleed) maxOf(screen.top, corner) else screen.top
-    val bottomSafe = if (fullBleed) maxOf(screen.bottom, screen.gestureBottom, corner) else {
-        maxOf(screen.bottom, screen.gestureBottom)
-    }
-    val top = (topSafe - glassTop).coerceAtLeast(0)
-    val bottom = (glassBottom - (areaHeight - bottomSafe)).coerceAtLeast(0)
-    val left = (maxOf(screen.left, corner) - glassLeft).coerceAtLeast(0)
-    val right = (glassRight - (areaWidth - maxOf(screen.right, corner))).coerceAtLeast(0)
-    if (edgeRoom.left == left && edgeRoom.top == top && edgeRoom.right == right && edgeRoom.bottom == bottom) {
+    val inset = PanelGeometry.contentInset(
+        glassLeft = glassLeft,
+        glassTop = glassTop,
+        glassRight = glassRight,
+        glassBottom = glassBottom,
+        areaWidth = areaWidth,
+        areaHeight = areaHeight,
+        edgeTop = screen.top,
+        edgeBottom = screen.bottom,
+        edgeLeft = screen.left,
+        edgeRight = screen.right,
+        gestureBottom = screen.gestureBottom,
+        cornerRadius = screen.cornerRadius,
+        fullBleed = fullBleed,
+    )
+    if (edgeRoom.left == inset.left && edgeRoom.top == inset.top &&
+        edgeRoom.right == inset.right && edgeRoom.bottom == inset.bottom
+    ) {
         return
     }
-    edgeRoom.set(left, top, right, bottom)
+    edgeRoom.set(inset.left, inset.top, inset.right, inset.bottom)
     applyContentPadding()
 }
 

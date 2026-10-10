@@ -128,19 +128,21 @@ internal object Themes {
 
     private fun phone(role: SystemRole) = PartSpec(system = true, role = role, custom = 0xFF000000.toInt())
 
+    private fun fixed(color: Int) = PartSpec(system = false, role = SystemRole.ACCENT1_200, custom = color)
+
     fun spec(theme: Theme): ThemeSpec = when (theme) {
         Theme.SYSTEM -> ThemeSpec(
             parts = mapOf(
                 ColorPart.SKIN to phone(SystemRole.NEUTRAL2_900),
-                ColorPart.EDGE to phone(SystemRole.ACCENT1_200),
-                ColorPart.OUTER_GLOW to phone(SystemRole.ACCENT1_300),
+                ColorPart.EDGE to fixed(NeonPalette.CYAN_GLOW),
+                ColorPart.OUTER_GLOW to fixed(NeonPalette.ELECTRIC_PURPLE),
                 ColorPart.TEXT to phone(SystemRole.SYSTEM_TEXT),
-                ColorPart.CURSOR to phone(SystemRole.ACCENT1_200),
-                ColorPart.FOLDER to phone(SystemRole.ACCENT2_200),
+                ColorPart.CURSOR to fixed(CURSOR_WHITE),
+                ColorPart.FOLDER to fixed(NeonPalette.CYAN_GLOW),
                 ColorPart.STATUS to phone(SystemRole.SYSTEM_TEXT),
             ),
             numbers = mapOf(
-                LookKeys.OPACITY to 100, LookKeys.CORNERS to 6, LookKeys.GLOW to 32,
+                LookKeys.OPACITY to 100, LookKeys.CORNERS to 4, LookKeys.GLOW to 50,
                 LookKeys.PULSE_SPEED to 42,
                 LookKeys.CURSOR_GLOW to 0,
             ),
@@ -236,10 +238,10 @@ internal class ThemeStore(private val context: Context, private val prefs: Panel
 
     fun base(): Theme = Theme.from(prefs.text(BASE))
 
-    fun themeMode(): ThemeMode = ThemeMode.from(prefs.text(THEME_MODE))
+    fun themeMode(): ThemeMode = ThemeMode.from(prefs.text(LookKeys.THEME_MODE))
 
     fun setThemeMode(mode: ThemeMode) {
-        prefs.write { text(THEME_MODE, mode.key) }
+        prefs.write { text(LookKeys.THEME_MODE, mode.key) }
     }
 
     private fun spec(): ThemeSpec = Themes.spec(base())

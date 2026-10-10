@@ -199,11 +199,13 @@ internal class FolderRow(
         bar.setBackgroundColor(look.decor)
         bar.visibility = if (active) VISIBLE else INVISIBLE
         name.setTextSize(TypedValue.COMPLEX_UNIT_SP, (if (big) 16f else 13f) * look.fontScale)
-        name.setTextColor(if (active) look.decor else look.secondaryText)
+        val ink = if (look.base == Theme.SYSTEM) look.text else if (active) look.decor else look.secondaryText
+        val note = if (look.base == Theme.SYSTEM) look.text else Hud.withAlpha(look.folder, 0.85f)
+        name.setTextColor(ink)
         detail.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10.5f * look.fontScale)
-        detail.setTextColor(Hud.withAlpha(look.folder, 0.85f))
+        detail.setTextColor(note)
         count.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f * look.fontScale)
-        count.setTextColor(Hud.withAlpha(look.folder, 0.85f))
+        count.setTextColor(note)
         setBackgroundColor(if (active) Hud.withAlpha(look.edge, 0.08f) else 0)
         val showRing = active && look.ring
         ring.visibility = if (showRing) VISIBLE else INVISIBLE

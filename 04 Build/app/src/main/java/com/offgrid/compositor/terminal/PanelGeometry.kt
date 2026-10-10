@@ -5,10 +5,21 @@ import kotlin.math.roundToInt
 
 internal enum class PanelResizeZone { NONE, BOTTOM_EDGE, BOTTOM_LEFT, BOTTOM_RIGHT }
 
+/** How far the words and buttons move in from a screen edge, in pixels. */
+internal data class PanelContentInset(
+    val left: Int,
+    val top: Int,
+    val right: Int,
+    val bottom: Int,
+)
+
 internal object PanelGeometry {
     const val RESIZE_BAR_HEIGHT_DP = 6f
     const val RESIZE_BAR_INSET_DP = 16f
     const val RESIZE_BAR_CAP_RADIUS_DP = 3f
+
+    /** Share of a round screen corner that the words and buttons stay out of. */
+    const val CONTENT_CORNER_SHARE = 0.3f
 
     fun isFullBleed(width: Int, height: Int, fullScreen: Boolean): Boolean =
         fullScreen || (width == 100 && height == 100)
@@ -104,6 +115,49 @@ internal object PanelGeometry {
             x >= right - depth -> PanelResizeZone.BOTTOM_RIGHT
             else -> PanelResizeZone.BOTTOM_EDGE
         }
+    }
+
+    /**
+     * Words and buttons stay clear of the status bar, the camera cutout, the gesture
+     * bar, and the round corners. The glass itself still reaches the screen edge.
+     * [edgeTop] already includes the taller of the status bar and the camera cutout.
+     */
+    fun contentInset(
+        glassLeft: Int,
+        glassTop: Int,
+        glassRight: Int,
+        glassBottom: Int,
+        areaWidth: Int,
+        areaHeight: Int,
+        edgeTop: Int,
+        edgeBottom: Int,
+        edgeLeft: Int,
+        edgeRight: Int,
+        gestureBottom: Int,
+        cornerRadius: Int,
+        fullBleed: Boolean,
+    ): PanelContentInset {
+        val corner = (cornerRadius.coerceAtLeast(0) * CONTENT_CORNER_SHARE).roundToInt()
+        val topSafe = if (fullBleed) maxOf(edgeTop, corner) else edgeTop.coerceAtLeast(0)
+        val bottomSafe = if (fullBleed) {
+            maxOf(edgeBottom, gestureBottom, corner)
+        } else {
+            maxOf(edgeBottom, gestureBottom)
+        }
+        val leftSafe = maxOf(edgeLeft, corner)
+        val rightSafe = maxOf(edgeRight, corner)
+        return PanelContentInset(
+            left = (leftSafe - glassLeft).coerceAtLeast(0),
+            top = (topSafe - glassTop).coerceAtLeast(0),
+            right = (glassRight - (areaWidth - rightSafe)).coerceAtLeast(0),
+            bottom = (glassBottom - (areaHeight - bottomSafe)).coerceAtLeast(0),
+        )
+    }
+
+    /** The thick bottom bar stays inside the round corner as well as the 16 dp side inset. */
+    fun resizeBarEndInsetPx(cornerRadiusPx: Float, density: Float): Float {
+        val floor = RESIZE_BAR_INSET_DP * density.coerceAtLeast(0f)
+        return maxOf(floor, cornerRadiusPx.coerceAtLeast(0f))
     }
 
     fun scrollThumbHeight(height: Int, total: Int, minimumHeight: Int): Float {

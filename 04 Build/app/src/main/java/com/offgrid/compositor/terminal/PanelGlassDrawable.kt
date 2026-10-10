@@ -18,6 +18,7 @@ import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Shader
 import android.graphics.drawable.Drawable
+import kotlin.math.roundToInt
 
 /**
  * The panel's glass.
@@ -236,6 +237,16 @@ internal class PanelGlassDrawable(
     )
 
     private fun dp(value: Float) = value * density
+
+    /** Bottom left is radii 6 and 7. Bottom right is radii 4 and 5. */
+    private fun bottomCornerRadius(leftSide: Boolean): Float {
+        val radii = displayCornerRadii ?: return 0f
+        val index = if (leftSide) 6 else 4
+        return if (index < radii.size) radii[index] else 0f
+    }
+
+    private fun cornerKey(): String =
+        displayCornerRadii?.joinToString(separator = ",") { it.toInt().toString() }.orEmpty()
 
     private fun titaniumOn(): Boolean = !pane && look?.titanium == true
 
@@ -470,7 +481,8 @@ internal class PanelGlassDrawable(
     private fun masksFor(): Masks? {
         val b = bounds
         if (b.isEmpty || glass.isEmpty || pane) return null
-        val key = "${b.width()}x${b.height()}:$margin:${look?.roundness}:${look?.holo}:${look?.borderThickness}:${look?.glowValue}"
+        val key = "${b.width()}x${b.height()}:$margin:${look?.roundness}:${look?.holo}:" +
+            "${look?.borderThickness}:${look?.glowValue}:${cornerKey()}"
         masks[key]?.let { return it }
         if (holdMasks) return masks.values.lastOrNull()
         // The masks are soft, so half size looks the same and uses a quarter of the memory.
@@ -537,8 +549,10 @@ internal class PanelGlassDrawable(
         val maskHeight = (minOf(halfRange * 2f * MASK_SCALE, bounds.height() * MASK_SCALE - top))
             .roundToInt()
             .coerceAtLeast(1)
-        val left = (glass.left + dp(PanelGeometry.RESIZE_BAR_INSET_DP) - bounds.left) * MASK_SCALE
-        val right = (glass.right - dp(PanelGeometry.RESIZE_BAR_INSET_DP) - bounds.left) * MASK_SCALE
+        val leftInset = PanelGeometry.resizeBarEndInsetPx(bottomCornerRadius(leftSide = true), density)
+        val rightInset = PanelGeometry.resizeBarEndInsetPx(bottomCornerRadius(leftSide = false), density)
+        val left = (glass.left + leftInset - bounds.left) * MASK_SCALE
+        val right = (glass.right - rightInset - bounds.left) * MASK_SCALE
         val bar = Bitmap.createBitmap(maskWidth, maskHeight, Bitmap.Config.ALPHA_8)
         val core = Bitmap.createBitmap(maskWidth, maskHeight, Bitmap.Config.ALPHA_8)
         val mid = Bitmap.createBitmap(maskWidth, maskHeight, Bitmap.Config.ALPHA_8)

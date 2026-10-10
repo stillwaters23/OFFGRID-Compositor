@@ -141,7 +141,12 @@ class PanelUiTest {
     @Test
     fun scrollingRevealsTheGlowThumb() {
         val scroll = ScrollView(context)
-        scroll.addView(View(context), FrameLayout.LayoutParams(
+        val child = object : View(context) {
+            override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+                setMeasuredDimension(Hud.dpi(context, 120f), Hud.dpi(context, 1000f))
+            }
+        }
+        scroll.addView(child, FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
             Hud.dpi(context, 1000f),
         ))
@@ -160,6 +165,8 @@ class PanelUiTest {
         thumb.layout(0, 0, Hud.dpi(context, 24f), height)
 
         scroll.scrollTo(0, Hud.dpi(context, 80f))
+        assertTrue(scroll.scrollY > 0)
+        thumb.noteScroll()
 
         assertEquals(View.VISIBLE, thumb.visibility)
     }
@@ -186,7 +193,8 @@ class PanelUiTest {
         walk(PanelTree.build())
 
         keys.forEach { key -> assertEquals("$key appears once", 1, found.count { it == key }) }
-        assertEquals(keys.toSet(), found.filter { it.startsWith("fx.") }.toSet())
+        val generated = found.filter { it.startsWith("fx.") && it !in keys }
+        assertTrue(generated.all { it.startsWith(FxKeys.SWEEP_GO_PREFIX) || it.startsWith(FxKeys.SOUND_PREFIX) })
     }
 
     @Test

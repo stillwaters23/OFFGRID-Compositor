@@ -238,3 +238,10 @@ States: passed, waiting for review, blocked, or waiting for Royalty's phone test
 - **Validation follow-up:** Commit `f88aed9` is published. Code review reported no findings; CodeQL had no analyzable code in scope. No build has run for this head.
 - **PR:** Pull request #15 remains draft, based on `final-build`, and unmerged.
 - **State:** published for CI and Rex review
+
+## 2026-10-09 11:10 PM CT: Lane A panel finish
+
+- **What was done:** Camera, microphone, settings, and Back controls are drawn in code as bioluminescent power buttons. Glow layers are cached bitmaps, so frames do not blur again. Width and height 100 fill the window. Content padding clears the status bar, camera cutout, gesture bar, and 30 percent of the corner radius. The top bar is 56 dp with 8 dp gaps and 40 dp controls. Width and height fields use tabular digits. The bottom resize edge is a 6 dp cached glow. The side drawer source is archived at `04 Build/archive/side_drawer.kt` and is not in the view tree. Night theme text is white on black. Day theme text is black on white. The debug workflow pull request filter now includes `final-build` so this pull request can run CI. Android Gradle Plugin stays at 8.13.2.
+- **Tests:** `./gradlew assembleDebug testDebugUnitTest --offline` from `04 Build` with `ANDROID_HOME` set. BUILD SUCCESSFUL in 14s. 71 unit tests, 0 failures, 0 errors, 0 skipped. Classes: EffectPanelTest 6, PanelGeometryTest 14, PanelUiTest 12, PanelFinishTest 3, PanelSettingsTest 9, StageTest 9, RainbowMixTest 12, CameraToolsTest 5, EffectLayersTest 1.
+- **PR:** Pull request #15 remains draft, based on `final-build`, and unmerged.
+- **State:** local build and tests passed. CI result is recorded in the next entry.
