@@ -300,3 +300,11 @@ States: passed, waiting for review, blocked, or waiting for Royalty's phone test
 - **PR / commit:** Pull request #13 on `copilot/lane-c-live-remote`. Not merged.
 - **State:** waiting for CI
 - **Next:** Report the head and the Build debug app run once GitHub finishes.
+
+## 2026-10-10 1:15 PM CT - Lane C RTMP test race
+
+- **Bootloader step:** Lane C. Live and Remote
+- **What was done:** The pull-request Build debug app run on `7fc2a38` failed in `PcTransportTest.rtmpPublishCarriesAnH264KeyFrame` with a SocketException. The fake RTMP server closed after the video-config packet, which reset the keyframe write when the server was fast. The server now stays open until the publisher closes and only counts an AVC picture packet. Eight local reruns passed. The push run on `7fc2a38` had already succeeded.
+- **PR / commit:** Pull request #13 on `copilot/lane-c-live-remote`. Not merged.
+- **State:** waiting for CI
+- **Next:** Report the new head and the Build debug app run once GitHub finishes.

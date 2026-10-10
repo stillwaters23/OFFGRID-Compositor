@@ -2,6 +2,7 @@ package com.offgrid.live
 
 import java.io.DataInputStream
 import java.io.DataOutputStream
+import java.io.EOFException
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
@@ -133,14 +134,20 @@ class PcTransportTest {
                     val chunks = RtmpChunkIo(input, output)
                     var published = ""
                     var videoSeen = false
-                    while (!videoSeen) {
-                        val message = chunks.read()
-                        if (message.type != 20 && message.type != 9) continue
-                        if (message.type == 9) {
-                            video.countDown()
+                    while (true) {
+                        val message = try {
+                            chunks.read()
+                        } catch (_: EOFException) {
+                            break
+                        } catch (_: java.net.SocketException) {
+                            break
+                        }
+                        if (message.type == 9 && message.payload.size > 5 && message.payload[1].toInt() == 1) {
                             videoSeen = true
+                            video.countDown()
                             continue
                         }
+                        if (message.type != 20) continue
                         val values = RtmpAmf.readAll(message.payload)
                         val name = (values.firstOrNull() as? AmfValue.Text)?.value ?: continue
                         if (name == "connect") {
@@ -151,6 +158,7 @@ class PcTransportTest {
                             published = values.filterIsInstance<AmfValue.Text>().joinToString(" ") { it.value }
                         }
                     }
+                    check(videoSeen)
                     published
                 }
             }
@@ -161,7 +169,7 @@ class PcTransportTest {
                     publisher.write(PcSample.Video(listOf(byteArrayOf(0x65, 0x11)), 33_000, true))
                     assertTrue(video.await(4, TimeUnit.SECONDS))
                 }
-                assertTrue(seen.get(2, TimeUnit.SECONDS).contains("offgrid"))
+                assertTrue(seen.get(4, TimeUnit.SECONDS).contains("offgrid"))
             } finally {
                 server.close()
                 executor.shutdownNow()
