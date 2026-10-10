@@ -1,5 +1,7 @@
 package com.offgrid.compositor.audio.voice
 
+import java.util.concurrent.atomic.AtomicBoolean
+
 enum class MicState { ON, OFF, BLOCKED }
 
 fun interface MicSource {
@@ -7,6 +9,12 @@ fun interface MicSource {
     fun start(onSamples: (FloatArray, Int) -> Unit, onFailure: () -> Unit): Boolean
 
     fun stop() = Unit
+
+    /**
+     * Hard block. Implementations must release the recorder when [blocked] is true
+     * and must refuse [start] until the block is cleared.
+     */
+    fun setHardBlock(blocked: Boolean) = Unit
 }
 
 fun interface VoiceAudioOutput {
@@ -14,7 +22,10 @@ fun interface VoiceAudioOutput {
     fun write(samples: FloatArray, count: Int)
 }
 
-/** Owns capture transitions. BLOCKED is sticky until explicitly unblocked. */
+/**
+ * Owns capture transitions. BLOCKED stays blocked until [setBlocked] is called with false.
+ * Stopping the recorder happens outside the controller lock so a capture callback can finish.
+ */
 class MicCaptureController(
     private val source: MicSource,
     private val dsp: VoiceSwapDsp,
@@ -27,73 +38,128 @@ class MicCaptureController(
     var state: MicState = MicState.OFF
         private set
 
+    private val lock = Any()
+    private val hardBlocked = AtomicBoolean(false)
     private var processed = FloatArray(0)
 
-    @Synchronized
     fun setEnabled(enabled: Boolean): Boolean {
-        if (state == MicState.BLOCKED) return false
         if (!enabled) {
-            transition(MicState.OFF)
+            val blocked = synchronized(lock) {
+                if (state == MicState.BLOCKED || hardBlocked.get()) {
+                    true
+                } else {
+                    transition(MicState.OFF)
+                    false
+                }
+            }
+            if (blocked) return false
             stopSource()
             return true
         }
-        if (state == MicState.ON) return true
-
-        transition(MicState.ON)
+        val startNow = synchronized(lock) {
+            if (state == MicState.BLOCKED || hardBlocked.get()) {
+                false
+            } else if (state == MicState.ON) {
+                null
+            } else {
+                transition(MicState.ON)
+                true
+            }
+        }
+        if (startNow == null) return true
+        if (!startNow) return false
         val started = try {
             source.start(::onSamples, ::failClosed)
         } catch (_: RuntimeException) {
             false
         }
-        if (!started) failClosed()
-        return started
-    }
-
-    @Synchronized
-    fun setBlocked(blocked: Boolean) {
-        if (blocked) {
-            transition(MicState.BLOCKED)
-            stopSource()
-        } else if (state == MicState.BLOCKED) {
-            transition(MicState.OFF)
-            stopSource()
-        }
-    }
-
-    @Synchronized
-    private fun onSamples(input: FloatArray, count: Int) {
-        if (state != MicState.ON) return
-        if (count <= 0 || count > input.size) {
+        val stillOn = synchronized(lock) { state == MicState.ON && !hardBlocked.get() }
+        if (!started || !stillOn) {
             failClosed()
-            return
+            return false
         }
-        if (processed.size < count) processed = FloatArray(count)
-        val started = clockNanos()
-        val healthy = try {
-            dsp.process(input, count, processed)
-        } catch (_: RuntimeException) {
+        return true
+    }
+
+    fun setBlocked(blocked: Boolean) {
+        if (blocked) hardBlocked.set(true)
+        val action = synchronized(lock) {
+            if (blocked) {
+                transition(MicState.BLOCKED)
+                BlockAction.ENGAGE
+            } else if (state == MicState.BLOCKED) {
+                transition(MicState.OFF)
+                hardBlocked.set(false)
+                BlockAction.RELEASE
+            } else {
+                BlockAction.NONE
+            }
+        }
+        when (action) {
+            BlockAction.ENGAGE -> {
+                engageSourceBlock()
+                stopSource()
+            }
+            BlockAction.RELEASE -> {
+                releaseSourceBlock()
+                stopSource()
+            }
+            BlockAction.NONE -> Unit
+        }
+    }
+
+    private fun onSamples(input: FloatArray, count: Int) {
+        if (hardBlocked.get()) return
+        val fail = synchronized(lock) {
+            if (hardBlocked.get() || state != MicState.ON) return@synchronized false
+            if (count <= 0 || count > input.size) return@synchronized true
+            if (processed.size < count) processed = FloatArray(count)
+            val started = clockNanos()
+            val healthy = try {
+                dsp.process(input, count, processed)
+            } catch (_: RuntimeException) {
+                false
+            }
+            val elapsed = clockNanos() - started
+            val tooSlow = elapsed < 0L || elapsed > maxProcessNanos
+            if (!healthy || tooSlow || hardBlocked.get()) {
+                processed.fill(0f, 0, count)
+                return@synchronized !hardBlocked.get() && (!healthy || tooSlow)
+            }
+            try {
+                output.write(processed, count)
+            } catch (_: RuntimeException) {
+                processed.fill(0f, 0, count)
+                return@synchronized true
+            }
+            processed.fill(0f, 0, count)
             false
         }
-        val elapsed = clockNanos() - started
-        if (!healthy || elapsed < 0L || elapsed > maxProcessNanos) {
-            processed.fill(0f, 0, count)
-            failClosed()
-            return
-        }
-        try {
-            output.write(processed, count)
-        } catch (_: RuntimeException) {
-            processed.fill(0f, 0, count)
-            failClosed()
-        }
-        processed.fill(0f, 0, count)
+        if (fail) failClosed()
     }
 
-    @Synchronized
     private fun failClosed() {
-        if (state == MicState.ON) transition(MicState.OFF)
-        dsp.reset()
+        synchronized(lock) {
+            if (state == MicState.ON) transition(MicState.OFF)
+            dsp.reset()
+        }
         stopSource()
+    }
+
+    private fun engageSourceBlock() {
+        try {
+            source.setHardBlock(true)
+        } catch (_: RuntimeException) {
+            Unit
+        }
+    }
+
+    private fun releaseSourceBlock() {
+        try {
+            source.setHardBlock(false)
+        } catch (_: RuntimeException) {
+            Unit
+        }
     }
 
     private fun stopSource() {
@@ -114,6 +180,8 @@ class MicCaptureController(
             Unit
         }
     }
+
+    private enum class BlockAction { ENGAGE, RELEASE, NONE }
 
     companion object {
         const val MAX_PROCESS_NANOS = 80_000_000L

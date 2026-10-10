@@ -3,6 +3,7 @@ package com.offgrid.compositor.terminal
 import com.offgrid.compositor.effects.Fire
 import com.offgrid.compositor.effects.FxKeys
 import com.offgrid.compositor.audio.voice.MicKeys
+import com.offgrid.compositor.audio.voice.RexVoiceProfile
 
 /**
  * The folders for the camera, the effects, recording, and each platform's kick tools and test
@@ -216,15 +217,15 @@ internal object EffectFolders {
             ToggleItem(MicKeys.BLOCKED, "Hard block", "Stops capture and prevents anything from reopening the mic.", false, isTest = false),
             ToggleItem(MicKeys.VOICE_SWAP, "Rex voice swap", "On-device pitch, formant color, and timbre EQ. No model or upload.", false, isTest = false),
             ToggleItem(MicKeys.BYPASS, "Bypass", "Passes clean, unprocessed voice through the safe output path.", false, isTest = false),
-            NumberItem(MicKeys.WET, "Wet / dry", "0 is clean voice. 100 is the full Rex effect.", 68),
-            NumberItem(MicKeys.PITCH, "Pitch shift", "50 is unchanged. 0 is lower. 100 is higher.", 58),
-            NumberItem(MicKeys.FORMANT, "Formant shift", "50 is unchanged. Move the voice color lower or higher.", 44),
-            NumberItem(MicKeys.LOW_EQ, "Low EQ", "50 is unchanged. 0 cuts lows. 100 boosts lows.", 56),
-            NumberItem(MicKeys.MID_EQ, "Mid EQ", "50 is unchanged. 0 cuts mids. 100 boosts mids.", 58),
-            NumberItem(MicKeys.HIGH_EQ, "High EQ", "50 is unchanged. 0 cuts highs. 100 boosts highs.", 46),
+            NumberItem(MicKeys.WET, "Wet / dry", "0 is clean voice. 100 is the full Rex effect.", RexVoiceProfile.WET_PERCENT),
+            NumberItem(MicKeys.PITCH, "Pitch shift", "50 is unchanged. 0 is lower. 100 is higher.", RexVoiceProfile.pitchPercent),
+            NumberItem(MicKeys.FORMANT, "Formant shift", "50 is unchanged. Move the voice color lower or higher.", RexVoiceProfile.formantPercent),
+            NumberItem(MicKeys.LOW_EQ, "Low EQ", "50 is unchanged. 0 cuts lows. 100 boosts lows.", RexVoiceProfile.lowPercent),
+            NumberItem(MicKeys.MID_EQ, "Mid EQ", "50 is unchanged. 0 cuts mids. 100 boosts mids.", RexVoiceProfile.midPercent),
+            NumberItem(MicKeys.HIGH_EQ, "High EQ", "50 is unchanged. 0 cuts highs. 100 boosts highs.", RexVoiceProfile.highPercent),
         ),
         notes = listOf(
-            "The Rex preset is a tunable placeholder. Adjust pitch, formants, EQ, and wet mix below.",
+            "Rex voice swap aims at Rex 01, Rex 02, and Rex 03. Rex.wav is not in this project. Pitch, formant, and EQ stay tunable.",
             "Capture begins only after you turn the mic on and allow microphone access.",
             "Hard block releases the recorder. Unblock does not turn the mic back on.",
             "Audio processing stays on this phone. No audio is uploaded.",

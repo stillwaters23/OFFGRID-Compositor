@@ -3,6 +3,7 @@ package com.offgrid.compositor.terminal
 import android.content.Context
 import com.offgrid.compositor.effects.FxKeys
 import com.offgrid.compositor.audio.voice.MicKeys
+import com.offgrid.compositor.audio.voice.RexVoiceProfile
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -137,6 +138,13 @@ class EffectPanelTest {
         assertEquals(false, defaults.toggles[MicKeys.BLOCKED])
         assertEquals(false, defaults.toggles[MicKeys.VOICE_SWAP])
         assertEquals(false, defaults.toggles[MicKeys.BYPASS])
+        assertEquals(RexVoiceProfile.WET_PERCENT, defaults.numbers[MicKeys.WET])
+        assertEquals(RexVoiceProfile.pitchPercent, defaults.numbers[MicKeys.PITCH])
+        assertEquals(RexVoiceProfile.formantPercent, defaults.numbers[MicKeys.FORMANT])
+        assertEquals(RexVoiceProfile.lowPercent, defaults.numbers[MicKeys.LOW_EQ])
+        assertEquals(RexVoiceProfile.midPercent, defaults.numbers[MicKeys.MID_EQ])
+        assertEquals(RexVoiceProfile.highPercent, defaults.numbers[MicKeys.HIGH_EQ])
+        assertTrue(RexVoiceProfile.pitchPercent < 50)
     }
 
     @Test
