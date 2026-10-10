@@ -1,6 +1,6 @@
 import { AlarmView } from "@/components/auric/alarm-view";
 import { AppearanceStudio } from "@/components/auric/appearance-studio";
-import { ClickerSoundsFolder } from "@/components/auric/clicker-sounds-folder";
+import { ClickerSoundsFolder } from "@/components/auric/clicker_sounds_folder";
 import { DeviceRoom } from "@/components/auric/device-room";
 import { LogsExports } from "@/components/auric/logs-exports";
 import { SpanReels } from "@/components/auric/span-reels";

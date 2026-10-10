@@ -16,7 +16,7 @@ test("L4 click voice, folder prefs, and catalog tests pass", () => {
       "--test",
       "tests/l4_click_voice.test.ts",
       "tests/l4_folder_prefs.test.ts",
-      "tests/l4-clicker-sounds.test.ts",
+      "tests/l4_clicker_sounds.test.ts",
     ],
     { cwd: root, encoding: "utf8" },
   );
