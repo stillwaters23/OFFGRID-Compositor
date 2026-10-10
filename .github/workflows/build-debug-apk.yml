@@ -7,13 +7,16 @@ on:
       - step-2-2-premium-panel
       - step-2-4-presets-layouts
       - final-build
+      - copilot/lane-e-media-pipe-person-segmentation
   pull_request:
     branches:
+      - final-build
       - main
       - final-build
       - ccr-c441a76e-hgt5wa
       - step-2-2-premium-panel
       - step-2-4-presets-layouts
+      - final-build
 
 permissions:
   contents: write
@@ -98,7 +101,7 @@ jobs:
 
       - name: Build the debug app
         working-directory: 04 Build
-        run: chmod +x ./gradlew && ./gradlew assembleDebug --stacktrace
+        run: chmod +x ./gradlew && ./gradlew testDebugUnitTest assembleDebug --stacktrace
 
       - name: Run Android lint
         working-directory: 04 Build
@@ -125,7 +128,10 @@ jobs:
               "CAMERA",
               "RECORD_AUDIO",
           }
-          banned = {"android.permission.ACCESS_NETWORK_STATE"}
+          banned = {
+              "android.permission.ACCESS_NETWORK_STATE",
+              "android.permission.INTERNET",
+          }
           name = "{http://schemas.android.com/apk/res/android}name"
           root = ET.parse(sys.argv[1]).getroot()
           found = sorted(
@@ -140,6 +146,10 @@ jobs:
           if "android.permission.RECORD_AUDIO" in found:
               print("The mic permission is in the app, and that is allowed.")
           print("ACCESS_NETWORK_STATE stays banned.")
+          if "android.permission.INTERNET" in found:
+              print("Camera frames must stay on the phone.")
+          else:
+              print("Internet permission is not in the app.")
           exact = {"com.offgrid.compositor.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"}
           extra = [
               p for p in found

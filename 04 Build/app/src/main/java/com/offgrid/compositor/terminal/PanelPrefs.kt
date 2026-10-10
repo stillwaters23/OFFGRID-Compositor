@@ -169,7 +169,7 @@ internal class PanelPrefs(context: Context) {
     /** Settings no reset or settings move ever removes. */
     private fun kept(key: String): Boolean =
         key.startsWith(TOGGLE + TEST_PREFIX) || key.startsWith(TEXT + TEST_PREFIX) ||
-            key == TEXT + KEEP_CAMERA_MODE || key == LAYOUT
+            key == TEXT + KEEP_CAMERA_MODE || key == TEXT + KEEP_BODY_MODE || key == LAYOUT
 
     companion object {
         const val TEST_PREFIX = "test."
@@ -184,6 +184,9 @@ internal class PanelPrefs(context: Context) {
 
         /** The camera mode's key (FxKeys.CAMERA_MODE). Resets never change it. */
         const val KEEP_CAMERA_MODE = "fx.camera.mode"
+
+        /** The body look (FxKeys.BODY_MODE). A reset must not turn it off and show the face. */
+        const val KEEP_BODY_MODE = "fx.body.mode"
         private const val FILE_NAME = "terminal_panel"
         private const val NUMBER = "number."
         private const val TOGGLE = "toggle."

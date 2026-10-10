@@ -51,6 +51,19 @@ class StageTest {
     }
 
     @Test
+    fun bodyLooksAreNotPlainAndOffLeavesTheCameraAlone() {
+        assertTrue(plan(1f, settings(choices = mapOf(FxKeys.BODY_MODE to FxKeys.BODY_OFF))).plain)
+        assertFalse(plan(1f, settings(choices = mapOf(FxKeys.BODY_MODE to FxKeys.BODY_OFF))).bodyOn)
+        for (mode in listOf(FxKeys.BODY_SEE, FxKeys.BODY_REPLACE, FxKeys.BODY_CLOAK, FxKeys.BODY_HOLO)) {
+            val planned = plan(1f, settings(choices = mapOf(FxKeys.BODY_MODE to mode, FxKeys.BODY_PLATE to FxKeys.BODY_PLATE_VOID)))
+            assertEquals(mode, planned.bodyMode)
+            assertTrue(planned.bodyOn)
+            assertFalse(planned.plain)
+            assertEquals(FxKeys.BODY_PLATE_VOID, planned.bodyPlate)
+        }
+    }
+
+    @Test
     fun cloakFadesInOverItsTypedTimeAndGhostIsInstant() {
         val cloak = settings(
             numbers = mapOf(FxKeys.CLOAK_FADE to 0),

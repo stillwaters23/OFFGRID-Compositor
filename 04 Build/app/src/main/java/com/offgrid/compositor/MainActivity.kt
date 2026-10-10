@@ -21,6 +21,7 @@ import androidx.annotation.OptIn
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ExperimentalMirrorMode
+import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.MirrorMode
 import androidx.camera.core.Preview
 import androidx.camera.core.UseCaseGroup
@@ -110,6 +111,10 @@ class MainActivity : AppCompatActivity() {
     internal var effectsBroken = false
     private lateinit var faces: FaceTracker
 
+    /** The person mask, shared by the segmenter thread and the drawing thread. */
+    private val masks = MaskBus()
+    private lateinit var segmenter: PersonSegmenter
+
     internal val mainHandler = Handler(Looper.getMainLooper())
     internal var stopRecordingTask: Runnable? = null
 
@@ -157,6 +162,7 @@ class MainActivity : AppCompatActivity() {
         mic = MicPipeline()
         engine.beatCount = { mic.beats.beats }
         faces = FaceTracker(this, engine)
+        segmenter = PersonSegmenter(this, engine, masks)
         effects = EffectsController(this, terminalPanel, engine)
         effects.lastVideo = { recordingFile() }
         effects.onSettings = { onEffectSettings() }
@@ -213,6 +219,7 @@ class MainActivity : AppCompatActivity() {
         processor?.onEffectsFailed = null
         processor?.release()
         processor = null
+        if (::segmenter.isInitialized) segmenter.release()
         super.onDestroy()
     }
 
@@ -226,6 +233,7 @@ class MainActivity : AppCompatActivity() {
     internal fun ensureProcessor(): CompositorProcessor {
         processor?.let { return it }
         val created = CompositorProcessor(effects.engine, EffectLayers.all())
+        created.useMasks(masks)
         created.onFirstFrame = {
             created.inputSize?.let { size ->
                 faces.streamAspect = maxOf(size.width, size.height).toFloat() / minOf(size.width, size.height)
@@ -248,7 +256,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     @OptIn(ExperimentalMirrorMode::class)
-    internal fun bindCamera(provider: ProcessCameraProvider, withFrameRate: Boolean) {
+    internal fun bindCamera(
+        provider: ProcessCameraProvider,
+        withFrameRate: Boolean,
+        withSegment: Boolean = true,
+    ) {
         val painter = ensureProcessor()
         faces.outputAspect = previewView.width.toFloat() / previewView.height
         val effect = CompositorEffect(
@@ -294,25 +306,55 @@ class MainActivity : AppCompatActivity() {
         val viewPort = ViewPort.Builder(Rational(previewView.width, previewView.height), rotation)
             .setScaleType(ViewPort.FILL_CENTER)
             .build()
-        val group = UseCaseGroup.Builder()
+        val groupBuilder = UseCaseGroup.Builder()
             .setViewPort(viewPort)
             .addUseCase(preview)
             .addUseCase(capture)
             .addEffect(effect)
-            .build()
+        if (withSegment) {
+            val analysis = ImageAnalysis.Builder()
+                .setResolutionSelector(segmentResolution())
+                .setTargetRotation(rotation)
+                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_YUV_420_888)
+                .build()
+            segmenter.attach(analysis)
+            groupBuilder.addUseCase(analysis)
+        }
+        val group = groupBuilder.build()
         try {
             provider.unbindAll()
             provider.bindToLifecycle(this, CameraSelector.DEFAULT_FRONT_CAMERA, group)
             videoCapture = capture
         } catch (error: Exception) {
-            if (withFrameRate) {
-                Log.w(TAG, "Steady frame rate was not available. Trying again.")
-                bindCamera(provider, withFrameRate = false)
-            } else {
-                Log.e(TAG, "Camera did not start", error)
-                showMessage(R.string.camera_failed, ButtonMode.NONE)
+            when {
+                withFrameRate -> {
+                    Log.w(TAG, "Steady frame rate was not available. Trying again.")
+                    bindCamera(provider, withFrameRate = false, withSegment = withSegment)
+                }
+                withSegment -> {
+                    Log.w(TAG, "Person segmentation stream was not available. Body modes stay black.")
+                    bindCamera(provider, withFrameRate = false, withSegment = false)
+                }
+                else -> {
+                    Log.e(TAG, "Camera did not start", error)
+                    showMessage(R.string.camera_failed, ButtonMode.NONE)
+                }
             }
         }
+    }
+
+    /** A small 16:9 frame for the person mask, the same crop as the preview. */
+    private fun segmentResolution(): ResolutionSelector {
+        return ResolutionSelector.Builder()
+            .setAspectRatioStrategy(AspectRatioStrategy.RATIO_16_9_FALLBACK_AUTO_STRATEGY)
+            .setResolutionStrategy(
+                ResolutionStrategy(
+                    Size(360, 640),
+                    ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER,
+                ),
+            )
+            .build()
     }
 
     internal fun unbindCamera() {

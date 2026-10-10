@@ -233,3 +233,11 @@ States: passed, waiting for review, blocked, or waiting for Royalty's phone test
 - **PR / commit:** Pull request #11, not merged.
 - **State:** waiting for review
 - **Next:** CI on this head must be green. Phone checks stay with Royalty: lip sync, a 20 second Robot plus Echo clip, and camera-off and mic-off in one recording.
+
+## 2026-10-09 11:13 PM CT — Lane E
+
+- **Bootloader step:** Lane E. Person segmentation. Not a new Bootloader step. Voice stays paused.
+- **What was done:** Added an on-device MediaPipe Tasks Image Segmenter (selfie / person) that feeds the GL compositor. Inside the video box the body can be see-through, replaced, covered by a body-shaped cloak, or drawn as a hologram. The mask is computed on its own thread. The GPU upload stays on the drawing thread. If the mask is missing or older than two frames at 30fps, the box goes black so the face never shows. The internet permission that MediaPipe's logging library asks for is removed. AGP stays 8.13.2.
+- **PR / commit:** Pull request #21 (`copilot/lane-e-media-pipe-person-segmentation`), not merged. Rex reviews it.
+- **State:** waiting for review
+- **Next:** Royalty's phone test on the S25 Ultra: 📁 Camera > 📁 Body mask. Try See-through, Replace, Body cloak, and Hologram. Cover the camera and confirm the box goes black instead of showing a face.

@@ -31,7 +31,9 @@ internal fun MainActivity.showLivePicture() {
             return
         }
         val settings = effects.engine.settings
-        val hidingFace = settings.on(FxKeys.DIAMOND_ON) || !settings.chose(FxKeys.CAMERA_MODE, FxKeys.MODE_LIVE)
+        val hidingFace = settings.on(FxKeys.DIAMOND_ON) ||
+            !settings.chose(FxKeys.CAMERA_MODE, FxKeys.MODE_LIVE) ||
+            MaskGate.hidesFace(settings.choice(FxKeys.BODY_MODE))
         val message = when {
             effectsBroken && hidingFace && !cameraDark -> R.string.effects_failed
             micProblem != 0 -> micProblem
