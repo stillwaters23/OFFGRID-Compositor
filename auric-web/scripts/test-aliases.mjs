@@ -1,16 +1,10 @@
-import { registerHooks } from "node:module";
-import { existsSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import * as nodeModule from "node:module";
+import { resolve } from "./test_alias_hooks.mjs";
 
-registerHooks({
-  resolve(specifier, context, nextResolve) {
-    if (specifier.startsWith("@/")) {
-      const base = new URL(`../src/${specifier.slice(2)}`, import.meta.url);
-      for (const extension of [".ts", ".tsx", ".js"]) {
-        const url = new URL(base.href + extension);
-        if (existsSync(fileURLToPath(url))) return nextResolve(url.href, context);
-      }
-    }
-    return nextResolve(specifier, context);
-  },
-});
+// registerHooks is synchronous and arrived after Node 22.14. The loader
+// register() path is the one this runtime and current CI both accept.
+if (typeof nodeModule.registerHooks === "function") {
+  nodeModule.registerHooks({ resolve });
+} else {
+  await nodeModule.register("./test_alias_hooks.mjs", import.meta.url);
+}

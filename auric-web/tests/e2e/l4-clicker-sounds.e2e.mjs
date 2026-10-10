@@ -13,6 +13,29 @@ test("Clicker Sounds lists, selects, previews, and stays within the viewport", a
   await page.addInitScript(() => {
     window.__auricOscillatorStarts = 0;
     window.__auricFrequencies = [];
+    window.__auricStartDeltas = [];
+    window.__auricAudioOptions = [];
+    window.__auricContexts = [];
+    const OriginalAudio = window.AudioContext;
+    function WrappedAudio(options) {
+      window.__auricAudioOptions.push(options ?? null);
+      const context = new OriginalAudio(options);
+      window.__auricContexts.push(context);
+      return context;
+    }
+    WrappedAudio.prototype = OriginalAudio.prototype;
+    window.AudioContext = WrappedAudio;
+    localStorage.setItem(
+      "auric-folder-settings-v1",
+      JSON.stringify({
+        layout: "big",
+        folderSizeAll: 50,
+        folderSizes: { "clicker-sounds": 72 },
+        folderIconStyle: { "clicker-sounds": "etched" },
+        folderNames: { "clicker-sounds": "House Clicks" },
+        folderOrder: [],
+      }),
+    );
     const original = AudioContext.prototype.createOscillator;
     AudioContext.prototype.createOscillator = function (...args) {
       const oscillator = original.apply(this, args);
@@ -20,6 +43,9 @@ test("Clicker Sounds lists, selects, previews, and stays within the viewport", a
       const setFrequency = oscillator.frequency.setValueAtTime.bind(oscillator.frequency);
       oscillator.start = (...startArgs) => {
         window.__auricOscillatorStarts += 1;
+        const when = startArgs[0];
+        const now = oscillator.context ? oscillator.context.currentTime : 0;
+        window.__auricStartDeltas.push(typeof when === "number" ? when - now : null);
         return start(...startArgs);
       };
       oscillator.frequency.setValueAtTime = (value, ...setArgs) => {
@@ -36,6 +62,11 @@ test("Clicker Sounds lists, selects, previews, and stays within the viewport", a
     await page.getByRole("button", { name: "OPEN SESSION" }).click();
     await page.getByRole("button", { name: "clicker-sounds unlocked" }).click();
     await page.getByRole("heading", { name: "Clicker Sounds" }).waitFor();
+    const clicker = page.locator(".tx-clicker");
+    await page.waitForFunction(() => document.querySelector(".tx-clicker")?.dataset.folderName === "House Clicks");
+    assert.equal(await clicker.getAttribute("data-folder-size"), "72");
+    assert.equal(await clicker.getAttribute("data-icon-style"), "etched");
+    assert.equal(await clicker.getByText("House Clicks").count(), 1);
     assert.equal(await page.evaluate(() => window.__auricFrequencies.includes(1640)), false, "opening the folder must not preview House click");
 
     const tabs = page.getByRole("tab");
@@ -66,6 +97,17 @@ test("Clicker Sounds lists, selects, previews, and stays within the viewport", a
     assert.equal(await defaultRow.getAttribute("aria-pressed"), "false");
     assert.equal(await page.evaluate(() => window.__auricOscillatorStarts) - startsBefore, 10);
     assert.equal(await page.evaluate(() => window.__auricFrequencies.filter((frequency) => frequency === 1346).length), 10);
+    const previewTiming = await page.evaluate(() => ({
+      options: window.__auricAudioOptions,
+      deltas: window.__auricStartDeltas.slice(-10),
+      latency: window.__auricContexts.map((context) => ({
+        hint: context.baseLatency,
+        output: context.outputLatency,
+      })),
+    }));
+    assert.ok(previewTiming.options.some((options) => options && options.latencyHint === "interactive"));
+    assert.ok(previewTiming.deltas.every((delta) => Math.abs(delta) < 0.001));
+    console.log("L4 click latency", JSON.stringify(previewTiming.latency));
 
     for (const mood of ["dark", "light"]) {
       await page.locator(".tx-root").evaluate((root, nextMood) => root.setAttribute("data-mood", nextMood), mood);

@@ -113,3 +113,26 @@
   margin: 0;
   white-space: nowrap;
 }
+
+.tx-clicker-rename {
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  margin: 0;
+  font-size: 16px;
+}
+
+.tx-clicker.is-title-24 .tx-clicker-rename {
+  font-size: 24px;
+}
+
+.tx-clicker.is-3d .tx-clicker-rename {
+  font-weight: 700;
+}
+
+/* Etched title: two layers, halo blur 4px. The 1px offset is a hairline. */
+.tx-clicker.is-etched .tx-clicker-rename {
+  text-shadow:
+    0 1px 0 color-mix(in oklab, var(--tx-ink) 40%, transparent),
+    0 0 4px color-mix(in oklab, var(--tx-cyan) 55%, transparent);
+}

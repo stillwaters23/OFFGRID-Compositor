@@ -1,17 +1,33 @@
-import { useState } from "react";
-import { playReelTick } from "@/lib/audio";
+import { useEffect, useState } from "react";
+import { playProceduralClick, primeClickVoice } from "@/lib/click_voice";
+import {
+  clickerFolderView,
+  readStoredFolderPreferences,
+  type ClickerFolderView,
+} from "@/lib/clicker_folder_prefs";
 import { HOUSE_CLICK_ID, TICK_FAMILIES, TICKS, tickById } from "@/lib/ticks";
 import { useAuric } from "@/lib/store";
 import "@/styles/clicker.css";
 
 export function ClickerSoundsFolder() {
   const [family, setFamily] = useState<(typeof TICK_FAMILIES)[number]>(TICK_FAMILIES[0]);
+  const [folderView, setFolderView] = useState<ClickerFolderView>(() => clickerFolderView(null));
   const reelSound = useAuric((s) => s.reelSound);
   const selected = tickById(reelSound).id;
   const cuts = TICKS.filter((tick) => tick.family === family);
 
+  useEffect(() => {
+    setFolderView(clickerFolderView(readStoredFolderPreferences()));
+  }, []);
+
   return (
-    <section className="tx-clicker">
+    <section
+      className={`tx-clicker is-${folderView.iconStyle} is-title-${folderView.titlePx}`}
+      data-folder-name={folderView.tileName}
+      data-folder-size={folderView.size}
+      data-icon-style={folderView.iconStyle}
+      onPointerDown={primeClickVoice}
+    >
       <div className="tx-clicker-tabs" role="tablist" aria-label="Clicker sound styles">
         {TICK_FAMILIES.map((style) => (
           <button
@@ -28,6 +44,7 @@ export function ClickerSoundsFolder() {
           </button>
         ))}
       </div>
+      {folderView.customName ? <p className="tx-clicker-rename">{folderView.customName}</p> : null}
       <div id="clicker-sound-cuts" className="tx-clicker-panel" role="tabpanel" aria-labelledby={`clicker-tab-${family.toLowerCase()}`}>
         <ul className="tx-clicker-list">
           {cuts.map((tick) => {
@@ -40,7 +57,7 @@ export function ClickerSoundsFolder() {
                   data-tick-id={tick.id}
                   aria-pressed={isSelected}
                   onClick={() => {
-                    playReelTick(tick.id);
+                    playProceduralClick(tick.id);
                     useAuric.getState().setReelSound(tick.id);
                   }}
                 >

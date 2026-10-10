@@ -467,7 +467,7 @@ test("rejects hosts that are not plain slugs", () => {
 
 test("renders install page markup", () => {
   const html = renderInstallPage("wild-race.grok.me", "/?install=1&platform=ios");
-  assert.match(html, /Add Wild Race to your/);
+  assert.match(html, /Add Auric to your/);
   assert.match(html, /\/__grok\/install\/styles\.css/);
   assert.match(html, /href="\/"/);
   assert.equal(html.includes("{{APP_NAME}}"), false);
@@ -479,12 +479,12 @@ test("escapes host-derived values in the install page", () => {
   assert.equal(html.includes("<script>alert(1)</script>"), false);
 });
 
-test("renders the host-named manifest with the platform launcher icon", () => {
+test("renders the AURIC manifest with correct launcher sizes", () => {
   const manifest = JSON.parse(renderWebManifest("wild-race.grok.me"));
-  assert.equal(manifest.name, "Wild Race");
-  assert.equal(manifest.short_name, "Wild Race");
-  assert.equal(manifest.icons[0].src, "/__grok/icon-180.png");
-  assert.deepEqual(manifest.icons.map((icon) => icon.sizes), ["180x180"]);
+  assert.equal(manifest.name, "Auric");
+  assert.equal(manifest.short_name, "Auric");
+  assert.equal(manifest.icons[0].src, "/icon-192.png");
+  assert.deepEqual(manifest.icons.map(i => i.sizes), ["192x192", "512x512", "512x512"]);
 });
 
 // Tripwires: the deployed-app path only works if Nitro scans server/ — an
@@ -501,8 +501,8 @@ test("nitro middleware and its bundled assets exist", () => {
   assert.match(middleware, /install-page\.html\?raw/);
   assert.match(middleware, /virtual:grok-og-identity/);
   readFileSync(join(TEMPLATE_ROOT, "scripts/install-page.html"));
+  readFileSync(join(TEMPLATE_ROOT, "public/__grok/icon-180.png"));
   readFileSync(join(TEMPLATE_ROOT, "public/__grok/install/styles.css"));
-  // The platform serves its launcher icon separately; it is not part of source checkouts.
 });
 
 test("vite plugin bakes og identity as a virtual module", () => {
