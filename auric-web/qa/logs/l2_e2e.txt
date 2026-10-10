@@ -1,0 +1,17 @@
+TAP version 13
+# L2 motion median=16.70ms p95=16.70ms frames=62
+# L2 apply frames=1 css=\#AABBCC beam=\#AABBCC
+# Subtest: Laser & Numbers drafts, applies, discards, persists, and fits all target widths
+ok 1 - Laser & Numbers drafts, applies, discards, persists, and fits all target widths
+  ---
+  duration_ms: 4166.277906
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 1
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 4498.723923

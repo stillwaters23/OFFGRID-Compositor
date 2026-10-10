@@ -1,0 +1,26 @@
+TAP version 13
+# Subtest: Clicker Sounds lists, selects, previews, and stays within the viewport
+not ok 1 - Clicker Sounds lists, selects, previews, and stays within the viewport
+  ---
+  duration_ms: 30918.7737
+  location: '/tmp/auric_l5_scratch/auric-web/tests/e2e/l4_clicker_sounds.e2e.mjs:8:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    locator.click: Timeout 30000ms exceeded.
+    Call log:
+      - waiting for getByRole('button', { name: 'clicker-sounds unlocked' })
+    
+  code: 'ERR_TEST_FAILURE'
+  name: 'TimeoutError'
+  stack: |-
+    TestContext.<anonymous> (/tmp/auric_l5_scratch/auric-web/tests/e2e/l4_clicker_sounds.e2e.mjs:63:73)
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 0
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 31238.049985
