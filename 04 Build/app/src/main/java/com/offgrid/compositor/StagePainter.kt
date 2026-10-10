@@ -6,6 +6,8 @@ import com.offgrid.compositor.effects.EffectTimes
 import com.offgrid.compositor.effects.FxKeys
 import com.offgrid.compositor.effects.ShatterMesh
 import com.offgrid.compositor.effects.StagePlan
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.nio.FloatBuffer
 
 /**
@@ -25,7 +27,14 @@ internal class StagePainter {
     private val shard = GlProgram(StageShaders.SHARD_VERTEX, StageShaders.SHARD_FRAGMENT)
     private val void = GlProgram(StageShaders.PICTURE_VERTEX, StageShaders.VOID_FRAGMENT)
     private val beach = GlProgram(StageShaders.PICTURE_VERTEX, StageShaders.BEACH_FRAGMENT)
+    private val body = GlProgram(StageShaders.PICTURE_VERTEX, StageShaders.BODY_FRAGMENT)
     private val shape = GlProgram(StageShaders.SHAPE_VERTEX, StageShaders.SHAPE_FRAGMENT)
+
+    /** The person mask, copied onto the GPU on this drawing thread. Never on the UI thread. */
+    private var maskTexture = 0
+    private var maskWidth = 0
+    private var maskHeight = 0
+    private var maskUpload: ByteBuffer? = null
 
     /** The camera picture this frame. Drawn fresh every frame. */
     private val live = GlTarget()
@@ -70,7 +79,7 @@ internal class StagePainter {
     /**
      * Paints one picture into a stage picture of [w] by [h] and returns it.
      * [cameraTexture] is the camera with [cameraMatrix]. [overlayTexture] is the drawn effects
-     * (0 when none) with [overlayMatrix].
+     * (0 when none) with [overlayMatrix]. [mask] is the person cutout, or null when that look is off.
      */
     fun paint(
         cameraTexture: Int,
@@ -81,6 +90,7 @@ internal class StagePainter {
         time: Float,
         overlayTexture: Int,
         overlayMatrix: FloatArray,
+        mask: MaskFrame? = null,
     ): GlTarget {
         width = w
         height = h
@@ -89,11 +99,28 @@ internal class StagePainter {
         workB.ensure(w, h)
         GLES20.glDisable(GLES20.GL_BLEND)
 
+        // A body look with no fresh mask never samples the camera. The box stays black.
+        if (plan.bodyOn && (mask == null || MaskGate.verdict(mask, System.nanoTime()) != MaskVerdict.APPLY)) {
+            live.bind()
+            GLES20.glClearColor(0f, 0f, 0f, 1f)
+            GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
+            live.filled = true
+            GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
+            return live
+        }
+
         // 1. The camera, mirrored for mirror plus scan.
         live.bind()
         drawCamera(cameraTexture, cameraMatrix, if (plan.mirror) 1f else 0f)
         live.filled = true
         var source = live
+
+        // 1b. The person mask: see-through, replace, body cloak, or hologram.
+        if (plan.bodyOn && mask != null) {
+            val into = other(source)
+            drawBody(source, into, mask, plan, time)
+            source = into
+        }
 
         // 2. Time freeze and quiet mode hold one still picture.
         if (plan.holdId != 0L) {
@@ -194,7 +221,13 @@ internal class StagePainter {
     }
 
     fun release() {
-        for (program in listOf(camera, overlay, picture, tilt, shard, void, beach, shape)) program.release()
+        for (program in listOf(camera, overlay, picture, tilt, shard, void, beach, body, shape)) program.release()
+        if (maskTexture != 0) {
+            GLES20.glDeleteTextures(1, intArrayOf(maskTexture), 0)
+            maskTexture = 0
+            maskWidth = 0
+            maskHeight = 0
+        }
         for (target in listOf(live, workA, workB, held, ghost)) target.release()
         for (target in echoes) target.release()
     }
@@ -467,6 +500,71 @@ internal class StagePainter {
         GLES20.glDisable(GLES20.GL_BLEND)
         drawPicture(from)
         to.filled = true
+    }
+
+    private fun drawBody(source: GlTarget, into: GlTarget, frame: MaskFrame, plan: StagePlan, time: Float) {
+        uploadMask(frame)
+        into.bind()
+        body.use()
+        bindPicture(body, source)
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE1)
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, maskTexture)
+        body.set1i("sMask", 1)
+        body.set1f("uKind", bodyKind(plan.bodyMode))
+        body.set1f("uPlate", if (plan.bodyPlate == FxKeys.BODY_PLATE_VOID) 1f else 0f)
+        body.set1f("uCut", plan.bodyCut)
+        body.set1f("uTime", time)
+        body.set1f("uAspect", width.toFloat() / height.coerceAtLeast(1))
+        GlShapes.drawFull(body)
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
+        into.filled = true
+    }
+
+    /** Puts the person mask on the GPU. Called only from the drawing thread. */
+    private fun uploadMask(frame: MaskFrame) {
+        if (maskTexture == 0) {
+            val names = IntArray(1)
+            GLES20.glGenTextures(1, names, 0)
+            maskTexture = names[0]
+            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, maskTexture)
+            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_LINEAR)
+            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR)
+            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE)
+            GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE)
+        } else {
+            GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, maskTexture)
+        }
+        val needed = frame.bytes.size
+        var buffer = maskUpload
+        if (buffer == null || buffer.capacity() < needed) {
+            buffer = ByteBuffer.allocateDirect(needed).order(ByteOrder.nativeOrder())
+            maskUpload = buffer
+        }
+        buffer.clear()
+        buffer.put(frame.bytes, 0, needed)
+        buffer.position(0)
+        if (frame.width != maskWidth || frame.height != maskHeight) {
+            GLES20.glTexImage2D(
+                GLES20.GL_TEXTURE_2D, 0, GLES20.GL_ALPHA,
+                frame.width, frame.height, 0,
+                GLES20.GL_ALPHA, GLES20.GL_UNSIGNED_BYTE, buffer,
+            )
+            maskWidth = frame.width
+            maskHeight = frame.height
+        } else {
+            GLES20.glTexSubImage2D(
+                GLES20.GL_TEXTURE_2D, 0, 0, 0,
+                frame.width, frame.height,
+                GLES20.GL_ALPHA, GLES20.GL_UNSIGNED_BYTE, buffer,
+            )
+        }
+    }
+
+    private fun bodyKind(mode: String): Float = when (mode) {
+        FxKeys.BODY_REPLACE -> 2f
+        FxKeys.BODY_CLOAK -> 3f
+        FxKeys.BODY_HOLO -> 4f
+        else -> 1f
     }
 
     private fun drawCamera(texture: Int, matrix: FloatArray, flipX: Float) {
