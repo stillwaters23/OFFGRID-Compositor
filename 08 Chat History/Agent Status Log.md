@@ -218,3 +218,18 @@ States: passed, waiting for review, blocked, or waiting for Royalty's phone test
 - **PR / commit:** Lane B pull request into `final-build`, not merged.
 - **State:** waiting for review
 - **Next:** read the CI log, fix anything it finds, then run the phone checks: a 20 second Robot plus Echo clip, camera off and mic off during a recording, and frame times.
+
+## 2026-10-09 11:00 PM CT — Lane B finisher
+
+- **Bootloader step:** Lane B round 2 on pull request #11. Base stays `final-build`. Not merged.
+- **What was done:**
+  - Restored the manifest removal of ACCESS_NETWORK_STATE. The allowlist accepts the AndroidX dynamic receiver permission by its exact name, and lint runs in CI.
+  - A mic read error releases AudioRecord once, and stop is safe to call again. The mic is released when the app is hidden.
+  - A denied mic turns the panel toggle off and leaves the Settings line on the record bar.
+  - MainActivity.kt is under 400 lines. The camera, playback, recording, and status pieces live in their own files. The new output and denial hooks are under 40 lines.
+  - The radar ping is mixed into the video audio. The replay buffer keeps an audio track while the mic is on.
+  - 📁 Microphone Effects is in the panel. The old "no mic" sentences are archived, not deleted.
+  - Unit tests cover the mic release, the denied capture state, the saved mic toggle, the replay audio track, the radar ping, and extra output bookkeeping.
+- **PR / commit:** Pull request #11, not merged.
+- **State:** waiting for review
+- **Next:** CI on this head must be green. Phone checks stay with Royalty: lip sync, a 20 second Robot plus Echo clip, and camera-off and mic-off in one recording.

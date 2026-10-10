@@ -27,7 +27,13 @@ internal class AvSession(
     fun start(file: File, onFinished: (Boolean) -> Unit): Boolean {
         val size = processor.recordingSize
         val made = try {
-            AvRecorder(file, size.width, size.height, sounds) { whole -> main.post { finish(whole, onFinished) } }
+            AvRecorder(
+                file,
+                size.width,
+                size.height,
+                sounds,
+                onFinished = { whole -> main.post { finish(whole, onFinished) } },
+            )
         } catch (error: IOException) {
             Log.e(TAG, "The recorder did not start", error)
             return false

@@ -16,6 +16,7 @@ import androidx.camera.core.SurfaceOutput
 import androidx.camera.core.SurfaceProcessor
 import androidx.camera.core.SurfaceRequest
 import com.offgrid.compositor.audio.AvRecorder
+import com.offgrid.compositor.audio.MicEngine
 import com.offgrid.compositor.effects.EffectEngine
 import com.offgrid.compositor.effects.FxKeys
 import com.offgrid.compositor.effects.OverlayLayer
@@ -66,6 +67,31 @@ class CompositorProcessor(
             effects?.reducedMotion = value
         }
 
+    /** Draws each finished picture into an extra encoder surface. Pass null to remove [id]. Any thread. */
+    fun setExtraOutput(id: String, surface: Surface?, width: Int, height: Int) {
+        executor.execute {
+            if (surface == null) {
+                destroyExtraOutput(extraOutputs.set(id, null))
+                return@execute
+            }
+            if (released || width <= 0 || height <= 0) return@execute
+            val eglSurface = EGL14.eglCreateWindowSurface(display, config, surface, intArrayOf(EGL14.EGL_NONE), 0)
+            if (eglSurface == null || eglSurface == EGL14.EGL_NO_SURFACE) {
+                Log.e(TAG, "Extra output $id could not draw")
+                return@execute
+            }
+            destroyExtraOutput(extraOutputs.set(id, ExtraOutputSlot(eglSurface, width, height)))
+        }
+    }
+
+    /** Feeds the replay buffer from [engine] while the mic is on. Pass null to stop. Any thread. */
+    fun setReplayAudio(engine: MicEngine?) {
+        executor.execute {
+            replayMic = engine
+            replay?.setMicFeed(engine)
+        }
+    }
+
     private val thread = HandlerThread("OffgridCompositor")
     private val handler: Handler
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -86,6 +112,8 @@ class CompositorProcessor(
     private var replaySurface = EGL14.EGL_NO_SURFACE
     private var replayWanted = false
     private var replaySeconds = 30
+    private var replayMic: MicEngine? = null
+    private val extraOutputs = ExtraOutputRegistry<ExtraOutputSlot>()
 
     /** The video recorder and its drawing target, while a recording runs. */
     @Volatile
@@ -259,6 +287,9 @@ class CompositorProcessor(
             recorder.frameDrawn(stamp)
             drawFinal(recorderSurface, recorder.width, recorder.height, stamp, painted, camera)
         }
+        for (slot in extraOutputs.values()) {
+            drawFinal(slot.eglSurface, slot.width, slot.height, stamp, painted, camera)
+        }
     }
 
     /**
@@ -354,6 +385,7 @@ class CompositorProcessor(
             }
             replay = buffer
             replaySurface = eglSurface
+            replayMic?.let { buffer.setMicFeed(it) }
         } catch (error: Exception) {
             Log.e(TAG, "The replay buffer could not start", error)
             replayWanted = false
@@ -368,6 +400,12 @@ class CompositorProcessor(
         }
         replay?.release()
         replay = null
+    }
+
+    private fun destroyExtraOutput(slot: ExtraOutputSlot?) {
+        if (slot == null) return
+        if (dummy != EGL14.EGL_NO_SURFACE) EGL14.eglMakeCurrent(display, dummy, dummy, context)
+        EGL14.eglDestroySurface(display, slot.eglSurface)
     }
 
     /**
@@ -648,6 +686,7 @@ class CompositorProcessor(
                 EGL14.eglDestroySurface(display, darkScreen)
                 darkScreen = EGL14.EGL_NO_SURFACE
             }
+            extraOutputs.clear().forEach(::destroyExtraOutput)
             stopReplay()
             if (dummy != EGL14.EGL_NO_SURFACE) {
                 EGL14.eglDestroySurface(display, dummy)
@@ -707,6 +746,12 @@ class CompositorProcessor(
             mainHandler.post { onFailed?.invoke() }
         }
     }
+
+    private class ExtraOutputSlot(
+        val eglSurface: android.opengl.EGLSurface,
+        val width: Int,
+        val height: Int,
+    )
 
     private class OutputSlot(
         val surfaceOutput: SurfaceOutput,

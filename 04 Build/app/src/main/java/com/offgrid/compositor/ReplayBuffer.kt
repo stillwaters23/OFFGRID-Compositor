@@ -3,17 +3,20 @@ package com.offgrid.compositor
 import android.media.MediaCodec
 import android.media.MediaCodecInfo
 import android.media.MediaFormat
-import android.media.MediaMuxer
 import android.os.Handler
 import android.os.HandlerThread
 import android.util.Log
 import android.view.Surface
+import com.offgrid.compositor.audio.FileMuxerSink
+import com.offgrid.compositor.audio.MicEngine
+import com.offgrid.compositor.audio.PcmSink
 import java.io.File
+import java.nio.ByteBuffer
 
 /**
  * The replay buffer (feature 7, Step 9; final build M4). It keeps the last moments of the
  * finished video, effects and all (never the panel), in the phone's memory, so Royalty can
- * save a clip without streaming again. It keeps the picture only, with no sound.
+ * save a clip without streaming again. While the mic is on, the same clip keeps an audio track.
  *
  * The camera stage draws every finished picture into [surface] too. The phone's video chip
  * packs them, and the newest [keepSeconds] are kept. They live in one fixed block of
@@ -25,8 +28,17 @@ internal class ReplayBuffer(val width: Int, val height: Int, @Volatile var keepS
     private val handler = Handler(thread.looper)
     private val codec: MediaCodec = MediaCodec.createEncoderByType(MIME)
     private val arena = SampleArena(MEMORY_BYTES)
+    private val replayAudio = ReplayAudio(AacReplayEncoder())
     private val lock = Any()
     private var format: MediaFormat? = null
+    private var micFeed: MicEngine? = null
+    private var audioOriginUs: Long? = null
+    private var audioFrames = 0L
+    private val micSink = PcmSink { block, frames ->
+        val copy = ShortArray(frames)
+        block.copyInto(copy, endIndex = frames)
+        handler.post { offerMic(copy, frames) }
+    }
 
     /** The encoder's input. The camera stage draws into it. */
     val surface: Surface
@@ -82,6 +94,35 @@ internal class ReplayBuffer(val width: Int, val height: Int, @Volatile var keepS
     private fun trim() {
         val newest = arena.newestTimeUs ?: return
         arena.dropBefore(newest - (keepSeconds + KEYFRAME_SECONDS) * MICROS)
+        arena.oldestTimeUs?.let { replayAudio.dropBefore(it) }
+    }
+
+    /** Listens to [engine] while the mic is on, and stops when it is null. The replay thread owns the encoder. */
+    fun setMicFeed(engine: MicEngine?) {
+        handler.post { attachMic(engine) }
+    }
+
+    private fun attachMic(engine: MicEngine?) {
+        if (micFeed === engine) return
+        micFeed?.removeSink(micSink)
+        micFeed = engine
+        if (engine == null) {
+            replayAudio.setMicOn(false)
+            return
+        }
+        if (replayAudio.setMicOn(true)) engine.addSink(micSink) else micFeed = null
+    }
+
+    private fun offerMic(block: ShortArray, frames: Int) {
+        if (!replayAudio.micOn) return
+        val timeUs = synchronized(lock) {
+            val origin = audioOriginUs ?: arena.newestTimeUs ?: 0L
+            if (audioOriginUs == null) audioOriginUs = origin
+            val time = origin + audioFrames * MICROS / AUDIO_RATE
+            audioFrames += frames
+            time
+        }
+        replayAudio.offer(block, frames, timeUs)
     }
 
     /** How many seconds are kept right now. It is lower than [keepSeconds] when the 64 MB block is full. */
@@ -101,44 +142,46 @@ internal class ReplayBuffer(val width: Int, val height: Int, @Volatile var keepS
     /** Writes the kept moments to [file]. Returns false if nothing is kept yet. Call off the main thread. */
     fun save(file: File): Boolean {
         val shape = synchronized(lock) { format } ?: return false
-        val muxer = MediaMuxer(file.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
-        return try {
-            val track = muxer.addTrack(shape)
-            // The lock is held while writing, so the block is not rewritten under the save. New pictures
-            // wait a moment, which only matters to the replay, never to the live video.
-            synchronized(lock) {
-                val newest = arena.newestTimeUs ?: return false
-                val from = newest - keepSeconds * MICROS
-                // Start at the last whole picture at or before the start time.
-                val all = arena.snapshot()
-                val start = all.indexOfLast { it.timeUs <= from && it.flags and MediaCodec.BUFFER_FLAG_KEY_FRAME != 0 }
-                    .takeIf { it >= 0 } ?: all.indexOfFirst { it.flags and MediaCodec.BUFFER_FLAG_KEY_FRAME != 0 }
-                if (start < 0) return false
-                muxer.start()
-                val info = MediaCodec.BufferInfo()
-                val first = all[start].timeUs
-                for (index in start until all.size) {
-                    val piece = all[index]
-                    info.set(0, piece.size, piece.timeUs - first, piece.flags)
-                    muxer.writeSampleData(track, arena.read(piece), info)
+        val video = ArrayList<ReplaySample>()
+        val audio = ArrayList<ReplaySample>()
+        var audioFormat: MediaFormat? = null
+        val ready = synchronized(lock) {
+            val newest = arena.newestTimeUs ?: return@synchronized false
+            val from = newest - keepSeconds * MICROS
+            val all = arena.snapshot()
+            val start = all.indexOfLast { it.timeUs <= from && it.flags and MediaCodec.BUFFER_FLAG_KEY_FRAME != 0 }
+                .takeIf { it >= 0 } ?: all.indexOfFirst { it.flags and MediaCodec.BUFFER_FLAG_KEY_FRAME != 0 }
+            if (start < 0) return@synchronized false
+            val first = all[start].timeUs
+            for (index in start until all.size) {
+                val piece = all[index]
+                val bytes = ByteArray(piece.size)
+                arena.read(piece).get(bytes)
+                video += ReplaySample(ByteBuffer.wrap(bytes), piece.timeUs - first, piece.flags, piece.size)
+            }
+            val slice = replayAudio.slice()
+            if (slice != null) {
+                audioFormat = slice.first
+                for (piece in slice.second) {
+                    val time = (piece.timeUs - first).coerceAtLeast(0L)
+                    audio += ReplaySample(ByteBuffer.wrap(piece.bytes), time, piece.flags, piece.bytes.size)
                 }
             }
-            muxer.stop()
             true
+        }
+        if (!ready) return false
+        return try {
+            ReplayClipWriter().write(FileMuxerSink(file.absolutePath), shape, video, audioFormat, audio)
         } catch (error: Exception) {
             Log.e(TAG, "Saving the replay failed", error)
             false
-        } finally {
-            try {
-                muxer.release()
-            } catch (error: IllegalStateException) {
-                Log.w(TAG, "The replay file was already closed", error)
-            }
         }
     }
 
     fun release() {
         handler.post {
+            attachMic(null)
+            replayAudio.release()
             try {
                 codec.stop()
             } catch (error: IllegalStateException) {
@@ -146,7 +189,11 @@ internal class ReplayBuffer(val width: Int, val height: Int, @Volatile var keepS
             }
             codec.release()
             surface.release()
-            synchronized(lock) { arena.clear() }
+            synchronized(lock) {
+                arena.clear()
+                audioOriginUs = null
+                audioFrames = 0L
+            }
             thread.quitSafely()
         }
     }
@@ -160,6 +207,7 @@ internal class ReplayBuffer(val width: Int, val height: Int, @Volatile var keepS
         private const val FRAME_RATE = 30
         private const val KEYFRAME_SECONDS = 1
         private const val MICROS = 1_000_000L
+        private const val AUDIO_RATE = 48_000L
     }
 
 }

@@ -59,7 +59,7 @@ internal class EffectsController(
         override fun run() {
             val s = engine.settings
             if (!s.on(FxKeys.RADAR_ON) && !s.on(FxKeys.MIRROR_ON)) return
-            sounds.play(SOUND_RADAR, s)
+            sounds.playRadar(s)
             main.postDelayed(this, radarTurnMs())
         }
     }
@@ -352,7 +352,6 @@ internal class EffectsController(
         const val MIN_REPLAY_SECONDS = 5
         const val REPLAY_FILE = "replay-now.mp4"
         const val DEFAULT_WORDS = "OFFGRID"
-        const val SOUND_RADAR = "radar"
         const val SOUND_EMOJI = "emoji"
         const val SOUND_INK = "ink"
         const val SOUND_TOGGLE = "toggle"

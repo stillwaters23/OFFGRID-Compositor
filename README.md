@@ -50,7 +50,8 @@ The camera toggle lets go of the camera when it is off. Viewers then see black w
 
 - **Record length:** seconds per video. 0 records until you tap **Stop**.
 - **Save to gallery:** each video also goes to your gallery, in Movies › OFFGRID.
-- **Replay buffer:** keeps the last moments of your video. Tap **Save replay** to keep a clip.
+- **Replay buffer:** keeps the last moments of your video. While the mic is on, that clip keeps the audio too. Tap **Save replay** to keep a clip.
+- **📁 Microphone Effects:** the mic toggle, pitch, robot, echo, radio, cave, volume, and the noise gate. The radar ping is mixed into the video while the radar is on.
 
 Tap **Record** on the bar at the bottom. Tap **Play last video** to watch it.
 

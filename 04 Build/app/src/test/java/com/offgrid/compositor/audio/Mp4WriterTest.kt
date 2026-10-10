@@ -9,8 +9,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35])
 class Mp4WriterTest {
     private class FakeSink : MuxerSink {
         val formats = ArrayList<String>()

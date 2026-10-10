@@ -199,6 +199,20 @@ class TerminalPanel @JvmOverloads constructor(
     /** Every effect setting right now, for the camera's effects. */
     fun effectSnapshot(): com.offgrid.compositor.effects.EffectSnapshot = EffectSettings.snapshot(store)
 
+    /** Saves a toggle from outside the panel, such as turning the mic off after a denial. */
+    fun setToggleSetting(key: String, on: Boolean) {
+        if (store.toggle(key) == on) return
+        store.setToggle(key, on)
+        refreshLook()
+        val folder = openFolder
+        if (folder != null && folder.items.any { it is ToggleItem && it.key == key }) {
+            val scroll = detailScroll.scrollY
+            buildDetail(folder)
+            detailScroll.post { detailScroll.scrollTo(0, scroll) }
+        }
+        settingChanged(key)
+    }
+
     /** The panel's glow color, for effects that follow the panel's look. */
     val glowColor: Int get() = look.outerGlow
 

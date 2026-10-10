@@ -33,6 +33,25 @@ internal class SoundBoard {
     /** Sounds still playing. All of them are let go when the soundboard closes. */
     private val playing = HashSet<AudioTrack>()
 
+    /**
+     * Puts the radar ping in the recorded audio whenever the radar or the mirror scan is on.
+     * The phone speaker still follows the soundboard switch.
+     */
+    fun playRadar(settings: EffectSnapshot) {
+        if (!RadarPing.intoVideo(settings.on(FxKeys.RADAR_ON), settings.on(FxKeys.MIRROR_ON))) return
+        val chosen = settings.choice(FxKeys.SOUND_PREFIX + RADAR)
+        val name = RadarPing.soundName(chosen)
+        val typed = settings.value(FxKeys.SOUND_VOLUME)
+        val gain = if (typed > 0f) typed else RadarPing.QUIET_GAIN
+        val speaker = settings.on(FxKeys.SOUND_ON) && chosen != OFF && typed > 0f
+        handler.post {
+            val samples = made.getOrPut(name) { SoundShapes.make(name) }
+            if (samples.isEmpty()) return@post
+            videoMix.add(samples, SoundShapes.RATE, gain)
+            if (speaker) playSpeaker(samples, typed)
+        }
+    }
+
     /** Plays [effect]'s chosen sound if the soundboard is on. [force] plays it even when off, for Try it. */
     fun play(effect: String, settings: EffectSnapshot, force: Boolean = false) {
         if (!force && !settings.on(FxKeys.SOUND_ON)) return
@@ -56,6 +75,10 @@ internal class SoundBoard {
         val samples = made.getOrPut(sound) { SoundShapes.make(sound) }
         if (samples.isEmpty()) return
         if (intoVideo) videoMix.add(samples, SoundShapes.RATE, volume)
+        playSpeaker(samples, volume)
+    }
+
+    private fun playSpeaker(samples: ShortArray, volume: Float) {
         var track: AudioTrack? = null
         try {
             track = AudioTrack.Builder()
@@ -103,6 +126,7 @@ internal class SoundBoard {
     private companion object {
         const val TAG = "OffgridSounds"
         const val OFF = "off"
+        const val RADAR = "radar"
     }
 }
 
