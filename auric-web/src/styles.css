@@ -16,6 +16,11 @@
   --fg: var(--digit);
   --bg: var(--felt);
   --digit-face: "Barlow Condensed";
+  --laser-color: #f0243e;
+  --laser-core: #ffffff;
+  --laser-bloom-a: 36%;
+  --laser-spread: 48px;
+  --laser-on: 1;
 }
 
 @theme {
@@ -565,7 +570,7 @@
   left: 8px;
   right: 8px;
   top: 50%;
-  height: calc(var(--reel-font, 40px) * var(--digit-scale, 1) * 1.62);
+  height: var(--reel-window, calc(var(--reel-font, 40px) * var(--digit-scale, 1) * 1.62));
   z-index: 4;
   transform: translateY(-50%);
   border-radius: 14px;
@@ -589,6 +594,57 @@
   border-top: 5px solid transparent;
   border-bottom: 5px solid transparent;
   filter: drop-shadow(0 0 5px color-mix(in oklab, var(--glow) 70%, transparent));
+}
+
+.laser-strip {
+  pointer-events: none;
+  position: absolute;
+  z-index: 5;
+  height: var(--laser-spread, 48px);
+  opacity: var(--laser-on, 1);
+  transform: translateY(-50%);
+  mix-blend-mode: screen;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    color-mix(in srgb, var(--laser-color, #f0243e) var(--laser-bloom-a, 36%), transparent),
+    transparent
+  );
+  box-shadow:
+    0 0 16px color-mix(in srgb, var(--laser-color, #f0243e) 30%, transparent),
+    0 0 32px color-mix(in srgb, var(--laser-color, #f0243e) 18%, transparent);
+}
+
+/* The specified 2px white-hot core is an optical hairline. */
+.laser-strip::before {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  top: calc(50% - 1px);
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--laser-color, #f0243e) 40%, var(--laser-core, #fff)) 6%,
+    var(--laser-core, #fff) 18% 82%,
+    color-mix(in srgb, var(--laser-color, #f0243e) 40%, var(--laser-core, #fff)) 94%,
+    transparent
+  );
+}
+
+.barrel[data-reel-selector="none"] [data-selected="1"] {
+  color: #fff;
+  text-shadow: 0 0 8px var(--laser-core, #fff), 0 0 16px var(--laser-color, #f0243e);
+}
+
+.l1-demo-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 352px), 1fr));
+}
+
+.reel-calendar-bank {
+  padding-inline: 16px;
 }
 
 .barrel[data-reel-size="sm"] .aperture,
@@ -2846,5 +2902,3 @@ html:has(.tx-root[data-mood="light"]) body {
   .tx-install-row { grid-template-columns: 1fr; }
   .tx-clock-line { white-space: normal; }
 }
-
-

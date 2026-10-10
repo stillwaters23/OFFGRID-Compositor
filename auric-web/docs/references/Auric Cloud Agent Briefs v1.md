@@ -203,7 +203,7 @@ You are making the Auric wheel feel finished. Four deliverables, in order:
   - `package.json` (`scripts` only)
   - **new** `tests/l1-*.test.ts`, `tests/e2e/l1-*.e2e.mjs`
   - `screenshots/l1/`
-  - `archive/2026-10-09-l1/`
+  - `archive/2026_10_09_l1/`
 - **FORBIDDEN:** everything else, especially `store.ts`, `glow.tsx`, `appearance.ts`, `appearance-studio.tsx`, `pavilion.tsx`, `modules.ts`, `folder-*.tsx`, `session-shell.tsx`, `wake.ts`, `alarm-*.tsx`, `timer-view.tsx` (presets), and the global forbidden list in §2.
 
 ### (c) GO

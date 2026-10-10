@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { controlById } from "@/lib/controls";
+import { reelGeometry, rowsCrossed } from "@/lib/reel_geometry";
 import { useAuric } from "@/lib/store";
 import { cn, wrapIndex } from "@/lib/utils";
 
@@ -15,6 +16,7 @@ type DrumReelProps = {
   fontClass?: string;
   size?: "lg" | "md" | "sm" | "plaque" | "hero" | "trio";
   label?: string;
+  selector?: "aperture" | "none";
 };
 
 const ANGLE = 26;
@@ -32,14 +34,18 @@ export function DrumReel({
   fontClass,
   size = "lg",
   label,
+  selector = "aperture",
 }: DrumReelProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
+  const barrelRef = useRef<HTMLDivElement>(null);
+  const resizeRaf = useRef<number>(0);
   const pos = useRef(value);
   const vel = useRef(0);
   const dragging = useRef(false);
   const lastY = useRef(0);
   const lastT = useRef(0);
   const lastTick = useRef(value);
+  const lastTickPosition = useRef(value);
   const raf = useRef<number>(0);
   const onChangeRef = useRef(onChange);
   const onTickRef = useRef(onTick);
@@ -50,11 +56,19 @@ export function DrumReel({
   const plaque = size === "plaque";
   const hero = size === "hero";
   const trio = size === "trio";
-  const radius = hero ? 128 : trio ? 78 : size === "lg" ? 96 : size === "md" ? 68 : plaque ? 72 : 52;
   const baseFont = hero ? 56 : trio ? 30 : size === "lg" ? 40 : size === "md" ? 24 : plaque ? 22 : 18;
   const longest = labels?.reduce((m, s) => Math.max(m, s.length), 2) ?? Math.max(pad, String(count - 1).length, 2);
-  const barrelW = hero ? 176 : trio ? 108 : size === "lg" ? 340 : size === "md" ? 72 : plaque ? 240 : 72;
-  const fontSize = Math.max(14, Math.min(baseFont, Math.floor((barrelW * 0.88) / Math.max(2, longest))));
+  const baseH = hero ? 288 : trio ? 180 : size === "lg" ? 224 : size === "md" ? 160 : plaque ? 176 : 120;
+  const barrelWpx = hero ? 176 : trio ? 108 : size === "lg" ? 260 : size === "md" ? 64 : plaque ? 200 : 72;
+  const [measured, setMeasured] = useState({ width: barrelWpx, height: baseH, digitScale: 1 });
+  const geometry = reelGeometry({
+    width: measured.width,
+    height: measured.height,
+    baseFont,
+    longest,
+    digitScale: measured.digitScale,
+  });
+  const { fontSize, radius, rowPitch } = geometry;
   const config = useRef({ count, labels, pad, radius });
   config.current = { count, labels, pad, radius };
   const paint = useCallback(() => {
@@ -69,7 +83,7 @@ export function DrumReel({
       const angle = (offset - frac) * ANGLE;
       const abs = Math.abs(angle);
       el.textContent = labels?.[n] ?? String(n).padStart(pad, "0");
-      el.style.transform = `rotateX(${-angle}deg) translateZ(${radius}px)`;
+      el.style.transform = `translateX(-50%) rotateX(${-angle}deg) translateZ(${radius}px)`;
       el.style.opacity = abs < 14 ? "1" : abs < 28 ? "0.55" : abs < 42 ? "0.28" : "0.1";
       el.dataset.selected = abs < ANGLE / 2 ? "1" : "0";
     });
@@ -79,17 +93,26 @@ export function DrumReel({
     if (!dragging.current && Math.abs(vel.current) < 0.001) {
       pos.current = value;
       lastTick.current = value;
+      lastTickPosition.current = value;
       paint();
     }
   }, [value, paint]);
 
+  function setSettled(settled: boolean) {
+    wrapRef.current?.setAttribute("data-reel-settled", settled ? "1" : "0");
+  }
+
   function emitIfNeeded() {
-    const rounded = wrapIndex(Math.round(pos.current), config.current.count);
-    if (rounded !== lastTick.current) {
-      lastTick.current = rounded;
+    const steps = rowsCrossed(lastTickPosition.current, pos.current);
+    if (steps === 0) return;
+    const target = Math.round(pos.current);
+    const direction = Math.sign(target - lastTickPosition.current);
+    for (let step = 1; step <= steps; step += 1) {
+      lastTick.current = wrapIndex(lastTickPosition.current + direction, config.current.count);
+      lastTickPosition.current += direction;
       onTickRef.current?.();
-      onChangeRef.current(rounded);
     }
+    onChangeRef.current(wrapIndex(target, config.current.count));
   }
 
   function loop() {
@@ -101,6 +124,7 @@ export function DrumReel({
       pos.current = Math.round(pos.current);
       emitIfNeeded();
       paint();
+      setSettled(true);
       return;
     }
     vel.current *= 0.94;
@@ -113,18 +137,21 @@ export function DrumReel({
         vel.current = 0;
         emitIfNeeded();
         paint();
+        setSettled(true);
         return;
       }
       pos.current += diff * 0.22;
     }
     emitIfNeeded();
     paint();
+    setSettled(false);
     raf.current = requestAnimationFrame(loop);
   }
 
   function onPointerDown(e: React.PointerEvent) {
     if (disabled) return;
     dragging.current = true;
+    setSettled(false);
     lastY.current = e.clientY;
     lastT.current = performance.now();
     vel.current = 0;
@@ -161,6 +188,7 @@ export function DrumReel({
     if (disabled) return;
     e.preventDefault();
     if (e.deltaY === 0) return;
+    setSettled(false);
     pos.current += e.deltaY > 0 ? 0.35 : -0.35;
     emitIfNeeded();
     paint();
@@ -180,17 +208,43 @@ export function DrumReel({
       cancelAnimationFrame(raf.current);
     };
   }, []);
-  useEffect(() => { paint(); }, [count, radius, labels, pad, paint]);
+  useEffect(() => {
+    paint();
+    setSettled(true);
+  }, [count, radius, labels, pad, paint]);
+  useEffect(() => {
+    const barrel = barrelRef.current;
+    if (!barrel || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      const { width, height } = entry.contentRect;
+      const nextScale = Number.parseFloat(getComputedStyle(barrel).getPropertyValue("--digit-scale"));
+      cancelAnimationFrame(resizeRaf.current);
+      resizeRaf.current = requestAnimationFrame(() => {
+        setMeasured((current) => {
+          const digitScale = Number.isFinite(nextScale) && nextScale >= 0 ? nextScale : current.digitScale;
+          if (
+            Math.abs(current.width - width) < 0.5 &&
+            Math.abs(current.height - height) < 0.5 &&
+            Math.abs(current.digitScale - digitScale) < 0.001
+          ) return current;
+          return { width, height, digitScale };
+        });
+      });
+    });
+    observer.observe(barrel);
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(resizeRaf.current);
+    };
+  }, []);
   useEffect(() => {
     if (!disabled) return;
     dragging.current = false;
     vel.current = 0;
     cancelAnimationFrame(raf.current);
   }, [disabled]);
-
-  const windowPx = Math.round(fontSize * 1.28);
-  const baseH = hero ? 288 : trio ? 180 : size === "lg" ? 224 : size === "md" ? 160 : plaque ? 176 : 120;
-  const barrelWpx = hero ? 176 : trio ? 108 : size === "lg" ? 260 : size === "md" ? 64 : plaque ? 200 : 72;
 
   const offsets = Array.from({ length: VISIBLE }, (_, i) => i - Math.floor(VISIBLE / 2));
 
@@ -204,19 +258,20 @@ export function DrumReel({
       <div
         className={cn(
           "barrel relative min-w-0 select-none touch-none overflow-hidden",
-          size === "md" ? "shrink-0" : "w-full max-w-full flex-1",
+          size === "md" ? "shrink-0" : "w-full max-w-full flex-none",
           disabled && "pointer-events-none",
         )}
+        ref={barrelRef}
         data-engine={engine}
         data-reel-size={size}
+        data-reel-selector={selector}
+        data-selected-row-center={geometry.rowCenter}
         style={{
           containerType: "inline-size",
-          ["--reel-window" as string]: `${windowPx}px`,
+          ["--reel-window" as string]: `${Math.max(rowPitch, fontSize * 1.62)}px`,
           ["--reel-font" as string]: `${fontSize}px`,
-          height: `calc(${baseH}px * var(--digit-scale, 1))`,
-          minHeight: trio ? 152 : size === "sm" ? 108 : size === "md" ? 140 : 120,
+          height: `min(max(96px, calc(${baseH}px * var(--digit-scale, 1))), max(96px, calc(100dvh - 96px)))`,
           width: size === "md" ? `${barrelWpx}px` : undefined,
-          minWidth: trio || size === "sm" ? 64 : undefined,
           maxWidth: "100%",
         }}
       >
@@ -232,7 +287,9 @@ export function DrumReel({
             vel.current = 0;
             cancelAnimationFrame(raf.current);
             pos.current = lastTick.current;
+            lastTickPosition.current = pos.current;
             paint();
+            setSettled(true);
           }}
           tabIndex={disabled ? -1 : 0}
           onKeyDown={(event) => {
@@ -245,6 +302,7 @@ export function DrumReel({
             pos.current = event.key === "Home" ? 0 : event.key === "End" ? count - 1 : Math.round(pos.current) + steps[event.key]!;
             emitIfNeeded();
             paint();
+            setSettled(true);
           }}
           role="slider"
           aria-valuemin={0}
@@ -272,15 +330,18 @@ export function DrumReel({
                   fontClass ?? (labels ? "font-sans" : "font-digits"),
                 )}
                 style={{
-                  fontSize: `min(calc(${fontSize}px * var(--digit-scale, 1)), calc((100cqw - ${trio || hero ? 36 : 20}px) / ${longest * 1.1}))`,
+                  fontSize: `${fontSize}px`,
                   backfaceVisibility: "hidden",
                   height: "1.16em",
+                  width: "max-content",
+                  left: "50%",
+                  right: "auto",
                 }}
               />
             ))}
           </div>
         </div>
-        <div className="aperture" />
+        {selector === "aperture" ? <div className="aperture" /> : null}
       </div>
     </div>
   );
