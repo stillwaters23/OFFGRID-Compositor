@@ -12,6 +12,11 @@
     <uses-permission
         android:name="android.permission.ACCESS_NETWORK_STATE"
         tools:node="remove" />
+    <!-- Lane E: MediaPipe's logging library asks to go online. The person mask stays on
+         the phone, so that permission is taken out. -->
+    <uses-permission
+        android:name="android.permission.INTERNET"
+        tools:node="remove" />
 
     <uses-feature
         android:name="android.hardware.camera"

@@ -16,6 +16,7 @@ import android.widget.PopupMenu
 import android.widget.TextView
 import com.offgrid.compositor.R
 import com.offgrid.compositor.effects.FxKeys
+import com.offgrid.compositor.ui.wheel.DrumReelView
 
 internal class TopBar(
     context: Context,
@@ -25,11 +26,15 @@ internal class TopBar(
     private val backOrb: BackOrbView,
     onShrink: () -> Unit,
     onToggle: (String, Boolean, String) -> Unit,
-    onDimensionChanged: (String, Int) -> Unit,
+    private val onDimensionChanged: (String, Int) -> Unit,
     onViewModeChanged: (Int) -> Unit,
+    private val onNotch: (Int) -> Unit = {},
+    private val laserSource: () -> Pair<Int, Int> = { NeonPalette.CYAN_GLOW to 72 },
 ) : LinearLayout(context), Styled {
     val widthInput: EditText
     val heightInput: EditText
+    val widthReel: DrumReelView
+    val heightReel: DrumReelView
     private val widthControl: FrameLayout
     private val heightControl: FrameLayout
     private val titleView: TextView
@@ -50,6 +55,8 @@ internal class TopBar(
     init {
         orientation = HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
+        clipChildren = false
+        clipToPadding = false
         setPadding(Hud.dpi(context, 8f), 0, Hud.dpi(context, 8f), 0)
         contentDescription = context.getString(R.string.terminal_drag)
 
@@ -77,14 +84,16 @@ internal class TopBar(
         addControl(microphone, controlWidth)
 
         widthInput = dimensionInput(context, "Width", width) { onDimensionChanged(LookKeys.WIDTH, it) }
+        widthReel = sizeReel(context, "Width", width, LookKeys.WIDTH)
         widthCaption = dimensionCaption(context, "W")
         widthPlate = dimensionPlate(context)
-        widthControl = dimensionControl(context, widthCaption, widthPlate, widthInput)
+        widthControl = dimensionControl(context, widthCaption, widthPlate, widthReel, widthInput)
         addControl(widthControl, controlWidth)
         heightInput = dimensionInput(context, "Height", height) { onDimensionChanged(LookKeys.HEIGHT, it) }
+        heightReel = sizeReel(context, "Height", height, LookKeys.HEIGHT)
         heightCaption = dimensionCaption(context, "H")
         heightPlate = dimensionPlate(context)
-        heightControl = dimensionControl(context, heightCaption, heightPlate, heightInput)
+        heightControl = dimensionControl(context, heightCaption, heightPlate, heightReel, heightInput)
         addControl(heightControl, controlWidth)
 
         moreButton = MoreButton(context).apply {
@@ -122,8 +131,10 @@ internal class TopBar(
     fun setDimensions(width: Int, height: Int) {
         currentWidth = width
         currentHeight = height
-        if (!widthInput.hasFocus()) widthInput.setText(width.toString())
-        if (!heightInput.hasFocus()) heightInput.setText(height.toString())
+        if (!widthReel.isInteracting) widthReel.setValue(width)
+        if (!heightReel.isInteracting) heightReel.setValue(height)
+        showTyped(widthInput, width)
+        showTyped(heightInput, height)
     }
 
     fun setQuickToggle(key: String, on: Boolean) {
@@ -144,6 +155,15 @@ internal class TopBar(
         val stroke = Hud.dpi(context, 1f).coerceAtLeast(1)
         widthPlate.setStroke(stroke, look.edge)
         heightPlate.setStroke(stroke, look.edge)
+        val (laser, level) = laserSource()
+        for (reel in listOf(widthReel, heightReel)) {
+            reel.setLaserColor(laser)
+            reel.setDimmer(level)
+            reel.setNumberColor(look.numberColor)
+            reel.setSelectedNumberColor(NumberColorGuard.colorOnBeam(look.numberColor, look.skin, laser, level))
+            reel.setHapticsEnabled(look.tick)
+            reel.setFontScale(1f)
+        }
         camera.applyAccent(look.edge, look.outerGlow)
         microphone.applyAccent(look.edge, look.outerGlow)
     }
@@ -203,6 +223,7 @@ internal class TopBar(
         setTextColor(Hud.WHITE)
         gravity = Gravity.CENTER
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
+        visibility = INVISIBLE
     }
 
     private fun dimensionPlate(context: Context) = GradientDrawable().apply {
@@ -211,18 +232,34 @@ internal class TopBar(
         setStroke(Hud.dpi(context, 1f).coerceAtLeast(1), NeonPalette.CYAN_GLOW)
     }
 
+    private fun showTyped(field: EditText, value: Int) {
+        if (field.hasFocus() || field.text.toString() == value.toString()) return
+        field.setText(value.toString())
+    }
+
+    private fun sizeReel(context: Context, label: String, value: Int, key: String) = DrumReelView(context).apply {
+        drawsOwnLaser = true
+        setReelLabel(label)
+        setValue(value)
+        onValueChanged = { onDimensionChanged(key, it) }
+        onValueSettled = { number -> onDimensionChanged(key, number) }
+        onNotch = onNotch
+    }
+
     private fun dimensionControl(
         context: Context,
         caption: TextView,
         plate: GradientDrawable,
+        reel: DrumReelView,
         field: EditText,
     ) = FrameLayout(context).apply {
-        val inset = Hud.dpi(context, 4f)
-        foreground = InsetDrawable(plate, inset, inset, inset, inset)
-        addView(caption, FrameLayout.LayoutParams(Hud.dpi(context, 12f), ViewGroup.LayoutParams.MATCH_PARENT, Gravity.START))
-        addView(field, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT).apply {
-            marginStart = Hud.dpi(context, 12f)
-        })
+        clipChildren = false
+        val inset = Hud.dpi(context, 2f)
+        background = InsetDrawable(plate, inset, inset, inset, inset)
+        addView(reel, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        addView(caption, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP))
+        field.visibility = GONE
+        addView(field, FrameLayout.LayoutParams(1, 1))
     }
 
     private companion object {

@@ -4,9 +4,11 @@ import android.content.Context
 import android.content.res.Configuration
 import android.content.res.Resources
 
-/** The seven parts of the panel that each have their own color folder, most used first. */
+/** The panel parts that each have their own color folder, most used first. */
 internal enum class ColorPart(val key: String, val title: String) {
     CURSOR("cursor", "Laser cursor color"),
+    NUMBER_DARK("number_dark", "Dark theme number color"),
+    NUMBER_LIGHT("number_light", "Light theme number color"),
     TEXT("text", "Typewriter text color"),
     EDGE("edge", "Edge color"),
     OUTER_GLOW("outer_glow", "Outer glow color"),
@@ -136,6 +138,8 @@ internal object Themes {
                 ColorPart.SKIN to phone(SystemRole.NEUTRAL2_900),
                 ColorPart.EDGE to fixed(NeonPalette.CYAN_GLOW),
                 ColorPart.OUTER_GLOW to fixed(NeonPalette.ELECTRIC_PURPLE),
+                ColorPart.NUMBER_DARK to fixed(0xFFFFFFFF.toInt()),
+                ColorPart.NUMBER_LIGHT to fixed(0xFF000000.toInt()),
                 ColorPart.TEXT to phone(SystemRole.SYSTEM_TEXT),
                 ColorPart.CURSOR to fixed(CURSOR_WHITE),
                 ColorPart.FOLDER to fixed(NeonPalette.CYAN_GLOW),
@@ -176,6 +180,7 @@ internal data class PanelLook(
     val base: Theme,
     val skin: Int,
     val edge: Int,
+    val numberColor: Int,
     val outerGlow: Int,
     val text: Int,
     val cursor: Int,
@@ -373,17 +378,24 @@ internal class ThemeStore(private val context: Context, private val prefs: Panel
 
     fun look(): PanelLook {
         val base = base()
+        val skin = color(ColorPart.SKIN)
         val edge = color(ColorPart.EDGE)
         val folder = color(ColorPart.FOLDER)
         val text = color(ColorPart.TEXT)
+        val numberColor = NumberColorGuard.visibleColor(if (NumberColorGuard.luminance(skin) < 0.35) {
+            color(ColorPart.NUMBER_DARK)
+        } else {
+            color(ColorPart.NUMBER_LIGHT)
+        }, skin)
         // Font size 50 is normal. 0 is three quarters as big. 100 is almost half again as big.
         val fontValue = number(LookKeys.FONT_SIZE)
         val fontScale = if (fontValue <= 50) 0.75f + 0.25f * fontValue / 50f else 1f + 0.45f * (fontValue - 50) / 50f
         val glowOn = toggle(LookKeys.GLOW_ON)
         val look = PanelLook(
             base = base,
-            skin = color(ColorPart.SKIN),
+            skin = skin,
             edge = edge,
+            numberColor = numberColor,
             outerGlow = color(ColorPart.OUTER_GLOW),
             text = text,
             cursor = color(ColorPart.CURSOR),

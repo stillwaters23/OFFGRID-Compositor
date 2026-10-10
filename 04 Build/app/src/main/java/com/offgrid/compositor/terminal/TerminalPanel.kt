@@ -30,6 +30,7 @@ import androidx.activity.OnBackPressedCallback
 import androidx.core.view.ViewCompat
 import androidx.core.view.isVisible
 import com.offgrid.compositor.R
+import com.offgrid.compositor.audio.clicker.ClickerSoundEngine
 import kotlin.math.roundToInt
 
 /**
@@ -102,7 +103,14 @@ class TerminalPanel @JvmOverloads constructor(
     internal var stableHeight = 0
     internal val themeRows = ArrayList<ThemeRow>()
 
-    /** Width and Height boxes inside the open Size folder, kept in step with the top boxes. */
+    /** Width and Height drums and typed boxes, kept in step with the top bar. */
+    internal val clickerSounds = ClickerSoundEngine()
+    internal var clickerEnabled = store.toggle(PanelTree.CLICKER_ENABLED)
+    internal var clickerStyle = CLICKER_STYLES.indexOf(store.choice(PanelTree.CLICKER_STYLE)).coerceAtLeast(0)
+    internal var clickerVariant = store.number(PanelTree.CLICKER_VARIANT)
+    internal var clickerVolume = store.number(PanelTree.CLICKER_VOLUME)
+    internal var sizeBank: SizeReelBank? = null
+    internal val sizeReels = ArrayList<Pair<String, WheelNumberRow>>()
     internal val sizeRows = ArrayList<Pair<String, NumberBox>>()
     internal var headingRing: HoloRingView? = null
     internal var guidance: LaserTypeView? = null
@@ -627,11 +635,13 @@ class TerminalPanel @JvmOverloads constructor(
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
+        clickerSounds.activate()
         viewTreeObserver.addOnGlobalFocusChangeListener(focusWatcher)
     }
 
     override fun onDetachedFromWindow() {
         viewTreeObserver.removeOnGlobalFocusChangeListener(focusWatcher)
+        clickerSounds.deactivate()
         shownOnScreen = false
         refreshClock()
         stopCentering()
@@ -660,6 +670,8 @@ class TerminalPanel @JvmOverloads constructor(
                 say(context.getString(if (on) R.string.terminal_toggle_on else R.string.terminal_toggle_off, label))
             },
             onDimensionChanged = { key, value -> setSizePercent(key, value, announce = false) },
+            onNotch = ::playWheelClick,
+            laserSource = { auricLaserColor() to store.number(PanelTree.AURIC_LASER_DIMMER) },
             onViewModeChanged = { mode ->
                 folderSettings.view = when (mode) {
                     0 -> FolderView.BIG_LIST

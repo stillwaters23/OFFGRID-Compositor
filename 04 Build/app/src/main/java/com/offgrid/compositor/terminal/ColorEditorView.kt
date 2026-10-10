@@ -129,6 +129,10 @@ internal class ColorEditorView(
     }
 
     private fun onHex(color: Int) {
+        if (!acceptsNumberColor(color)) {
+            rejectNumberColor()
+            return
+        }
         store.setCustom(part, color, RainbowMix.split(color))
         refresh()
         onLookChanged()
@@ -146,6 +150,10 @@ internal class ColorEditorView(
         val weights = IntArray(RainbowMix.NAMES.size) { boxes.getOrNull(it)?.value ?: 0 }
         weights[index] = value
         val color = RainbowMix.mix(weights)
+        if (!acceptsNumberColor(color)) {
+            rejectNumberColor()
+            return
+        }
         store.setCustom(part, color, weights)
         swatch.color = color
         hexBox.show(RainbowMix.hex(color))
@@ -157,6 +165,10 @@ internal class ColorEditorView(
     }
 
     private fun onSystem(on: Boolean) {
+        if (on && !acceptsNumberColor(store.part(part).role.resolve(context))) {
+            rejectNumberColor()
+            return
+        }
         store.setSystem(part, on)
         refresh()
         onLookChanged()
@@ -169,6 +181,31 @@ internal class ColorEditorView(
         refresh()
         onLookChanged()
         say(context.getString(R.string.terminal_color_reset_done, part.title))
+    }
+
+    private fun acceptsNumberColor(color: Int): Boolean {
+        val backgrounds = when (part) {
+            ColorPart.NUMBER_DARK -> (Theme.entries.map { store.preview(it)[0] } +
+                NumberColorGuard.DARK_BACKGROUND).let { themes ->
+                if (NumberColorGuard.luminance(store.color(ColorPart.SKIN)) < 0.35) {
+                    themes + store.color(ColorPart.SKIN)
+                } else {
+                    themes
+                }
+            }
+            ColorPart.NUMBER_LIGHT -> if (NumberColorGuard.luminance(store.color(ColorPart.SKIN)) >= 0.35) {
+                listOf(NumberColorGuard.LIGHT_BACKGROUND, store.color(ColorPart.SKIN))
+            } else {
+                listOf(NumberColorGuard.LIGHT_BACKGROUND)
+            }
+            else -> return true
+        }
+        return backgrounds.all { NumberColorGuard.accepts(color, it) }
+    }
+
+    private fun rejectNumberColor() {
+        refresh()
+        say(context.getString(R.string.terminal_color_low_contrast, part.title))
     }
 
     private companion object {

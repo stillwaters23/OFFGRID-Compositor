@@ -225,6 +225,8 @@ internal fun TerminalPanel.clearDetail() {
     headingRing = null
     themeRows.clear()
     sizeRows.clear()
+    sizeReels.clear()
+    sizeBank = null
     subFolders = null
 }
 

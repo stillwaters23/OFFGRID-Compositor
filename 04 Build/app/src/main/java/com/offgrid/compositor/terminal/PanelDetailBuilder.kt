@@ -43,8 +43,32 @@ internal fun TerminalPanel.buildDetail(folder: PanelFolder) {
     }
     if (folder.items.isNotEmpty()) {
         detailContent.addView(sectionLabel(sectionFor(folder)))
-        for (item in folder.items) {
-            detailContent.addView(itemView(folder, item), LinearLayout.LayoutParams(MATCH, WRAP))
+        var index = 0
+        val items = folder.items
+        while (index < items.size) {
+            val item = items[index]
+            val next = items.getOrNull(index + 1)
+            if (item is NumberItem && next is NumberItem &&
+                item.key == LookKeys.WIDTH && next.key == LookKeys.HEIGHT
+            ) {
+                val bank = SizeReelBank(
+                    context,
+                    item,
+                    next,
+                    store.number(item.key),
+                    store.number(next.key),
+                    laserSource = { auricLaserColor() to store.number(PanelTree.AURIC_LASER_DIMMER) },
+                    onChange = { key, number, announce -> setSizePercent(key, number, announce) },
+                    onNotch = ::playWheelClick,
+                    onProblem = { say(it) },
+                )
+                sizeBank = bank
+                detailContent.addView(bank, LinearLayout.LayoutParams(MATCH, WRAP))
+                index += 2
+            } else {
+                detailContent.addView(itemView(folder, item), LinearLayout.LayoutParams(MATCH, WRAP))
+                index += 1
+            }
         }
     }
     // Final build: every folder with settings has its own Reset at the bottom.
@@ -72,13 +96,15 @@ internal fun TerminalPanel.sectionFor(folder: PanelFolder): Int = when {
 
 internal fun TerminalPanel.itemView(folder: PanelFolder, item: PanelItem): View = when (item) {
     is NumberItem -> if (item.key == LookKeys.WIDTH || item.key == LookKeys.HEIGHT) {
-        NumberRow(
+        WheelNumberRow(
             context,
             item,
             store.number(item.key),
+            laserSource = { auricLaserColor() to store.number(PanelTree.AURIC_LASER_DIMMER) },
             onChange = { value, announce -> setSizePercent(item.key, value, announce) },
+            onNotch = ::playWheelClick,
             onProblem = { say(it) },
-        ).also { sizeRows += item.key to it.box }
+        ).also { sizeReels += item.key to it }
     } else {
         NumberRow(
             context,

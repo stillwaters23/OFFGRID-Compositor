@@ -18,6 +18,7 @@ private const val BREATH_FAST_S = 1.2f
 /** Reads the saved theme settings again, then repaints the whole panel. */
 internal fun TerminalPanel.refreshLook() {
     look = store.look()
+    syncClicker()
     applyLook()
 }
 

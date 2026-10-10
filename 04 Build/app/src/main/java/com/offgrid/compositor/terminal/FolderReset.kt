@@ -4,8 +4,8 @@ import com.offgrid.compositor.effects.FxKeys
 
 /**
  * Every folder's Reset (final build, M5). It puts the settings in a folder, and in the
- * folders inside it, back to the start. Test marks and the camera mode never change, so a
- * reset never shows Royalty's face by surprise.
+ * folders inside it, back to the start. Test marks, the camera mode, and the body look never
+ * change, so a reset never shows Royalty's face by surprise.
  */
 internal object FolderReset {
     /** True when [folder] or a folder inside it has a setting that Reset puts back. */
@@ -46,5 +46,6 @@ internal object FolderReset {
         else -> false
     }
 
-    private fun kept(key: String): Boolean = key == FxKeys.CAMERA_MODE || key.startsWith(PanelPrefs.TEST_PREFIX)
+    private fun kept(key: String): Boolean =
+        key == FxKeys.CAMERA_MODE || key == FxKeys.BODY_MODE || key.startsWith(PanelPrefs.TEST_PREFIX)
 }

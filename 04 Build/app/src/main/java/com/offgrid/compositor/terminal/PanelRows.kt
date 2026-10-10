@@ -376,8 +376,8 @@ internal class NumberBox(
     override fun applyLook(look: PanelLook) {
         tick = look.tick
         setTextSize(TypedValue.COMPLEX_UNIT_SP, baseSp * look.fontScale)
-        setTextColor(look.edge)
-        highlightColor = Hud.withAlpha(look.edge, 0.35f)
+        setTextColor(look.numberColor)
+        highlightColor = Hud.withAlpha(look.numberColor, 0.35f)
         background = fieldBackground(context, look)
         textCursorDrawable = GradientDrawable().apply {
             setColor(look.cursor)

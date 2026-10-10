@@ -101,6 +101,8 @@ class EffectPanelTest {
         val (_, store) = store()
         val start = EffectSettings.snapshot(store)
         assertEquals(FxKeys.MODE_LIVE, start.choice(FxKeys.CAMERA_MODE))
+        assertEquals(FxKeys.BODY_OFF, start.choice(FxKeys.BODY_MODE))
+        assertEquals(40, start.raw(FxKeys.BODY_EDGE))
         assertTrue("the face diamond starts on", start.on(FxKeys.DIAMOND_ON))
         assertTrue(start.on(FxKeys.DIAMOND_FOLLOW))
         assertFalse(start.on(FxKeys.EMOJI_ON))
@@ -129,7 +131,7 @@ class EffectPanelTest {
             folder.folders.forEach { walk(it) }
         }
         walk(home)
-        for (id in listOf("camera", "camera.diamond", "camera.cloak", "camera.status", "camera.ghost", "camera.takeover",
+        for (id in listOf("camera", "camera.diamond", "camera.body", "camera.cloak", "camera.status", "camera.ghost", "camera.takeover",
             "camera.mirror", "effects", "effects.emoji", "effects.ink", "effects.border", "effects.fireworks", "effects.portal",
             "effects.heroes", "effects.coaster", "effects.clouds", "effects.beach", "effects.freeze", "effects.illusion",
             "effects.sweep", "effects.depth", "effects.write", "effects.radar", "effects.echo", "effects.quiet", "effects.shatter",
@@ -166,6 +168,8 @@ class EffectPanelTest {
     fun aFolderResetPutsOnlyThatFolderBackAndNeverTheCameraMode() {
         val (_, store) = store()
         store.setChoice(FxKeys.CAMERA_MODE, FxKeys.MODE_CLOAK)
+        store.setChoice(FxKeys.BODY_MODE, FxKeys.BODY_SEE)
+        store.setNumber(FxKeys.BODY_EDGE, 99)
         store.setNumber(FxKeys.CLOAK_STRENGTH, 99)
         store.setNumber(FxKeys.EMOJI_SIZE, 99)
         store.setText(FxKeys.STATUS_TEXT, "AWAY")
@@ -175,10 +179,13 @@ class EffectPanelTest {
         assertEquals(60, store.number(FxKeys.CLOAK_STRENGTH))
         assertEquals("CLOAKED", store.text(FxKeys.STATUS_TEXT))
         assertEquals("the camera mode stays, so the face never shows", FxKeys.MODE_CLOAK, store.choice(FxKeys.CAMERA_MODE))
+        assertEquals("the body look stays, so the face never shows", FxKeys.BODY_SEE, store.choice(FxKeys.BODY_MODE))
+        assertEquals(40, store.number(FxKeys.BODY_EDGE))
         assertEquals("other folders keep their settings", 99, store.number(FxKeys.EMOJI_SIZE))
         // Reset all keeps the camera mode too.
         store.resetAll()
         assertEquals(FxKeys.MODE_CLOAK, store.choice(FxKeys.CAMERA_MODE))
+        assertEquals(FxKeys.BODY_SEE, store.choice(FxKeys.BODY_MODE))
         assertNotEquals(99, store.number(FxKeys.EMOJI_SIZE))
     }
 }

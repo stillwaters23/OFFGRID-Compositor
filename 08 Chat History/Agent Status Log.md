@@ -252,3 +252,18 @@ States: passed, waiting for review, blocked, or waiting for Royalty's phone test
 - **PR:** https://github.com/stillwaters23/OFFGRID-Compositor/pull/15
 - **Run:** https://github.com/stillwaters23/OFFGRID-Compositor/actions/runs/38023174944
 - **State:** open for Rex's review
+
+## 2026-10-09 11:13 PM CT — Lane E
+
+- **Bootloader step:** Lane E. Person segmentation. Not a new Bootloader step. Voice stays paused.
+- **What was done:** Added an on-device MediaPipe Tasks Image Segmenter (selfie / person) that feeds the GL compositor. Inside the video box the body can be see-through, replaced, covered by a body-shaped cloak, or drawn as a hologram. The mask is computed on its own thread. The GPU upload stays on the drawing thread. If the mask is missing or older than two frames at 30fps, the box goes black so the face never shows. The internet permission that MediaPipe's logging library asks for is removed. AGP stays 8.13.2.
+- **PR / commit:** Pull request #21 (`copilot/lane-e-media-pipe-person-segmentation`), not merged. Rex reviews it.
+- **State:** waiting for review
+- **Next:** Royalty's phone test on the S25 Ultra: 📁 Camera > 📁 Body mask. Try See-through, Replace, Body cloak, and Hologram. Cover the camera and confirm the box goes black instead of showing a face.
+
+## 2026-10-10 6:20 PM UTC: Lane A merged final-build
+
+- **What was done:** Merged `origin/final-build` into `copilot/lane-a-panel-ui` with a regular merge commit. Lane E person segmentation, the QA reports, and P1's drum reels and clicker stay. Width and Height drum wheels sit in the top bar. The Size folder keeps the paired reels and the typed fallback. The side panel stays archived. System remains the only theme in the picker. Android Gradle Plugin stays 8.13.2.
+- **Tests:** `./gradlew assembleDebug testDebugUnitTest` from `04 Build`. BUILD SUCCESSFUL in 19s. 103 unit tests, 0 failures, 0 errors, 0 skipped.
+- **PR:** Pull request #15 stays open. It is not merged from this branch.
+- **State:** local build and tests passed. CI is the next check.

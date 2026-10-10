@@ -210,6 +210,11 @@ internal fun TerminalPanel.setSizePercent(key: String, value: Int, announce: Boo
 /** Shows Width and Height in every box that shows them, except one being typed in. */
 internal fun TerminalPanel.showSizeNumbers(widthPercent: Int, heightPercent: Int) {
     topBar.setDimensions(widthPercent, heightPercent)
+    sizeBank?.show(LookKeys.WIDTH, widthPercent)
+    sizeBank?.show(LookKeys.HEIGHT, heightPercent)
+    for ((key, row) in sizeReels) {
+        row.show(if (key == LookKeys.WIDTH) widthPercent else heightPercent)
+    }
     for ((key, box) in sizeRows) {
         val value = if (key == LookKeys.WIDTH) widthPercent else heightPercent
         if (!box.hasFocus() && box.value != value) box.show(value)

@@ -9,6 +9,7 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.TextView
 import com.offgrid.compositor.R
+import com.offgrid.compositor.ui.wheel.DrumReelView
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -120,6 +121,7 @@ class PanelFinishTest {
         assertTrue(panel.topBar.widthInput.fontFeatureSettings.orEmpty().contains("tnum"))
         assertTrue(panel.topBar.heightInput.fontFeatureSettings.orEmpty().contains("tnum"))
         assertEquals(panel.backOrb, panel.topBar.getChildAt(0))
+        assertTrue(findViews(panel.topBar).filterIsInstance<DrumReelView>().size >= 2)
 
         panel.store.setThemeMode(ThemeMode.NIGHT)
         panel.refreshLook()
