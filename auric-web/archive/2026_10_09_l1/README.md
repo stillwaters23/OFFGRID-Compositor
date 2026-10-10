@@ -1,6 +1,6 @@
-# Archive 2026-10-09 L1
+# Archive 2026_10_09_l1
 
-These files moved out of `auric-web/src/styles/` on 2026-10-10.
+These files moved out of `auric-web/src/styles/` on 2026-10-10. The directory was renamed from `archive/2026-10-09-l1/` to `archive/2026_10_09_l1/` so the path has no hyphens.
 
 | Archived file | Previous path | Why |
 |---|---|---|

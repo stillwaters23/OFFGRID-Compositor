@@ -54,6 +54,9 @@ test("new L1 files use underscores and the empty lane hooks are archived", () =>
   assert.equal(css.includes(".laser-strip"), true);
   const route = readFileSync(join(SRC, "routes/laser_demo.tsx"), "utf8");
   assert.equal(route.includes('createFileRoute("/laser_demo")'), true);
+  const root = fileURLToPath(new URL("..", import.meta.url));
+  assert.equal(existsSync(join(root, "archive/2026_10_09_l1/README.md")), true);
+  assert.equal(existsSync(join(root, "archive/2026-10-09-l1")), false);
 });
 
 test("Pavilion SoundDeck keeps the default aperture selector", () => {
