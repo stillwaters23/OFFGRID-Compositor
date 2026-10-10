@@ -155,6 +155,7 @@ class MainActivity : AppCompatActivity() {
         faces = FaceTracker(this, engine)
         segmenter = PersonSegmenter(this, engine, masks)
         effects = EffectsController(this, terminalPanel, engine)
+        LiveIntegration.install(this, effects, { processor }, controlBar, terminalPanel) // Lane C hook
         effects.lastVideo = { recordingFile() }
         effects.onSettings = { onEffectSettings() }
         effects.start()
@@ -836,7 +837,6 @@ class MainActivity : AppCompatActivity() {
 
         /** The words shown while the camera is live, which follow the settings. */
         val LIVE_MESSAGES = setOf(R.string.shape_ready, R.string.camera_ready, R.string.ghost_on, R.string.effects_failed)
-
         /** Recording errors that still leave a whole video behind. */
         val KEPT_ERRORS = setOf(
             VideoRecordEvent.Finalize.ERROR_FILE_SIZE_LIMIT_REACHED,

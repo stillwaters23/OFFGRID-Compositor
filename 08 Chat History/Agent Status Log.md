@@ -205,6 +205,86 @@ States: passed, waiting for review, blocked, or waiting for Royalty's phone test
 - **State:** waiting for review
 - **Next:** Milestone 5: final polish, lint, the final report in pull request #8, and the phone test list.
 
+## 2026-10-09 7:53 AM CT — Lane C
+
+- **Bootloader step:** Lane C. Live and Remote
+- **What was done:** Added the `live` Android library with a small secure overlay, foreground service, pairing-key and local-session foundations, focused security tests, and the Bigo live guide. App-side integration and phone checks were pending because the initial checkout had no `final-build` ref.
+- **PR / commit:** Pull request #13. Commit `d5b2852` plus Lane C changes.
+- **State:** blocked
+- **Next:** Resolve Android Gradle plugin access; fetch the PR base and apply the C9 hooks.
+
+## 2026-10-09 8:15 AM CT — Lane C verification
+
+- **Bootloader step:** Lane C. Live and Remote
+- **What was done:** The RFC 5869, key-generation, AES-GCM, X25519, wrong-key, replay, loopback-control, and video-frame checks pass with the standalone Kotlin compiler. The Android build task cannot resolve AGP 8.13.2 in this environment.
+- **PR / commit:** Pull request #13. Lane C changes are in progress.
+- **State:** blocked
+- **Next:** Resolve Android Gradle plugin and SDK access, fetch `final-build`, then run device and screenshot checks.
+
+## 2026-10-09 8:18 AM CT — Lane C base merge
+
+- **Bootloader step:** Lane C. Live and Remote
+- **What was done:** Fetched and merged the pull request base, `final-build` at `9ec834c`. Preserved both branches' status-log entries. C9-specific Live and Remote actions and settings are not present in the fetched panel code.
+- **PR / commit:** Pull request #13. Merge commit is being finalized.
+- **State:** blocked
+- **Next:** Add the available app-side C9 host and compositor hooks; request the missing Lane A action rows, then run build and device checks.
+
+## 2026-10-09 8:26 AM CT — Lane C integration
+
+- **Bootloader step:** Lane C. Live and Remote
+- **What was done:** Added the app host adapter, Live action hooks, and a 24 fps compositor surface for the finished remote preview. The overlay service can collapse the overlay for clean screen-share output, and its Open notification action can recover after process recreation. Requested the missing Lane A Live and Remote actions/settings and Lane B camera/mic settings wiring.
+- **PR / commit:** Pull request #13. C9 integration changes are pending validation.
+- **State:** blocked
+- **Next:** Validate the app changes, retry the Android build, then publish the hooks and record any remaining device checks.
+
+## 2026-10-09 8:27 AM CT — Lane C validation
+
+- **Bootloader step:** Lane C. Live and Remote
+- **What was done:** Secret scan found no secrets and `git diff --check` passed. `./gradlew assembleDebug testDebugUnitTest lintDebug` could not start because AGP 8.13.2 is unavailable from the configured plugin repositories. The latest Actions run is `action_required` with zero jobs, so there are no CI job logs. Emulator, screenshot, and device checks remain unavailable.
+- **PR / commit:** Pull request #13. App integration changes are committed.
+- **State:** blocked
+- **Next:** Run automated code review and security validation, then report remaining Lane A/B work and device checks.
+
+## 2026-10-09 9:25 AM CT — Lane C round two
+
+- **Bootloader step:** Lane C. Live and Remote review follow-up
+- **What was done:** Corrected the Android library plugin declaration, added Live and Remote panel keys/rows/actions and local PC endpoint validation tests, removed duplicate audio permission and Bigo note, improved overlay resize input, and added derived transcript authentication plus channel key ratcheting.
+- **PR / commit:** Pull request #13. Round two changes are in progress.
+- **State:** blocked
+- **Next:** The Lane B PR branch does not yet contain the promised `setExtraOutput` API, so remove the duplicate compositor drawing hook only after that shared output path is present. Finish UI routing, PC streaming integration, validation, and PR details.
+
+## 2026-10-09 9:34 AM CT — Lane C round two validation
+
+- **Bootloader step:** Lane C. Live and Remote review follow-up
+- **What was done:** Added pairing and remote-preview screens, role-driven local discovery/server wiring, service stream-type entry points, SRT/RTMP endpoint validation and OBS setup steps. Standalone Kotlin checks pass for local output validation, HKDF, derived transcript confirmation, and channel rekey. XML and whitespace checks pass. Android Gradle remains blocked resolving AGP 8.13.2.
+- **PR / commit:** Pull request #13. Round two changes are staged for publication.
+- **State:** blocked
+- **Next:** Lane B's current PR branch does not yet expose `setExtraOutput`, so its final shared-surface integration and the under-40-line cap still require that API to land. PC transport/encoded audio and device checks also remain incomplete.
+
+## 2026-10-09 9:41 AM CT — Lane C review follow-up
+
+- **Bootloader step:** Lane C. Follow-up review
+- **What was done:** Fixed role changes from local panel settings, stop the camera role before switching to remote, sync camera/mic/mode state for the remote toggles, and time out incomplete pairing handshakes. Standalone encrypted loopback and timeout checks pass.
+- **PR / commit:** Pull request #13. Follow-up changes are pending publication.
+- **State:** blocked
+- **Next:** The public Lane B output-surface API and real PC transport are still unavailable; finish those after Lane B lands, then rerun Android tests and device checks.
+
+## 2026-10-09 10:52 PM CT - Lane C PC transport
+
+- **Bootloader step:** Lane C. Live and Remote
+- **What was done:** Added a real H.264 Send to PC path (SRT caller and RTMP publisher) of the finished picture, plus a silent AAC-LC track. Pairing stays a 128-character SecureRandom key over a direct X25519, HKDF, and AES-GCM link, with reconnect backoff. Panel actions reach overlay settings, clean output, pairing, preview, and Send to PC. The old single-surface compositor path is archived. AGP stays 8.13.2. Local `testDebugUnitTest` reported 64 tests, 0 failures, 0 errors, 0 skipped, and `assembleDebug` succeeded. GitHub CI has not reported yet.
+- **PR / commit:** Pull request #13 on `copilot/lane-c-live-remote`.
+- **State:** waiting for CI
+- **Next:** Post the checklist comment once the GitHub workflow on this branch finishes.
+
+## 2026-10-09 11:35 PM CT - Lane C HR review fixes
+
+- **Bootloader step:** Lane C. Live and Remote
+- **What was done:** Removed ACCESS_WIFI_STATE, CHANGE_WIFI_STATE, CHANGE_WIFI_MULTICAST_STATE, and NEARBY_WIFI_DEVICES from the live manifest and archived those lines. Handshake confirmation is now HMAC of the transcript plus the local role, and each side checks the other role's tag. An echoed tag fails. Local `testDebugUnitTest` reported 66 tests, 0 failures. The merged debug manifest keeps INTERNET and does not declare those Wi-Fi permissions or RECORD_AUDIO. GitHub CI has not reported on this commit yet.
+- **PR / commit:** Pull request #13 on `copilot/lane-c-live-remote`.
+- **State:** waiting for CI
+- **Next:** Update the checklist comment with the GitHub log once the workflow finishes, and keep the 35 Lane C hook lines in the pull request description.
+
 ## 2026-10-09 11:13 PM CT — Lane E
 
 - **Bootloader step:** Lane E. Person segmentation. Not a new Bootloader step. Voice stays paused.
@@ -212,3 +292,19 @@ States: passed, waiting for review, blocked, or waiting for Royalty's phone test
 - **PR / commit:** Pull request #21 (`copilot/lane-e-media-pipe-person-segmentation`), not merged. Rex reviews it.
 - **State:** waiting for review
 - **Next:** Royalty's phone test on the S25 Ultra: 📁 Camera > 📁 Body mask. Try See-through, Replace, Body cloak, and Hologram. Cover the camera and confirm the box goes black instead of showing a face.
+
+## 2026-10-10 1:05 PM CT - Lane C merge of final-build
+
+- **Bootloader step:** Lane C. Live and Remote
+- **What was done:** Merged `origin/final-build` (`30bfb5c`, Lane E, P1, and QA) into pull request #13 with a regular merge commit. Kept the person mask, Auric wheel, and Live and Remote. Kept INTERNET for local Send to PC and the direct phone link. Archived Lane E's manifest removal of that permission. The person mask still has no server call, and public hosts stay refused.
+- **PR / commit:** Pull request #13 on `copilot/lane-c-live-remote`. Not merged.
+- **State:** waiting for CI
+- **Next:** Report the head and the Build debug app run once GitHub finishes.
+
+## 2026-10-10 1:15 PM CT - Lane C RTMP test race
+
+- **Bootloader step:** Lane C. Live and Remote
+- **What was done:** The pull-request Build debug app run on `7fc2a38` failed in `PcTransportTest.rtmpPublishCarriesAnH264KeyFrame` with a SocketException. The fake RTMP server closed after the video-config packet, which reset the keyframe write when the server was fast. The server now stays open until the publisher closes and only counts an AVC picture packet. Eight local reruns passed. The push run on `7fc2a38` had already succeeded.
+- **PR / commit:** Pull request #13 on `copilot/lane-c-live-remote`. Not merged.
+- **State:** waiting for CI
+- **Next:** Report the new head and the Build debug app run once GitHub finishes.

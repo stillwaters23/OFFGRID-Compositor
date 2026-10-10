@@ -2,6 +2,7 @@ package com.offgrid.compositor.terminal
 
 import android.content.Context
 import com.offgrid.compositor.effects.FxKeys
+import com.offgrid.live.LiveActions
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -113,6 +114,41 @@ class EffectPanelTest {
         }
         assertEquals("folder ids are unique", ids.size, ids.toSet().size)
         assertEquals(18, home.folders.count { it.kind == FolderKind.PLATFORM })
+    }
+
+    @Test
+    fun liveAndRemoteFolderUsesTheRequiredKeysAndActions() {
+        val folder = PanelTree.build().folders.single { it.id == "live_remote" }
+        val keys = folder.items.mapNotNull {
+            when (it) {
+                is ToggleItem -> it.key
+                is NumberItem -> it.key
+                is ChoiceItem -> it.key
+                is TextItem -> it.key
+                else -> null
+            }
+        }.toSet()
+        assertTrue(FxKeys.LIVE_OVERLAY in keys)
+        assertTrue(FxKeys.REMOTE_ROLE in keys)
+        assertTrue(FxKeys.LIVE_PC_ON in keys)
+        assertTrue(FxKeys.LIVE_PC_PROTOCOL in keys)
+        assertTrue(FxKeys.LIVE_PC_HOST in keys)
+        assertTrue(FxKeys.LIVE_PC_PORT in keys)
+        assertTrue(FxKeys.LIVE_PC_RES in keys)
+        assertTrue(FxKeys.LIVE_PC_BITRATE in keys)
+        val actions = folder.items.filterIsInstance<ActionItem>().map { it.action }
+        assertTrue(PanelAction.LIVE_OPEN_OVERLAY_SETTINGS in actions)
+        assertTrue(PanelAction.LIVE_CLEAN_OUTPUT in actions)
+        assertTrue(PanelAction.REMOTE_OPEN_PAIRING in actions)
+        assertTrue(PanelAction.LIVE_SEND_TO_PC in actions)
+        assertTrue(PanelAction.REMOTE_OPEN_PREVIEW in actions)
+        assertFalse(folder.items.filterIsInstance<ToggleItem>().single { it.key == FxKeys.LIVE_OVERLAY }.default)
+        assertEquals("off", folder.items.filterIsInstance<ChoiceItem>().first { it.key == FxKeys.REMOTE_ROLE }.default)
+        assertEquals(LiveActions.OPEN_OVERLAY, PanelAction.LIVE_OPEN_OVERLAY_SETTINGS.name)
+        assertEquals(LiveActions.CLEAN_OUTPUT, PanelAction.LIVE_CLEAN_OUTPUT.name)
+        assertEquals(LiveActions.OPEN_PAIRING, PanelAction.REMOTE_OPEN_PAIRING.name)
+        assertEquals(LiveActions.OPEN_PREVIEW, PanelAction.REMOTE_OPEN_PREVIEW.name)
+        assertEquals(LiveActions.SEND_TO_PC, PanelAction.LIVE_SEND_TO_PC.name)
     }
 
     @Test

@@ -91,6 +91,13 @@ internal enum class PanelAction {
     HANDSHAKE_ADD,
     HANDSHAKE_BLOCK,
     HANDSHAKE_CHECK,
+
+    // Lane C hook
+    LIVE_OPEN_OVERLAY_SETTINGS,
+    LIVE_CLEAN_OUTPUT,
+    REMOTE_OPEN_PAIRING,
+    REMOTE_OPEN_PREVIEW,
+    LIVE_SEND_TO_PC,
 }
 
 /** Final build: the saved looks (theme, colors, glow, cursor, toggle style, size), with save, load, rename, delete. */
@@ -223,6 +230,8 @@ internal object PanelTree {
             EffectFolders.camera(),
             EffectFolders.effects(),
             EffectFolders.record(),
+            // Lane C hook
+            EffectFolders.liveRemote(),
             offgridFolder(),
         ) + PLATFORMS.mapIndexed { index, platform -> platformFolder(index + 1, platform) }
         return PanelFolder(id = "home", title = "HOME", tag = null, kind = FolderKind.SETTINGS, folders = top)
