@@ -109,8 +109,10 @@ jobs:
         run: ./gradlew testDebugUnitTest --stacktrace
 
       # Royalty, Oct 9 2026: the mic is approved. The old guard failed when RECORD_AUDIO
-      # was present and printed "Mic permission is not in the app." RECORD_AUDIO is allowed.
-      # ACCESS_NETWORK_STATE stays banned, and so does every permission not on this list.
+      # was present and printed "Mic permission is not in the app." This lane allows
+      # CAMERA and RECORD_AUDIO only. ACCESS_NETWORK_STATE stays banned, and so do
+      # INTERNET, Wi-Fi, notifications, overlay, and foreground-service permissions.
+      # androidx.core adds one package permission; that exact name is accepted.
       - name: Check the built app only asks for allowed permissions
         run: |
           set -euo pipefail
@@ -122,17 +124,6 @@ jobs:
           allowed = {
               "CAMERA",
               "RECORD_AUDIO",
-              "SYSTEM_ALERT_WINDOW",
-              "FOREGROUND_SERVICE",
-              "FOREGROUND_SERVICE_CAMERA",
-              "FOREGROUND_SERVICE_MICROPHONE",
-              "FOREGROUND_SERVICE_SPECIAL_USE",
-              "POST_NOTIFICATIONS",
-              "INTERNET",
-              "ACCESS_WIFI_STATE",
-              "CHANGE_WIFI_STATE",
-              "NEARBY_WIFI_DEVICES",
-              "CHANGE_WIFI_MULTICAST_STATE",
           }
           banned = {"android.permission.ACCESS_NETWORK_STATE"}
           name = "{http://schemas.android.com/apk/res/android}name"
