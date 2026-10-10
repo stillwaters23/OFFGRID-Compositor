@@ -84,9 +84,15 @@ class RemoteServiceDiscovery(
 
     fun discover(onFound: (InetSocketAddress) -> Unit) {
         stopDiscovery()
-        multicastLock = wifiManager.createMulticastLock("offgrid-remote-discovery").apply {
-            setReferenceCounted(false)
-            acquire()
+        try {
+            multicastLock = wifiManager.createMulticastLock("offgrid-remote-discovery").apply {
+                setReferenceCounted(false)
+                acquire()
+            }
+        } catch (error: SecurityException) {
+            releaseMulticastLock()
+            onFailure("Local network permission is missing.")
+            return
         }
         val listener = object : NsdManager.DiscoveryListener {
             override fun onDiscoveryStarted(serviceType: String) = Unit

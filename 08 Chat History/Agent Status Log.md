@@ -276,3 +276,11 @@ States: passed, waiting for review, blocked, or waiting for Royalty's phone test
 - **PR / commit:** Pull request #13 on `copilot/lane-c-live-remote`.
 - **State:** waiting for CI
 - **Next:** Post the checklist comment once the GitHub workflow on this branch finishes.
+
+## 2026-10-09 11:35 PM CT - Lane C HR review fixes
+
+- **Bootloader step:** Lane C. Live and Remote
+- **What was done:** Removed ACCESS_WIFI_STATE, CHANGE_WIFI_STATE, CHANGE_WIFI_MULTICAST_STATE, and NEARBY_WIFI_DEVICES from the live manifest and archived those lines. Handshake confirmation is now HMAC of the transcript plus the local role, and each side checks the other role's tag. An echoed tag fails. Local `testDebugUnitTest` reported 66 tests, 0 failures. The merged debug manifest keeps INTERNET and does not declare those Wi-Fi permissions or RECORD_AUDIO. GitHub CI has not reported on this commit yet.
+- **PR / commit:** Pull request #13 on `copilot/lane-c-live-remote`.
+- **State:** waiting for CI
+- **Next:** Update the checklist comment with the GitHub log once the workflow finishes, and keep the 35 Lane C hook lines in the pull request description.

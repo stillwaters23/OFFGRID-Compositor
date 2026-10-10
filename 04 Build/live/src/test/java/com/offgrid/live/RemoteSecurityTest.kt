@@ -1,5 +1,7 @@
 package com.offgrid.live
 
+import java.io.DataInputStream
+import java.io.DataOutputStream
 import java.net.InetAddress
 import java.net.Socket
 import java.net.ServerSocket
@@ -102,11 +104,52 @@ class RemoteSecurityTest {
         assertArrayEquals(firstKeys.transcriptMac, secondKeys.transcriptMac)
 
         val transcript = first.publicKey + second.publicKey + firstNonce + secondNonce
-        val confirmation = RemoteHandshake.confirm(key, transcript)
-        assertTrue(RemoteHandshake.verifyConfirmation(key, transcript, confirmation))
-        assertFalse(RemoteHandshake.verifyConfirmation(PairingKey.generate(), transcript, confirmation))
-        assertFalse(confirmation.contentEquals(Hkdf.hmac(key.toByteArray(Charsets.US_ASCII), transcript)))
+        val initiatorTag = RemoteHandshake.confirm(key, transcript, RemoteHandshake.ROLE_INITIATOR)
+        val responderTag = RemoteHandshake.confirm(key, transcript, RemoteHandshake.ROLE_RESPONDER)
+        assertFalse(initiatorTag.contentEquals(responderTag))
+        assertTrue(RemoteHandshake.verifyConfirmation(key, transcript, RemoteHandshake.ROLE_INITIATOR, initiatorTag))
+        assertTrue(RemoteHandshake.verifyConfirmation(key, transcript, RemoteHandshake.ROLE_RESPONDER, responderTag))
+        assertFalse(RemoteHandshake.verifyConfirmation(key, transcript, RemoteHandshake.ROLE_RESPONDER, initiatorTag))
+        assertFalse(RemoteHandshake.verifyConfirmation(PairingKey.generate(), transcript, RemoteHandshake.ROLE_INITIATOR, initiatorTag))
+        assertFalse(initiatorTag.contentEquals(Hkdf.hmac(key.toByteArray(Charsets.US_ASCII), transcript)))
+        assertArrayEquals(firstKeys.transcriptMac, RemoteHandshake.transcriptMac(key, transcript))
         assertNotEquals(firstKeys.initiatorKey.toList(), firstKeys.responderKey.toList())
+    }
+
+    @Test
+    fun echoedConfirmationDoesNotProveThePairingKey() {
+        val loopback = InetAddress.getLoopbackAddress()
+        val pairingKey = PairingKey.generate()
+        val executor = Executors.newSingleThreadExecutor()
+        ServerSocket(0, 1, loopback).use { server ->
+            try {
+                val echoed = executor.submit<Boolean> {
+                    val socket = server.accept()
+                    socket.soTimeout = 2_000
+                    val input = DataInputStream(socket.getInputStream())
+                    val output = DataOutputStream(socket.getOutputStream())
+                    val peer = RemoteHandshake.create()
+                    val remoteKey = readFrame(input)
+                    val remoteNonce = readFrame(input)
+                    writeFrame(output, peer.publicKey)
+                    writeFrame(output, peer.nonce)
+                    output.flush()
+                    val proof = ByteArray(32)
+                    input.readFully(proof)
+                    output.write(proof)
+                    output.flush()
+                    socket.close()
+                    remoteKey.isNotEmpty() && remoteNonce.size == 32
+                }
+                val failure = runCatching {
+                    RemoteSession.establish(Socket(loopback, server.localPort), pairingKey, true)
+                }.exceptionOrNull()
+                assertEquals("Keys don't match", failure?.message)
+                assertTrue(echoed.get(2, TimeUnit.SECONDS))
+            } finally {
+                executor.shutdownNow()
+            }
+        }
     }
 
     @Test
@@ -248,6 +291,17 @@ class RemoteSecurityTest {
     fun publicAddressesAreRejected() {
         assertFalse(LocalAddressPolicy.isAllowed(InetAddress.getByName("8.8.8.8")))
         assertTrue(LocalAddressPolicy.isAllowed(InetAddress.getByName("192.168.1.5")))
+    }
+
+    private fun readFrame(input: DataInputStream): ByteArray {
+        val size = input.readInt()
+        require(size in 1..256)
+        return ByteArray(size).also(input::readFully)
+    }
+
+    private fun writeFrame(output: DataOutputStream, value: ByteArray) {
+        output.writeInt(value.size)
+        output.write(value)
     }
 
     private fun String.hexBytes(): ByteArray =

@@ -1,0 +1,10 @@
+These four permissions were removed from 04 Build/live/src/main/AndroidManifest.xml.
+Send to PC is allowed to use INTERNET only. Local discovery code stays, and a missing
+permission is reported instead of crashing the camera, the remote, or Send to PC.
+
+<uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+<uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+<uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+<uses-permission
+    android:name="android.permission.NEARBY_WIFI_DEVICES"
+    android:usesPermissionFlags="neverForLocation" />

@@ -116,11 +116,14 @@ class RemoteSession private constructor(
             val firstNonce = if (isInitiator) local.nonce else peerNonce
             val secondNonce = if (isInitiator) peerNonce else local.nonce
             val transcript = firstPublicKey + secondPublicKey + firstNonce + secondNonce
-            val proof = RemoteHandshake.confirm(pairingKey, transcript)
+            val localRole = if (isInitiator) RemoteHandshake.ROLE_INITIATOR else RemoteHandshake.ROLE_RESPONDER
+            val peerRole = if (isInitiator) RemoteHandshake.ROLE_RESPONDER else RemoteHandshake.ROLE_INITIATOR
+            val proof = RemoteHandshake.confirm(pairingKey, transcript, localRole)
             output.write(proof)
             output.flush()
             val peerProof = ByteArray(PROOF_SIZE).also(input::readFully)
-            require(MessageDigest.isEqual(proof, peerProof)) { "Keys don't match" }
+            val expectedPeer = RemoteHandshake.confirm(pairingKey, transcript, peerRole)
+            require(MessageDigest.isEqual(expectedPeer, peerProof)) { "Keys don't match" }
 
             val keys = local.derive(peerPublicKey, peerNonce, pairingKey, isInitiator)
             val sendKey = if (isInitiator) keys.initiatorKey else keys.responderKey

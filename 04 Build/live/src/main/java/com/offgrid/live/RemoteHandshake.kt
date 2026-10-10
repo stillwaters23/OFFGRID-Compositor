@@ -54,14 +54,29 @@ class RemoteHandshake private constructor(
             return RemoteHandshake(pair, nonce)
         }
 
-        fun confirm(pairingKey: String, transcript: ByteArray): ByteArray {
+        const val ROLE_INITIATOR = "initiator"
+        const val ROLE_RESPONDER = "responder"
+
+        fun confirm(pairingKey: String, transcript: ByteArray, role: String): ByteArray {
+            require(PairingKey.isValid(pairingKey))
+            require(role == ROLE_INITIATOR || role == ROLE_RESPONDER)
+            val pairingBytes = pairingKey.toByteArray(Charsets.US_ASCII)
+            val tagged = transcript + role.toByteArray(Charsets.US_ASCII)
+            return Hkdf.hmac(confirmationKey(pairingBytes), tagged)
+        }
+
+        fun verifyConfirmation(
+            pairingKey: String,
+            transcript: ByteArray,
+            role: String,
+            confirmation: ByteArray,
+        ): Boolean = MessageDigest.isEqual(confirm(pairingKey, transcript, role), confirmation)
+
+        fun transcriptMac(pairingKey: String, transcript: ByteArray): ByteArray {
             require(PairingKey.isValid(pairingKey))
             val pairingBytes = pairingKey.toByteArray(Charsets.US_ASCII)
             return Hkdf.hmac(confirmationKey(pairingBytes), transcript)
         }
-
-        fun verifyConfirmation(pairingKey: String, transcript: ByteArray, confirmation: ByteArray): Boolean =
-            MessageDigest.isEqual(confirm(pairingKey, transcript), confirmation)
 
         private fun confirmationKey(pairingKey: ByteArray): ByteArray =
             Hkdf.sha256(
@@ -81,5 +96,6 @@ data class SessionKeys(
     val transcriptMac: ByteArray,
 ) {
     fun confirmWith(pairingKey: String, transcript: ByteArray): Boolean =
-        RemoteHandshake.verifyConfirmation(pairingKey, transcript, transcriptMac)
+        runCatching { MessageDigest.isEqual(RemoteHandshake.transcriptMac(pairingKey, transcript), transcriptMac) }
+            .getOrDefault(false)
 }
