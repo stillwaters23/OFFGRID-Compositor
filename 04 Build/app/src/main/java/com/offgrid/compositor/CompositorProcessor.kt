@@ -8,12 +8,15 @@ import android.opengl.GLES20
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
 import android.view.Surface
 import androidx.camera.core.CameraEffect
 import androidx.camera.core.SurfaceOutput
 import androidx.camera.core.SurfaceProcessor
 import androidx.camera.core.SurfaceRequest
+import com.offgrid.compositor.audio.AvRecorder
+import com.offgrid.compositor.audio.MicEngine
 import com.offgrid.compositor.effects.EffectEngine
 import com.offgrid.compositor.effects.FxKeys
 import com.offgrid.compositor.effects.OverlayLayer
@@ -64,6 +67,22 @@ class CompositorProcessor(
             effects?.reducedMotion = value
         }
 
+    /** Draws each finished picture into a live or Send to PC surface. Pass null to remove [id]. Any thread. */
+    fun setExtraOutput(id: String, surface: Surface?, width: Int, height: Int) {
+        executor.execute {
+            if (released) return@execute
+            liveOutputs.set(this@CompositorProcessor, id, surface, width, height)
+        }
+    }
+
+    /** Feeds the replay buffer from [engine] while the mic is on. Pass null to stop. Any thread. */
+    fun setReplayAudio(engine: MicEngine?) {
+        executor.execute {
+            replayMic = engine
+            replay?.setMicFeed(engine)
+        }
+    }
+
     private val thread = HandlerThread("OffgridCompositor")
     private val handler: Handler
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -91,8 +110,47 @@ class CompositorProcessor(
     private var replaySurface = EGL14.EGL_NO_SURFACE
     private var replayWanted = false
     private var replaySeconds = 30
-    // Lane C hook
     private val liveOutputs = LiveOutputDrawer()
+    private var replayMic: MicEngine? = null
+
+    /** The video recorder and its drawing target, while a recording runs. */
+    @Volatile
+    private var recorder: AvRecorder? = null
+    private var recorderSurface = EGL14.EGL_NO_SURFACE
+    private val stampClock = StampClock()
+
+    /** True while the camera is off. A timer draws the stage from a black picture instead. */
+    private var cameraOff = false
+    private var blackCamera: BlackCamera? = null
+    private var darkScreen = EGL14.EGL_NO_SURFACE
+    private var darkScreenWidth = 0
+    private var darkScreenHeight = 0
+    private val darkTick = object : Runnable {
+        override fun run() {
+            if (!cameraOff || released) return
+            val started = SystemClock.uptimeMillis()
+            drawDark()
+            handler.postDelayed(this, maxOf(1L, DARK_FRAME_MS - (SystemClock.uptimeMillis() - started)))
+        }
+    }
+
+    /**
+     * The size of the finished picture, from the biggest camera output. Before the camera starts it is a
+     * portrait 720p picture. A recording is made at [recordingSize].
+     */
+    @Volatile
+    private var pictureSize = android.util.Size(DEFAULT_WIDTH, DEFAULT_HEIGHT)
+
+    /** The size to make a recorder at: the picture, no longer than 1280 on its long side, in steps of 16. */
+    val recordingSize: android.util.Size
+        get() {
+            val size = pictureSize
+            val scale = minOf(1f, RECORD_LONG_SIDE / maxOf(size.width, size.height).toFloat())
+            return android.util.Size(
+                maxOf(REPLAY_STEP, (size.width * scale).toInt() / REPLAY_STEP * REPLAY_STEP),
+                maxOf(REPLAY_STEP, (size.height * scale).toInt() / REPLAY_STEP * REPLAY_STEP),
+            )
+        }
 
     /** The camera stream's size, once the camera starts. The face finder uses its shape. */
     @Volatile
@@ -179,6 +237,7 @@ class CompositorProcessor(
             return
         }
         outputs.add(OutputSlot(surfaceOutput, eglSurface, size.width, size.height))
+        pictureSize = outputs.maxBy { it.width * it.height }.let { android.util.Size(it.width, it.height) }
         Log.i(
             TAG,
             "Output ${size.width}x${size.height} targets=${surfaceOutput.targets}",
@@ -205,9 +264,58 @@ class CompositorProcessor(
             }
             drawSlot(slot, stamp, painted)
         }
-        drawReplay(snapshot, stamp, painted)
-        // Lane C hook
+        if (snapshot.isNotEmpty()) {
+            val main = snapshot.maxBy { it.width * it.height }
+            drawRecorders(main.width, main.height, stampClock.next(StampClock.Source.CAMERA, stamp), painted, main)
+        }
         liveOutputs.draw(this, stamp, snapshot, painted)
+    }
+
+    /** Draws the finished picture into the replay buffer and the video recorder too, the same one the screen gets. */
+    private fun drawRecorders(width: Int, height: Int, stamp: Long, painted: GlTarget?, camera: OutputSlot?) {
+        if (released) return
+        if (replayWanted) {
+            if (replay == null) startReplay(width, height)
+            val buffer = replay
+            if (buffer != null && replaySurface != EGL14.EGL_NO_SURFACE) {
+                drawFinal(replaySurface, buffer.width, buffer.height, stamp, painted, camera)
+            }
+        }
+        val recorder = recorder
+        if (recorder != null && recorderSurface != EGL14.EGL_NO_SURFACE) {
+            recorder.frameDrawn(stamp)
+            drawFinal(recorderSurface, recorder.width, recorder.height, stamp, painted, camera)
+        }
+    }
+
+    /**
+     * Draws one finished picture into [target]: the stage picture, or the plain camera when no
+     * effect changes it, then the old effect list and the test diamond. Returns false if the target could not be used.
+     */
+    private fun drawFinal(target: android.opengl.EGLSurface, w: Int, h: Int, stamp: Long, painted: GlTarget?, camera: OutputSlot?): Boolean {
+        if (!EGL14.eglMakeCurrent(display, target, target, context)) {
+            return false
+        }
+        GLES20.glViewport(0, 0, w, h)
+        GLES20.glClearColor(0f, 0f, 0f, 1f)
+        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
+        val painter = drawer ?: return true
+        val staged = stage
+        if (painted != null && staged != null) {
+            staged.present(painted, w, h)
+        } else if (camera != null && inputTextureId != 0 && !coverFace) {
+            camera.surfaceOutput.updateTransformMatrix(updatedTransform, textureTransform)
+            painter.drawCamera(inputTextureId, updatedTransform)
+        }
+        GLES20.glEnable(GLES20.GL_BLEND)
+        GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
+        effectList.drawAll(w, h)
+        if (testShapeOn) {
+            painter.drawTopLayer()
+        }
+        EGLExt.eglPresentationTimeANDROID(display, target, stamp)
+        EGL14.eglSwapBuffers(display, target)
+        return true
     }
 
     /** Turns the replay buffer on or off, keeping the last [seconds] seconds. */
@@ -223,20 +331,10 @@ class CompositorProcessor(
     /** Saves the replay buffer's kept moments to [file]. Returns false if there is nothing yet. Any thread. */
     fun saveReplay(file: java.io.File): Boolean = replay?.save(file) ?: false
 
-    // Lane C hook
-    fun setExtraOutput(id: String, surface: Surface?, width: Int, height: Int) {
-        executor.execute {
-            if (released) return@execute
-            liveOutputs.set(this@CompositorProcessor, id, surface, width, height)
-        }
-    }
-
-    // Lane C hook
     fun setLiveSurface(surface: Surface, width: Int, height: Int) {
         setExtraOutput("preview", surface, width, height)
     }
 
-    // Lane C hook
     fun clearLiveSurface(surface: Surface) {
         executor.execute {
             if (released) return@execute
@@ -244,27 +342,39 @@ class CompositorProcessor(
         }
     }
 
-    /** Draws the finished picture into the replay buffer too, the same one the video gets. */
-    private fun drawReplay(slots: List<OutputSlot>, stamp: Long, painted: GlTarget?) {
-        if (!replayWanted || released || slots.isEmpty()) return
-        val main = slots.maxBy { it.width * it.height }
-        if (replay == null) startReplay(main.width, main.height)
-        val buffer = replay ?: return
-        if (replaySurface == EGL14.EGL_NO_SURFACE) return
-        if (!EGL14.eglMakeCurrent(display, replaySurface, replaySurface, context)) return
-        GLES20.glViewport(0, 0, buffer.width, buffer.height)
-        val staged = stage
-        GLES20.glClearColor(0f, 0f, 0f, 1f)
-        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
-        if (painted != null && staged != null) {
-            staged.present(painted, buffer.width, buffer.height)
-        } else if (!coverFace) {
-            val painter = drawer ?: return
-            main.surfaceOutput.updateTransformMatrix(updatedTransform, textureTransform)
-            painter.drawCamera(inputTextureId, updatedTransform)
+    /** The seconds the replay buffer really keeps when its 64 MB is full and lower than the typed seconds. Otherwise null. Any thread. */
+    fun replayMemoryLimitSeconds(): Int? = replay?.memoryLimitSeconds
+
+    /** Starts drawing every finished picture into [next]. [next] must be built with [recordingSize]. */
+    fun startRecorder(next: AvRecorder) {
+        executor.execute {
+            val eglSurface = if (released) EGL14.EGL_NO_SURFACE else {
+                EGL14.eglCreateWindowSurface(display, config, next.surface, intArrayOf(EGL14.EGL_NONE), 0)
+            }
+            if (eglSurface == null || eglSurface == EGL14.EGL_NO_SURFACE) {
+                Log.e(TAG, "The video recorder could not draw")
+                next.stop()
+                return@execute
+            }
+            recorder = next
+            recorderSurface = eglSurface
         }
-        EGLExt.eglPresentationTimeANDROID(display, replaySurface, stamp)
-        EGL14.eglSwapBuffers(display, replaySurface)
+    }
+
+    /** Stops drawing into the recorder, then lets it finish its file. */
+    fun stopRecorder() {
+        executor.execute { endRecorder() }
+    }
+
+    private fun endRecorder() {
+        val finished = recorder ?: return
+        if (recorderSurface != EGL14.EGL_NO_SURFACE) {
+            if (dummy != EGL14.EGL_NO_SURFACE) EGL14.eglMakeCurrent(display, dummy, dummy, context)
+            EGL14.eglDestroySurface(display, recorderSurface)
+            recorderSurface = EGL14.EGL_NO_SURFACE
+        }
+        recorder = null
+        finished.stop()
     }
 
     private fun startReplay(width: Int, height: Int) {
@@ -282,6 +392,7 @@ class CompositorProcessor(
             }
             replay = buffer
             replaySurface = eglSurface
+            replayMic?.let { buffer.setMicFeed(it) }
         } catch (error: Exception) {
             Log.e(TAG, "The replay buffer could not start", error)
             replayWanted = false
@@ -364,6 +475,89 @@ class CompositorProcessor(
         }
     }
 
+    /**
+     * Turns the black stage on or off. While the camera is off no pictures come in, so a timer draws the
+     * effects over black for the screen, the video recorder, and the replay buffer. Any thread.
+     */
+    fun setCameraOff(off: Boolean) {
+        executor.execute {
+            if (off == cameraOff || released) return@execute
+            cameraOff = off
+            stage?.forgetPictures()
+            if (off) handler.post(darkTick) else handler.removeCallbacks(darkTick)
+        }
+    }
+
+    /** Shows the black stage on [surface] while the camera is off. Pass null to stop. Any thread. */
+    fun setDarkScreen(surface: Surface?, width: Int, height: Int) {
+        executor.execute {
+            if (darkScreen != EGL14.EGL_NO_SURFACE) {
+                if (dummy != EGL14.EGL_NO_SURFACE) EGL14.eglMakeCurrent(display, dummy, dummy, context)
+                EGL14.eglDestroySurface(display, darkScreen)
+                darkScreen = EGL14.EGL_NO_SURFACE
+            }
+            if (surface == null || released) return@execute
+            val created = EGL14.eglCreateWindowSurface(display, config, surface, intArrayOf(EGL14.EGL_NONE), 0)
+            if (created == null || created == EGL14.EGL_NO_SURFACE) {
+                Log.e(TAG, "The black screen could not draw")
+                return@execute
+            }
+            darkScreen = created
+            darkScreenWidth = width
+            darkScreenHeight = height
+        }
+    }
+
+    private fun drawDark() {
+        if (display == EGL14.EGL_NO_DISPLAY || dummy == EGL14.EGL_NO_SURFACE || !ready) return
+        if (!EGL14.eglMakeCurrent(display, dummy, dummy, context)) return
+        val black = blackCamera ?: BlackCamera(createExternalTexture()).also { blackCamera = it }
+        val size = recordingSize
+        val painted = if (black.update()) paintDark(size.width, size.height, black.textureId) else null
+        val stamp = stampClock.next(StampClock.Source.BLACK, SystemClock.elapsedRealtimeNanos())
+        if (darkScreen != EGL14.EGL_NO_SURFACE) {
+            drawFinal(darkScreen, darkScreenWidth, darkScreenHeight, stamp, painted, null)
+        }
+        drawRecorders(size.width, size.height, stamp, painted, null)
+    }
+
+    /** Paints the effects stage over the black picture. */
+    private fun paintDark(width: Int, height: Int, blackTexture: Int): GlTarget? {
+        val painter = stage ?: return null
+        val overlay = effects
+        val time = engine.now()
+        plan.update(
+            time = time,
+            settings = engine.settings,
+            fired = engine.firedNow(),
+            face = engine.freshFace(time),
+            modeChangedAt = engine.modeChangedAt,
+            previousMode = engine.previousMode,
+        )
+        overlay?.latch()
+        overlay?.request(width, height)
+        val drawn = overlay != null && overlay.hasPicture
+        coverFace = false
+        return try {
+            painter.paint(
+                cameraTexture = blackTexture,
+                cameraMatrix = IDENTITY,
+                w = width,
+                h = height,
+                plan = plan,
+                time = time,
+                overlayTexture = if (drawn) overlay?.texture ?: 0 else 0,
+                overlayMatrix = overlay?.matrix ?: IDENTITY,
+            )
+        } catch (error: RuntimeException) {
+            Log.e(TAG, "Effects stage failed", error)
+            stage?.release()
+            stage = null
+            effectsFailed()
+            null
+        }
+    }
+
     private fun effectsFailed() {
         if (toldEffectsFailed) return
         toldEffectsFailed = true
@@ -378,33 +572,10 @@ class CompositorProcessor(
         if (slot.width == 0 || slot.height == 0) {
             return
         }
-        if (!EGL14.eglMakeCurrent(display, slot.eglSurface, slot.eglSurface, context)) {
+        if (!drawFinal(slot.eglSurface, slot.width, slot.height, stamp, painted, slot)) {
             fail("Could not draw a frame")
             return
         }
-        GLES20.glViewport(0, 0, slot.width, slot.height)
-        GLES20.glClearColor(0f, 0f, 0f, 1f)
-        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
-        slot.surfaceOutput.updateTransformMatrix(updatedTransform, textureTransform)
-        val textureId = inputTextureId
-        val painter = drawer
-        if (textureId == 0 || painter == null) {
-            return
-        }
-        val staged = stage
-        if (painted != null && staged != null) {
-            staged.present(painted, slot.width, slot.height)
-        } else if (!coverFace) {
-            painter.drawCamera(textureId, updatedTransform)
-        }
-        GLES20.glEnable(GLES20.GL_BLEND)
-        GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
-        effectList.drawAll(slot.width, slot.height)
-        if (testShapeOn) {
-            painter.drawTopLayer()
-        }
-        EGLExt.eglPresentationTimeANDROID(display, slot.eglSurface, stamp)
-        EGL14.eglSwapBuffers(display, slot.eglSurface)
         if (!toldFirstFrame && slot.surfaceOutput.targets and CameraEffect.PREVIEW != 0) {
             toldFirstFrame = true
             mainHandler.post { onFirstFrame?.invoke() }
@@ -512,8 +683,16 @@ class CompositorProcessor(
             stage = null
             effects?.release()
             effects = null
+            cameraOff = false
+            handler.removeCallbacks(darkTick)
+            endRecorder()
+            blackCamera?.release()
+            blackCamera = null
+            if (darkScreen != EGL14.EGL_NO_SURFACE) {
+                EGL14.eglDestroySurface(display, darkScreen)
+                darkScreen = EGL14.EGL_NO_SURFACE
+            }
             stopReplay()
-            // Lane C hook
             liveOutputs.release(this)
             if (dummy != EGL14.EGL_NO_SURFACE) {
                 EGL14.eglDestroySurface(display, dummy)
@@ -585,6 +764,11 @@ class CompositorProcessor(
         const val TAG = "OffgridCompositor"
 
         const val REPLAY_STEP = 16
+        const val DEFAULT_WIDTH = 720
+        const val DEFAULT_HEIGHT = 1280
+        const val RECORD_LONG_SIDE = 1280f
+        const val DARK_FRAME_MS = 33L
+        val IDENTITY = FloatArray(16).also { android.opengl.Matrix.setIdentityM(it, 0) }
 
         /** The stage picture's longest side, in pixels. The video is 1280 tall, so this keeps it sharp. */
         const val MAX_STAGE_SIDE = 1920f

@@ -2,6 +2,8 @@ package com.offgrid.compositor.terminal
 
 import com.offgrid.compositor.effects.Fire
 import com.offgrid.compositor.effects.FxKeys
+import com.offgrid.compositor.audio.voice.MicKeys
+import com.offgrid.compositor.audio.voice.RexVoiceProfile
 
 /**
  * The folders for the camera, the effects, recording, and each platform's kick tools and test
@@ -84,6 +86,7 @@ internal object EffectFolders {
             mirrorScan(),
         ),
         items = listOf(
+            ToggleItem(FxKeys.CAMERA_ON, "Camera", "Turn the camera on or off. It starts on and sends camera video.", true, isTest = false),
             ChoiceItem(
                 FxKeys.CAMERA_MODE,
                 "Camera mode",
@@ -99,6 +102,7 @@ internal object EffectFolders {
         ),
         notes = listOf(
             "Pick what viewers see. It is baked into the video.",
+            "Use the top Camera toggle to stop or start camera video.",
             "Blackout, Cloak void, Status label, and Ghost never show your face.",
             "Body mask can cut your body out of the box. If the mask drops, the box goes black.",
             "Reset never changes the camera mode or the body look, so your face never shows by surprise.",
@@ -144,6 +148,46 @@ internal object EffectFolders {
             "Inside the video box, your body can be see-through or replaced.",
             "If the mask is missing or too old, the whole box goes black, so your face never shows.",
             "Reset does not turn the body look off.",
+        ),
+    )
+
+    fun microphone() = PanelFolder(
+        id = "microphone",
+        title = "📁 Microphone Effects",
+        tag = null,
+        kind = FolderKind.EFFECTS,
+        items = listOf(
+            ToggleItem(FxKeys.MIC_ON, "Mic", "Record microphone audio. It starts off.", false, isTest = false),
+            ToggleItem(FxKeys.MIC_FX_ON, "Microphone Effects", "Turn the voice effects on or off.", false, isTest = false),
+            NumberItem(FxKeys.MIC_PITCH, "Pitch", "50 keeps your natural pitch.", 50),
+            ToggleItem(FxKeys.MIC_ROBOT_ON, "Robot", "Give your voice a robot sound.", false, isTest = false),
+            NumberItem(FxKeys.MIC_ROBOT_AMOUNT, "Robot amount", "0 is natural. 100 is fully robotic.", 50),
+            ToggleItem(FxKeys.MIC_ECHO_ON, "Echo", "Add an echo to your voice.", false, isTest = false),
+            NumberItem(FxKeys.MIC_ECHO_DELAY, "Echo delay", "Set the time before the echo.", 50),
+            NumberItem(FxKeys.MIC_ECHO_AMOUNT, "Echo amount", "Set how much the echo repeats.", 50),
+            ToggleItem(FxKeys.MIC_RADIO_ON, "Radio", "Give your voice a radio sound.", false, isTest = false),
+            ToggleItem(FxKeys.MIC_CAVE_ON, "Cave", "Add a cave echo to your voice.", false, isTest = false),
+            NumberItem(FxKeys.MIC_CAVE_AMOUNT, "Cave amount", "0 is light. 100 is deep.", 50),
+            NumberItem(FxKeys.MIC_GAIN, "Mic volume", "0 is silent. 50 is natural. 100 is loud.", 50),
+            NumberItem(FxKeys.MIC_GATE, "Noise gate", "0 turns the gate off. Higher values cut quiet sounds.", 0),
+            ToggleItem(FxKeys.MIC_SOUNDS_IN_VIDEO, "Sounds in video", "Include soundboard audio in video recordings.", true, isTest = false),
+            ToggleItem(FxKeys.MIC_BEAT_GLOW, "Beat glow", "Let the audio pulse the glow border.", false, isTest = false),
+            ToggleItem(MicKeys.BLOCKED, "Hard block", "Stops capture and prevents anything from reopening the mic.", false, isTest = false),
+            ToggleItem(MicKeys.VOICE_SWAP, "Rex voice swap", "On-device pitch, formant color, and timbre EQ. No model or upload.", false, isTest = false),
+            ToggleItem(MicKeys.BYPASS, "Bypass", "Passes clean, unprocessed voice through the safe output path.", false, isTest = false),
+            NumberItem(MicKeys.WET, "Wet / dry", "0 is clean voice. 100 is the full Rex effect.", RexVoiceProfile.WET_PERCENT),
+            NumberItem(MicKeys.PITCH, "Rex pitch", "50 is unchanged. 0 is lower. 100 is higher.", RexVoiceProfile.pitchPercent),
+            NumberItem(MicKeys.FORMANT, "Formant shift", "50 is unchanged. Move the voice color lower or higher.", RexVoiceProfile.formantPercent),
+            NumberItem(MicKeys.LOW_EQ, "Low EQ", "50 is unchanged. 0 cuts lows. 100 boosts lows.", RexVoiceProfile.lowPercent),
+            NumberItem(MicKeys.MID_EQ, "Mid EQ", "50 is unchanged. 0 cuts mids. 100 boosts mids.", RexVoiceProfile.midPercent),
+            NumberItem(MicKeys.HIGH_EQ, "High EQ", "50 is unchanged. 0 cuts highs. 100 boosts highs.", RexVoiceProfile.highPercent),
+        ),
+        notes = listOf(
+            "Everything runs on this phone. Nothing goes to the cloud.",
+            "Rex voice swap aims at Rex 01, Rex 02, and Rex 03. Rex.wav is not in this project. Pitch, formant, and EQ stay tunable.",
+            "Capture begins only after you turn the mic on and allow microphone access.",
+            "Hard block releases the recorder. Unblock does not turn the mic back on.",
+            "Audio processing stays on this phone. No audio is uploaded.",
         ),
     )
 
@@ -230,7 +274,8 @@ internal object EffectFolders {
         ),
         notes = listOf(
             "Pick Ghost in Camera mode to turn it on. GHOST ON shows on your screen.",
-            "This app has no mic, so no sound ever goes out.",
+            "Video audio uses the mic when Mic is on, with Microphone Effects applied. Soundboard sounds are included when Sounds in video is on.",
+            "The mic stays off unless you turn it on in Microphone Effects.",
             "If ghost was already on when the app opened, the box stays blank.",
         ),
     )
@@ -444,7 +489,8 @@ internal object EffectFolders {
         fire(Fire.TIME_FREEZE, "Freeze now", "Holds your video still, then picks back up like a glitch."),
         notes = listOf(
             "Viewers see a paused picture, not a dropped stream.",
-            "This app has no mic, so no sound goes out during the freeze.",
+            "Video audio uses the mic when Mic is on, with Microphone Effects applied on this phone. Soundboard sounds are included when Sounds in video is on.",
+            "Mic audio follows the Microphone Effects settings.",
         ),
     )
 
@@ -590,7 +636,8 @@ internal object EffectFolders {
         ),
         notes = listOf(
             "Sounds play from your phone's speaker only.",
-            "This app has no mic, so the sounds are not added to the video.",
+            "Sounds in video, in Microphone Effects, also puts these sounds in the recording.",
+            "Voice audio follows the Microphone Effects settings.",
         ),
     )
 
@@ -611,8 +658,11 @@ internal object EffectFolders {
         ),
         notes = listOf(
             "Videos have your effects in them. The panel is never in them.",
-            "There is no sound, because this app never uses the mic.",
-            "Videos stay on your phone. Nothing uploads.",
+            "The replay keeps audio while the mic is on. The radar ping is mixed into the video.",
+            "Video audio uses the mic when Mic is on, with Microphone Effects and Rex voice swap applied.",
+            "Soundboard sounds are included when Sounds in video is on.",
+            "Hard block releases the mic. Processed voice can also be read from the voice output hook.",
+            "Videos and voice processing stay on your phone. Nothing uploads.",
         ),
     )
 

@@ -1,3 +1,9 @@
+/**
+ * Archived. The side panel was taken out of the terminal. This copy is kept so the
+ * work is not deleted. It sits outside the app source set, so it is not compiled
+ * and it is not shown.
+ */
+
 package com.offgrid.compositor.terminal
 
 import android.animation.ValueAnimator

@@ -1,6 +1,8 @@
 package com.offgrid.compositor.terminal
 
 import android.content.Context
+import com.offgrid.compositor.audio.voice.MicKeys
+import com.offgrid.compositor.audio.voice.RexVoiceProfile
 import com.offgrid.compositor.effects.FxKeys
 import com.offgrid.live.LiveActions
 import org.junit.Assert.assertEquals
@@ -36,37 +38,65 @@ class EffectPanelTest {
     }
 
     @Test
-    fun presetsSaveLoadRenameAndDelete() {
+    fun profilesSaveLoadRenameArchiveAndRestore() {
         val (prefs, store) = store()
         val presets = LookPresets(context, prefs)
         store.setNumber(LookKeys.GLOW, 90)
         store.setChoice(LookKeys.TOGGLE_STYLE, ToggleStyle.BLACK.key)
         store.setNumber(LookKeys.WIDTH, 70)
+        store.setChoice(FxKeys.CAMERA_MODE, FxKeys.MODE_BLACKOUT)
+        store.setToggle(FxKeys.EMOJI_ON, false)
+        prefs.setPosition(0.2f, 0.7f)
         assertEquals(LookPresets.Result.DONE, presets.save("Night"))
-        // Change the look and an effect, then load the preset back.
+        // Change the profile settings, then load the saved folder back.
         store.setNumber(LookKeys.GLOW, 10)
         store.setChoice(LookKeys.TOGGLE_STYLE, ToggleStyle.WHITE.key)
         store.setNumber(LookKeys.WIDTH, 100)
         store.setToggle(FxKeys.EMOJI_ON, true)
+        store.setChoice(FxKeys.CAMERA_MODE, FxKeys.MODE_LIVE)
+        prefs.setPosition(0.8f, 0.3f)
         assertEquals(LookPresets.Result.DONE, presets.load("Night"))
         assertEquals(90, store.number(LookKeys.GLOW))
         assertEquals(ToggleStyle.BLACK, store.look().toggleStyle)
         assertEquals(70, store.number(LookKeys.WIDTH))
-        assertTrue("effects are not part of a look", store.toggle(FxKeys.EMOJI_ON))
-        assertEquals(LookPresets.Result.REPLACED, presets.save("Night"))
+        assertFalse("profiles restore effect toggles", store.toggle(FxKeys.EMOJI_ON))
+        assertEquals(FxKeys.MODE_BLACKOUT, store.choice(FxKeys.CAMERA_MODE))
+        assertEquals(0.2f to 0.7f, prefs.position())
+        assertEquals(LookPresets.Result.TAKEN, presets.save("Night"))
+        assertEquals(LookPresets.Result.REPLACED, presets.save("Night", overwrite = true))
         assertEquals(LookPresets.Result.NO_NAME, presets.save("  "))
         presets.save("Day")
         assertEquals(listOf("Night", "Day"), presets.names())
+        assertEquals(LookPresets.Result.DONE, presets.duplicate("Night", "Night Copy"))
+        assertTrue(presets.names().contains("Night Copy"))
         assertEquals(LookPresets.Result.TAKEN, presets.rename("Night", "Day"))
         assertEquals(LookPresets.Result.DONE, presets.rename("Night", "Midnight"))
-        assertEquals(listOf("Midnight", "Day"), presets.names())
+        assertEquals(listOf("Midnight", "Day", "Night Copy"), presets.names())
         assertEquals(LookPresets.Result.DONE, presets.load("Midnight"))
-        assertEquals(LookPresets.Result.DONE, presets.delete("Day"))
-        assertEquals(listOf("Midnight"), presets.names())
-        assertEquals(LookPresets.Result.MISSING, presets.load("Day"))
+        assertEquals(LookPresets.Result.DONE, presets.archive("Day"))
+        assertEquals(listOf("Day"), presets.archivedNames())
+        assertEquals(LookPresets.Result.DONE, presets.restore("Day"))
+        assertTrue(presets.names().contains("Day"))
+        assertEquals(LookPresets.Result.DONE, presets.load("Day"))
         // Reset all never deletes presets.
         store.resetAll()
-        assertEquals(listOf("Midnight"), LookPresets(context, PanelPrefs(context)).names())
+        assertTrue(LookPresets(context, PanelPrefs(context)).names().contains("Midnight"))
+    }
+
+    @Test
+    fun profileImportRejectsBadJsonAndAcceptsOnlyTypedPreferenceEntries() {
+        val prefs = PanelPrefs(context)
+        val profiles = LookPresets(context, prefs)
+        assertEquals(LookPresets.Result.BAD_FILE, profiles.importJson("Bad", "{"))
+        assertEquals(
+            LookPresets.Result.BAD_FILE,
+            profiles.importJson("Bad", """{"text.handshake_code":"private"}"""),
+        )
+        assertEquals(
+            LookPresets.Result.DONE,
+            profiles.importJson("Clean", """{"toggle.fx.emoji.on":true,"position_x":0.4,"position_y":0.6}"""),
+        )
+        assertTrue(profiles.exportJson("Clean")?.contains("\"toggle.fx.emoji.on\":true") == true)
     }
 
     @Test
@@ -105,7 +135,8 @@ class EffectPanelTest {
         }
         walk(home)
         for (id in listOf("camera", "camera.diamond", "camera.body", "camera.cloak", "camera.status", "camera.ghost", "camera.takeover",
-            "camera.mirror", "effects", "effects.emoji", "effects.ink", "effects.border", "effects.fireworks", "effects.portal",
+            "microphone", "effects",
+            "camera.mirror", "effects.emoji", "effects.ink", "effects.border", "effects.fireworks", "effects.portal",
             "effects.heroes", "effects.coaster", "effects.clouds", "effects.beach", "effects.freeze", "effects.illusion",
             "effects.sweep", "effects.depth", "effects.write", "effects.radar", "effects.echo", "effects.quiet", "effects.shatter",
             "effects.sound", "record", "presets", "offgrid_to_offgrid.handshake", "tiktok.effects", "tiktok.tests.code",
@@ -149,6 +180,37 @@ class EffectPanelTest {
         assertEquals(LiveActions.OPEN_PAIRING, PanelAction.REMOTE_OPEN_PAIRING.name)
         assertEquals(LiveActions.OPEN_PREVIEW, PanelAction.REMOTE_OPEN_PREVIEW.name)
         assertEquals(LiveActions.SEND_TO_PC, PanelAction.LIVE_SEND_TO_PC.name)
+    }
+
+    @Test
+    fun microphoneSettingsStartOffAndExposeTheRexTuningControls() {
+        val defaults = PanelTree.defaults
+        val mic = PanelTree.build().folders.first { it.id == "microphone" }
+        val keys = mic.items.mapNotNull {
+            when (it) {
+                is NumberItem -> it.key
+                is ToggleItem -> it.key
+                else -> null
+            }
+        }
+
+        assertTrue(MicKeys.ON in keys)
+        assertTrue(MicKeys.BLOCKED in keys)
+        assertTrue(MicKeys.VOICE_SWAP in keys)
+        assertTrue(MicKeys.BYPASS in keys)
+        assertTrue(listOf(MicKeys.WET, MicKeys.PITCH, MicKeys.FORMANT, MicKeys.LOW_EQ, MicKeys.MID_EQ, MicKeys.HIGH_EQ)
+            .all { it in defaults.numbers })
+        assertEquals(false, defaults.toggles[MicKeys.ON])
+        assertEquals(false, defaults.toggles[MicKeys.BLOCKED])
+        assertEquals(false, defaults.toggles[MicKeys.VOICE_SWAP])
+        assertEquals(false, defaults.toggles[MicKeys.BYPASS])
+        assertEquals(RexVoiceProfile.WET_PERCENT, defaults.numbers[MicKeys.WET])
+        assertEquals(RexVoiceProfile.pitchPercent, defaults.numbers[MicKeys.PITCH])
+        assertEquals(RexVoiceProfile.formantPercent, defaults.numbers[MicKeys.FORMANT])
+        assertEquals(RexVoiceProfile.lowPercent, defaults.numbers[MicKeys.LOW_EQ])
+        assertEquals(RexVoiceProfile.midPercent, defaults.numbers[MicKeys.MID_EQ])
+        assertEquals(RexVoiceProfile.highPercent, defaults.numbers[MicKeys.HIGH_EQ])
+        assertTrue(RexVoiceProfile.pitchPercent < 50)
     }
 
     @Test

@@ -50,13 +50,14 @@ internal class PowerToggleView(context: Context) : View(context), Styled {
 
     private var style = ToggleStyle.WHITE
     private var glowOn = false
-    private var glowColor = Hud.WHITE
+    private var extraHalo = false
+    private var accent = NeonPalette.CYAN_GLOW
+    private var glowColor = NeonPalette.ELECTRIC_PURPLE
     private var mix = 0f
     private var fade: ValueAnimator? = null
     private var tick = true
     private val disc = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
-    private val ring = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
-    private val halo = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+    private val stamp = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val edge = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     private val symbol = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
@@ -99,7 +100,9 @@ internal class PowerToggleView(context: Context) : View(context), Styled {
     override fun applyLook(look: PanelLook) {
         tick = look.tick
         style = look.toggleStyle
-        glowOn = look.toggleGlow && look.glowStrength > 0f
+        glowOn = look.glowStrength > 0f
+        extraHalo = look.toggleGlow
+        accent = look.edge
         glowColor = look.outerGlow
         invalidate()
     }
@@ -112,60 +115,53 @@ internal class PowerToggleView(context: Context) : View(context), Styled {
     override fun onDraw(canvas: Canvas) {
         val current = fixedStyle ?: style
         val t = mix
+        val size = minOf(width, height)
+        if (size <= 0) return
         val cx = width / 2f
         val cy = height / 2f
-        val radius = minOf(width, height) / 2f - Hud.dp(context, EDGE_ROOM_DP)
-        if (radius <= 0f) return
-        val ringWidth = Hud.dp(context, RING_DP)
+        val radius = size * BioluminescentPowerIcon.DISC_SHARE
+        val layers = if (glowOn) {
+            BioluminescentPowerIcon.layers(size, accent, glowColor, resources.displayMetrics.density)
+        } else {
+            null
+        }
+        if (layers != null) {
+            val left = (width - size) / 2f
+            val top = (height - size) / 2f
+            val halo = when {
+                t <= 0f -> 0.22f
+                extraHalo -> t
+                else -> 0.72f * t
+            }
+            BioluminescentPowerIcon.paintLayers(canvas, left, top, layers, halo, stamp)
+        }
         val onFill: Int
         val offFill: Int
-        val onRing: Int
-        val offRing: Int
         val onSymbol: Int
         val offSymbol: Int
         when (current) {
             ToggleStyle.WHITE -> {
                 onFill = Hud.WHITE
                 offFill = Color.TRANSPARENT
-                onRing = Hud.WHITE
-                offRing = Hud.withAlpha(Hud.WHITE, DIM)
                 onSymbol = Hud.INK
                 offSymbol = Hud.withAlpha(Hud.WHITE, DIM)
             }
             ToggleStyle.BLACK -> {
                 onFill = Hud.INK
                 offFill = Hud.INK
-                onRing = Hud.WHITE
-                offRing = DIM_GRAY
                 onSymbol = Hud.WHITE
                 offSymbol = DIM_GRAY
             }
         }
-        // The optional halo, in the glow color, only on toggles that are on.
-        if (glowOn && t > 0f) {
-            halo.color = Hud.withAlpha(glowColor, 0.9f * t)
-            halo.strokeWidth = ringWidth * 2f
-            halo.setShadowLayer(Hud.dp(context, HALO_DP) * t, 0f, 0f, Hud.withAlpha(glowColor, t))
-            canvas.drawCircle(cx, cy, radius, halo)
-        }
         disc.color = lerp(offFill, onFill, t)
         canvas.drawCircle(cx, cy, radius, disc)
-        // A faint dark edge keeps Pure White visible on a white background too.
         if (current == ToggleStyle.WHITE) {
             edge.color = Hud.withAlpha(Hud.INK, EDGE_ALPHA)
             edge.strokeWidth = Hud.dp(context, 1f)
             canvas.drawCircle(cx, cy, radius + edge.strokeWidth / 2f, edge)
         }
-        ring.color = lerp(offRing, onRing, t)
-        ring.strokeWidth = ringWidth
-        canvas.drawCircle(cx, cy, radius - ringWidth / 2f, ring)
-        // The power symbol: an open circle with a gap at the top, and a line down into the gap.
         symbol.color = lerp(offSymbol, onSymbol, t)
-        symbol.strokeWidth = radius * SYMBOL_WIDTH
-        val arcRadius = radius * ARC_SHARE
-        arcBox.set(cx - arcRadius, cy - arcRadius + radius * 0.06f, cx + arcRadius, cy + arcRadius + radius * 0.06f)
-        canvas.drawArc(arcBox, ARC_START, ARC_SWEEP, false, symbol)
-        canvas.drawLine(cx, cy - radius * LINE_TOP, cx, cy - radius * LINE_BOTTOM, symbol)
+        BioluminescentPowerIcon.drawPowerSymbol(canvas, cx, cy, radius, symbol, arcBox)
     }
 
     override fun onInitializeAccessibilityNodeInfo(info: AccessibilityNodeInfo) {
@@ -192,19 +188,9 @@ internal class PowerToggleView(context: Context) : View(context), Styled {
         /** A full 52 dp square, above the 48 dp smallest comfortable touch target. */
         const val SIZE_DP = 52f
 
-        /** Room around the circle for the optional halo. */
-        const val EDGE_ROOM_DP = 6f
-        const val RING_DP = 2f
-        const val HALO_DP = 7f
         const val DIM = 0.42f
         const val EDGE_ALPHA = 0.35f
         const val DIM_GRAY = 0xFF5C5C5C.toInt()
-        const val SYMBOL_WIDTH = 0.13f
-        const val ARC_SHARE = 0.5f
-        const val ARC_START = 305f
-        const val ARC_SWEEP = 290f
-        const val LINE_TOP = 0.62f
-        const val LINE_BOTTOM = 0.1f
         const val FADE_MS = 160L
 
         /** Mixes two colors, alpha included. */

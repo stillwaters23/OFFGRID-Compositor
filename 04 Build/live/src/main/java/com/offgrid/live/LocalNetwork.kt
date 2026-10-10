@@ -161,12 +161,20 @@ class WifiDirectDiscovery(context: Context) {
     private val channel = manager.initialize(context, context.mainLooper, null)
 
     fun discover(onStarted: (Boolean) -> Unit) {
-        manager.discoverPeers(channel, resultListener(onStarted))
+        try {
+            manager.discoverPeers(channel, resultListener(onStarted))
+        } catch (_: SecurityException) {
+            onStarted(false)
+        }
     }
 
     fun connect(deviceAddress: String, onStarted: (Boolean) -> Unit) {
         val config = WifiP2pConfig().apply { this.deviceAddress = deviceAddress }
-        manager.connect(channel, config, resultListener(onStarted))
+        try {
+            manager.connect(channel, config, resultListener(onStarted))
+        } catch (_: SecurityException) {
+            onStarted(false)
+        }
     }
 
     fun groupOwnerAddress(onResolved: (InetAddress?) -> Unit) {

@@ -51,7 +51,7 @@ internal class MoreButton(context: Context) : View(context), Styled {
 
 /** A small picture of each choice in the ⋮ menu, drawn with lines. */
 internal class ChoiceGlyph(context: Context, private val kind: Kind) : View(context), Styled {
-    enum class Kind { LIST, BIG_LIST, GRID_2, GRID_3, IMPORTANT, A_TO_Z, CUSTOM, SIDE_SHOW, SIDE_SWIPE, SIDE_HIDDEN }
+    enum class Kind { LIST, BIG_LIST, GRID_2, GRID_3, IMPORTANT, A_TO_Z, CUSTOM }
 
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val box = RectF()
@@ -113,17 +113,6 @@ internal class ChoiceGlyph(context: Context, private val kind: Kind) : View(cont
                 bar(0.1f, 0.2f + row * 0.26f, 0.9f, 0.28f + row * 0.26f)
                 canvas.drawCircle(x0 + s * 0.9f, y0 + s * (0.24f + row * 0.26f), line * 1.4f, paint)
             }
-            Kind.SIDE_SHOW -> {
-                frame(0.08f, 0.14f, 0.92f, 0.86f)
-                bar(0.08f, 0.14f, 0.34f, 0.86f)
-            }
-            Kind.SIDE_SWIPE -> {
-                frame(0.08f, 0.14f, 0.92f, 0.86f)
-                bar(0.08f, 0.14f, 0.16f, 0.86f)
-                bar(0.3f, 0.47f, 0.62f, 0.53f)
-                bar(0.52f, 0.38f, 0.58f, 0.62f)
-            }
-            Kind.SIDE_HIDDEN -> frame(0.08f, 0.14f, 0.92f, 0.86f)
         }
     }
 }
@@ -207,9 +196,9 @@ internal class ChoiceRow(context: Context, label: String, help: String, private 
         this.look = look
         (glyph as? Styled)?.applyLook(look)
         title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f * look.fontScale)
-        title.setTextColor(if (chosen) look.decor else look.sideText)
+        title.setTextColor(if (chosen) look.decor else look.secondaryText)
         note.setTextSize(TypedValue.COMPLEX_UNIT_SP, 9.5f * look.fontScale)
-        note.setTextColor(Hud.withAlpha(look.sideText, 0.62f))
+        note.setTextColor(Hud.withAlpha(look.secondaryText, 0.62f))
         mark.color = look.decor
         foreground = pressGlow(context, look.edge)
         setBackgroundColor(if (chosen) Hud.withAlpha(look.edge, 0.09f) else 0)
@@ -228,8 +217,7 @@ internal class ChoiceRow(context: Context, label: String, help: String, private 
  * The ⋮ menu (Step 2.4), like the three dots in Samsung My Files.
  *
  * View: List, Big list, Grid 2, or Grid 3. Sort: Important first, A to Z, or Custom, with
- * Move folders to unlock dragging. Folder size from 0 to 100. Side list: Show, Swipe to
- * open, or Hidden. Each choice works at once and is saved. A tap outside the card, Done,
+ * Move folders to unlock dragging. Folder size from 0 to 100. Each choice works at once and is saved. A tap outside the card, Done,
  * or the phone's Back key closes it.
  */
 internal class PanelMenu(
@@ -243,7 +231,6 @@ internal class PanelMenu(
         fun onSortChosen(sort: FolderSort)
         fun onUnlockChanged(unlocked: Boolean)
         fun onFolderSize(value: Int, announce: Boolean)
-        fun onSideChosen(mode: SideMode)
         fun onMenuClosed()
         fun onProblem(message: String)
 
@@ -261,7 +248,6 @@ internal class PanelMenu(
     private val glass = PanelGlassDrawable(density, 0f, pane = true)
     private val viewRows = LinkedHashMap<FolderView, ChoiceRow>()
     private val sortRows = LinkedHashMap<FolderSort, ChoiceRow>()
-    private val sideRows = LinkedHashMap<SideMode, ChoiceRow>()
     private val unlockRow: ToggleRow
     private val sizeRow: NumberRow
     private val undoButton: ActionButton
@@ -366,19 +352,6 @@ internal class PanelMenu(
         )
         content.addView(sizeRow, LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
 
-        content.addView(section(R.string.terminal_menu_side))
-        val sideKinds = mapOf(
-            SideMode.SHOW to ChoiceGlyph.Kind.SIDE_SHOW,
-            SideMode.SWIPE to ChoiceGlyph.Kind.SIDE_SWIPE,
-            SideMode.HIDDEN to ChoiceGlyph.Kind.SIDE_HIDDEN,
-        )
-        for (mode in SideMode.entries) {
-            val row = ChoiceRow(context, mode.title, mode.help, ChoiceGlyph(context, sideKinds.getValue(mode)))
-            row.setOnClickListener { listener.onSideChosen(mode) }
-            sideRows[mode] = row
-            content.addView(row, LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
-        }
-
         val done = ActionButton(context, context.getString(R.string.terminal_menu_done))
         done.setOnClickListener { close(animate = true) }
         content.addView(done, LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply {
@@ -424,10 +397,8 @@ internal class PanelMenu(
     fun refresh() {
         val view = settings.view
         val sort = settings.sort
-        val side = settings.side
         viewRows.forEach { (key, row) -> row.chosen = key == view }
         sortRows.forEach { (key, row) -> row.chosen = key == sort }
-        sideRows.forEach { (key, row) -> row.chosen = key == side }
         if (unlockRow.toggle.isOn != settings.unlocked) unlockRow.toggle.setOn(settings.unlocked)
         if (!sizeRow.box.hasFocus() && sizeRow.box.value != settings.size) sizeRow.box.show(settings.size)
     }

@@ -17,16 +17,22 @@ import android.widget.TextView
 import com.offgrid.compositor.R
 import kotlin.math.hypot
 
+internal fun folderColumnCount(innerWidth: Int, minimumCellWidth: Float, requestedColumns: Int): Int {
+    val minimum = minimumCellWidth.coerceAtLeast(1f)
+    val fits = (innerWidth.coerceAtLeast(0) / minimum).toInt().coerceAtLeast(1)
+    return requestedColumns.coerceAtLeast(1).coerceAtMost(fits)
+}
+
 /** How folders are laid out (Step 2.4, the ⋮ menu). */
 internal enum class FolderView(val key: String, val title: String, val help: String, val columns: Int) {
     LIST("list", "List", "One folder per row, top to bottom.", 1),
-    BIG_LIST("big_list", "Big list", "One big folder per row.", 1),
+    BIG_LIST("big_list", "Big tiles", "One big folder per row.", 1),
     GRID_2("grid_2", "Grid 2", "Two folders side by side.", 2),
     GRID_3("grid_3", "Grid 3", "Three folders across.", 3),
     ;
 
     companion object {
-        fun from(key: String?): FolderView = entries.firstOrNull { it.key == key } ?: LIST
+        fun from(key: String?): FolderView = entries.firstOrNull { it.key == key } ?: GRID_2
     }
 }
 
@@ -42,21 +48,9 @@ internal enum class FolderSort(val key: String, val title: String, val help: Str
     }
 }
 
-/** Where the side list of folders is. */
-internal enum class SideMode(val key: String, val title: String, val help: String) {
-    SHOW("show", "Show", "The side list is always there."),
-    SWIPE("swipe", "Swipe to open", "Swipe right from the left edge to open it."),
-    HIDDEN("hidden", "Hidden", "No side list."),
-    ;
-
-    companion object {
-        fun from(key: String?): SideMode = entries.firstOrNull { it.key == key } ?: SHOW
-    }
-}
-
 /**
  * The ⋮ menu's choices, saved on the phone. Reset all clears them, which brings back the
- * start: List, Important first, side list shown, folder size 50, folders locked.
+ * start: Big tiles, Important first, folder size 50, folders locked.
  */
 internal class FolderSettings(private val prefs: PanelPrefs) {
     var view: FolderView
@@ -66,10 +60,6 @@ internal class FolderSettings(private val prefs: PanelPrefs) {
     var sort: FolderSort
         get() = FolderSort.from(prefs.text(SORT))
         set(value) = prefs.write { text(SORT, value.key) }
-
-    var side: SideMode
-        get() = SideMode.from(prefs.text(SIDE))
-        set(value) = prefs.write { text(SIDE, value.key) }
 
     /** Folder size from 0 to 100. 50 is the normal size. */
     var size: Int
@@ -121,7 +111,6 @@ internal class FolderSettings(private val prefs: PanelPrefs) {
         const val START_SIZE = 50
         private const val VIEW = "folder_view"
         private const val SORT = "folder_sort"
-        private const val SIDE = "side_mode"
         private const val SIZE = "folder_size"
         private const val UNLOCKED = "folders_unlocked"
         private const val ORDER = "folder_order."
@@ -198,8 +187,8 @@ internal class FolderRow(
         look?.let { applyLook(it) }
     }
 
-    /** Extra room at the right end for the grip handle while folders can move. */
-    fun setGripRoom(room: Int) {
+    /** Extra room at the right end for the drag handle while folders can move. */
+    fun setHandleRoom(room: Int) {
         val wanted = endPad + room
         if (paddingRight != wanted) setPadding(paddingLeft, paddingTop, wanted, paddingBottom)
     }
@@ -210,11 +199,13 @@ internal class FolderRow(
         bar.setBackgroundColor(look.decor)
         bar.visibility = if (active) VISIBLE else INVISIBLE
         name.setTextSize(TypedValue.COMPLEX_UNIT_SP, (if (big) 16f else 13f) * look.fontScale)
-        name.setTextColor(if (active) look.decor else look.sideText)
+        val ink = if (look.base == Theme.SYSTEM) look.text else if (active) look.decor else look.secondaryText
+        val note = if (look.base == Theme.SYSTEM) look.text else Hud.withAlpha(look.folder, 0.85f)
+        name.setTextColor(ink)
         detail.setTextSize(TypedValue.COMPLEX_UNIT_SP, 10.5f * look.fontScale)
-        detail.setTextColor(Hud.withAlpha(look.folder, 0.85f))
+        detail.setTextColor(note)
         count.setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f * look.fontScale)
-        count.setTextColor(Hud.withAlpha(look.folder, 0.85f))
+        count.setTextColor(note)
         setBackgroundColor(if (active) Hud.withAlpha(look.edge, 0.08f) else 0)
         val showRing = active && look.ring
         ring.visibility = if (showRing) VISIBLE else INVISIBLE
@@ -230,7 +221,7 @@ internal class FolderRow(
 /**
  * Folders laid out as a list, a big list, or a grid of 2 or 3 across (Step 2.4).
  *
- * With [dragOn], a folder moves after a long press, or right away from its grip handle
+ * With [dragOn], a folder moves after a long press, or right away from its drag handle
  * (the three short lines). Anywhere else, a swipe still scrolls the list (final build,
  * Rex's review). The other folders slide out of the way, the phone ticks softly as the
  * folder lands on each new spot, and the new order is handed to [onMoved] when the finger
@@ -254,13 +245,13 @@ internal class FolderLayout(context: Context, private val sub: Boolean) : ViewGr
         set(value) {
             if (field == value) return
             field = value
-            gripRoom()
+            dragHandleRoom()
             invalidate()
         }
 
     private val order = ArrayList<PanelFolder>()
     private val cells = HashMap<String, View>()
-    private var view = FolderView.LIST
+    private var view = FolderView.GRID_2
     private var size = FolderSettings.START_SIZE
     private var activeId: String? = null
     private var columns = 1
@@ -280,7 +271,7 @@ internal class FolderLayout(context: Context, private val sub: Boolean) : ViewGr
     private var slideNext = false
     private var grabbedByHandle = false
     private var orderBefore: List<PanelFolder> = emptyList()
-    private val grip = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+    private val dragHandle = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
         strokeCap = android.graphics.Paint.Cap.ROUND
     }
     private val longPress = Runnable {
@@ -334,7 +325,7 @@ internal class FolderLayout(context: Context, private val sub: Boolean) : ViewGr
                 styler?.invoke(cell)
             }
             setActive(activeId)
-            gripRoom()
+            dragHandleRoom()
             if (ValueAnimator.areAnimatorsEnabled() && isAttachedToWindow) {
                 alpha = 0f
                 animate().alpha(1f).setDuration(FADE_MS).start()
@@ -373,8 +364,7 @@ internal class FolderLayout(context: Context, private val sub: Boolean) : ViewGr
         val width = MeasureSpec.getSize(widthMeasureSpec)
         val inner = (width - paddingLeft - paddingRight).coerceAtLeast(0)
         // A grid never squeezes folders smaller than they can be read. It uses fewer columns instead.
-        val fits = (inner / Hud.dp(context, MIN_CELL_DP)).toInt().coerceAtLeast(1)
-        columns = view.columns.coerceAtMost(fits)
+        columns = folderColumnCount(inner, Hud.dp(context, MIN_CELL_DP), view.columns)
         cellWidth = inner / columns
         var height = paddingTop + paddingBottom
         var rowHeight = 0
@@ -437,10 +427,10 @@ internal class FolderLayout(context: Context, private val sub: Boolean) : ViewGr
                 downY = event.y
                 val cell = cellAt(event.x, event.y)
                 candidate = cell
-                grabbedByHandle = cell != null && onGrip(cell, event.x, event.y)
+                grabbedByHandle = cell != null && onDragHandle(cell, event.x, event.y)
                 if (cell != null) {
                     if (grabbedByHandle) {
-                        // The grip moves the folder right away. The list doesn't scroll from it.
+                        // The drag handle moves the folder right away. The list doesn't scroll from it.
                         parent?.requestDisallowInterceptTouchEvent(true)
                     } else {
                         postDelayed(longPress, ViewConfiguration.getLongPressTimeout().toLong())
@@ -487,9 +477,9 @@ internal class FolderLayout(context: Context, private val sub: Boolean) : ViewGr
         }
     }
 
-    /** The grip handle: the right end of a row, or the top right corner of a tile. */
-    private fun onGrip(cell: View, x: Float, y: Float): Boolean {
-        val reach = Hud.dp(context, GRIP_TOUCH_DP)
+    /** The drag handle: the right end of a row, or the top right corner of a tile. */
+    private fun onDragHandle(cell: View, x: Float, y: Float): Boolean {
+        val reach = Hud.dp(context, DRAG_HANDLE_TOUCH_DP)
         return if (cell is FolderRow) {
             x >= cell.right - reach
         } else {
@@ -497,18 +487,18 @@ internal class FolderLayout(context: Context, private val sub: Boolean) : ViewGr
         }
     }
 
-    /** Rows leave room at their right end for the grip while folders can move. */
-    private fun gripRoom() {
-        val room = if (dragOn) Hud.dpi(context, GRIP_ROOM_DP) else 0
-        for (cell in cells.values) if (cell is FolderRow) cell.setGripRoom(room)
+    /** Rows leave room at their right end for the drag handle while folders can move. */
+    private fun dragHandleRoom() {
+        val room = if (dragOn) Hud.dpi(context, DRAG_HANDLE_ROOM_DP) else 0
+        for (cell in cells.values) if (cell is FolderRow) cell.setHandleRoom(room)
     }
 
     override fun dispatchDraw(canvas: android.graphics.Canvas) {
         super.dispatchDraw(canvas)
         if (!dragOn) return
         val look = PanelLook.current ?: return
-        grip.color = Hud.withAlpha(look.decor, 0.85f)
-        grip.strokeWidth = Hud.dp(context, 2f)
+        dragHandle.color = Hud.withAlpha(look.decor, 0.85f)
+        dragHandle.strokeWidth = Hud.dp(context, 2f)
         val half = Hud.dp(context, 7f)
         val gap = Hud.dp(context, 4.5f)
         for (cell in cells.values) {
@@ -516,13 +506,13 @@ internal class FolderLayout(context: Context, private val sub: Boolean) : ViewGr
             val cx: Float
             val cy: Float
             if (cell is FolderRow) {
-                cx = cell.right - Hud.dp(context, GRIP_ROOM_DP) / 2f + cell.translationX
+                cx = cell.right - Hud.dp(context, DRAG_HANDLE_ROOM_DP) / 2f + cell.translationX
                 cy = (cell.top + cell.bottom) / 2f + cell.translationY
             } else {
                 cx = cell.right - Hud.dp(context, 16f) + cell.translationX
                 cy = cell.top + Hud.dp(context, 16f) + cell.translationY
             }
-            for (step in -1..1) canvas.drawLine(cx - half, cy + step * gap, cx + half, cy + step * gap, grip)
+            for (step in -1..1) canvas.drawLine(cx - half, cy + step * gap, cx + half, cy + step * gap, dragHandle)
         }
     }
 
@@ -647,9 +637,9 @@ internal class FolderLayout(context: Context, private val sub: Boolean) : ViewGr
         const val LIFT_ALPHA = 0.92f
         const val EDGE_ZONE_DP = 48f
 
-        /** The grip's touch area and the room rows leave for it. */
-        const val GRIP_TOUCH_DP = 48f
-        const val GRIP_ROOM_DP = 40f
+        /** The drag handle's touch area and the room rows leave for it. */
+        const val DRAG_HANDLE_TOUCH_DP = 48f
+        const val DRAG_HANDLE_ROOM_DP = 40f
         const val SCROLL_STEP_DP = 6f
     }
 }

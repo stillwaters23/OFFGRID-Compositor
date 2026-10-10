@@ -285,6 +285,83 @@ States: passed, waiting for review, blocked, or waiting for Royalty's phone test
 - **State:** waiting for CI
 - **Next:** Update the checklist comment with the GitHub log once the workflow finishes, and keep the 35 Lane C hook lines in the pull request description.
 
+## 2026-10-09 8:05 AM CT — Lane B, Copilot
+- **Bootloader step:** Lane B: Camera, Mic and Recording.
+- **What was done:**
+  - B0: CI runs on pull requests into `final-build`, checks the merged manifest against the permission allowlist, and bans only voice code.
+  - B1: RECORD_AUDIO is in the manifest. The mic is asked for only when the mic toggle goes on.
+  - B2: the camera and mic toggles bind and release the camera and the mic. Black with effects shows while the camera is off.
+  - B3: a new `audio/` package has the mic, the voice effects, the beat finder, and the recorder that writes MP4 with video and audio.
+  - B4: the glow border pulses with the mic beat, at most 3 times a second.
+  - B5: the replay buffer uses one 64 MB block, and the recording function was renamed.
+  - The local sandbox cannot reach Google's Maven, so Gradle, lint, Robolectric tests, and on-device checks were not run there. CI must confirm them.
+- **PR / commit:** Lane B pull request into `final-build`, not merged.
+- **State:** waiting for review
+- **Next:** read the CI log, fix anything it finds, then run the phone checks: a 20 second Robot plus Echo clip, camera off and mic off during a recording, and frame times.
+
+## 2026-10-09 11:00 PM CT — Lane B finisher
+
+- **Bootloader step:** Lane B round 2 on pull request #11. Base stays `final-build`. Not merged.
+- **What was done:**
+  - Restored the manifest removal of ACCESS_NETWORK_STATE. The allowlist accepts the AndroidX dynamic receiver permission by its exact name, and lint runs in CI.
+  - A mic read error releases AudioRecord once, and stop is safe to call again. The mic is released when the app is hidden.
+  - A denied mic turns the panel toggle off and leaves the Settings line on the record bar.
+  - MainActivity.kt is under 400 lines. The camera, playback, recording, and status pieces live in their own files. The new output and denial hooks are under 40 lines.
+  - The radar ping is mixed into the video audio. The replay buffer keeps an audio track while the mic is on.
+  - 📁 Microphone Effects is in the panel. The old "no mic" sentences are archived, not deleted.
+  - Unit tests cover the mic release, the denied capture state, the saved mic toggle, the replay audio track, the radar ping, and extra output bookkeeping.
+- **PR / commit:** Pull request #11, not merged.
+- **State:** waiting for review
+- **Next:** CI on this head must be green. Phone checks stay with Royalty: lip sync, a 20 second Robot plus Echo clip, and camera-off and mic-off in one recording.
+
+## 2026-10-09 8:41 AM CT — Lane A base sync
+
+- **Bootloader step:** Lane A. Panel UI
+- **What was done:** Integrated the current `final-build` history into the Lane A branch and kept the final-build files and existing features. The PR had been forked from the Step 2 ancestor, so this is a merge commit rather than a rewritten rebase. Follow-up work is removing the side drawer and stale mic notes, adding layout tests, and verifying CI.
+- **PR / commit:** Pull request #15, draft, targeting `final-build`.
+- **State:** in progress
+- **Next:** Resolve the remaining panel UI requests, run tests and build, and keep the PR unmerged for Rex's review.
+
+## 2026-10-09 9:05 AM CT — Lane A review follow-up
+
+- **What was done:** Removed side-panel navigation and its saved settings, corrected the recording notes, restored full-bleed sizing and the visible Back control/scroll thumb in the final-build panel, and added sizing/layout tests.
+- **Validation:** The latest `final-build` Actions build passed. Local targeted Gradle tests could not start because Android Gradle Plugin 8.13.2 could not be resolved.
+- **PR / commit:** Pull request #15, draft, targeting `final-build`.
+- **State:** merge resolution and validation in progress
+- **Next:** Finish final review, commit the merge, and keep the PR unmerged for Rex's review.
+
+## 2026-10-09 9:10 AM CT — Lane A merge complete
+
+- **What was done:** Published merge commit `77beeb9` with `final-build` as its second parent. The side panel is removed; full-bleed sizing, insets-aware border geometry, Back navigation, custom scroll thumbs, and sizing/layout tests are retained in the final-build panel.
+- **Validation:** Secret scan and CodeQL reported no findings. The latest `final-build` Actions run passed. No Actions build ran for this PR head because the workflow's pull-request branch filter excludes `final-build`; local Gradle tests could not resolve Android Gradle Plugin 8.13.2.
+- **Requests for other lanes:** Add `final-build` to the build workflow's pull-request branch filter so this PR can receive a CI run.
+- **PR / commit:** Pull request #15, draft, targeting `final-build`.
+- **State:** open and unmerged for Rex's review
+
+## 2026-10-09 9:43 AM CT: Lane A round 2 fixes
+
+- **What was done:** Restored the panel top bar and camera/microphone quick toggles, added the `fx.cam.on` and `fx.mic.*` rows, corrected the recording audio notes, removed the resize grip, added bottom-edge resize zones, strengthened the high-glow bloom, and split panel behavior into focused files. `TerminalPanel.kt` is under 1,000 lines.
+- **Tests added:** Full-bleed measurement, panel geometry and resize zones, border inset, glow curve, scroll thumb geometry, responsive top-bar layout, microphone contract coverage, and toggle persistence/UI refresh.
+- **Validation:** `git diff --check` passes and no grip, slider, TODO, FIXME, or em-dash matches remain in owned panel sources. Local Gradle tests cannot configure because Android Gradle Plugin 8.13.2 is unavailable from the configured repositories. The latest successful PR build is from the earlier head, not these round 2 changes. The older failed `final-build` run stopped while downloading Android SDK command-line tools.
+- **Device evidence:** No screenshot or `dumpsys gfxinfo` result is available from this environment.
+- **Validation follow-up:** Commit `f88aed9` is published. Code review reported no findings; CodeQL had no analyzable code in scope. No build has run for this head.
+- **PR:** Pull request #15 remains draft, based on `final-build`, and unmerged.
+- **State:** published for CI and Rex review
+
+## 2026-10-09 11:10 PM CT: Lane A panel finish
+
+- **What was done:** Camera, microphone, settings, and Back controls are drawn in code as bioluminescent power buttons. Glow layers are cached bitmaps, so frames do not blur again. Width and height 100 fill the window. Content padding clears the status bar, camera cutout, gesture bar, and 30 percent of the corner radius. The top bar is 56 dp with 8 dp gaps and 40 dp controls. Width and height fields use tabular digits. The bottom resize edge is a 6 dp cached glow. The side drawer source is archived at `04 Build/archive/side_drawer.kt` and is not in the view tree. Night theme text is white on black. Day theme text is black on white. The debug workflow pull request filter now includes `final-build` so this pull request can run CI. Android Gradle Plugin stays at 8.13.2.
+- **Tests:** `./gradlew assembleDebug testDebugUnitTest --offline` from `04 Build` with `ANDROID_HOME` set. BUILD SUCCESSFUL in 14s. 71 unit tests, 0 failures, 0 errors, 0 skipped. Classes: EffectPanelTest 6, PanelGeometryTest 14, PanelUiTest 12, PanelFinishTest 3, PanelSettingsTest 9, StageTest 9, RainbowMixTest 12, CameraToolsTest 5, EffectLayersTest 1.
+- **PR:** Pull request #15 remains draft, based on `final-build`, and unmerged.
+- **State:** local build and tests passed. CI result is recorded in the next entry.
+
+## 2026-10-09 11:15 PM CT: Lane A CI for the panel finish
+
+- **Validation:** GitHub Actions run 38023174944 on commit `4a9637b` completed with conclusion success. Job "Build the debug app" passed. `assembleDebug` printed `BUILD SUCCESSFUL in 2m 32s`. `testDebugUnitTest` printed `BUILD SUCCESSFUL in 36s`. The run also printed `No saved secrets found.` and `Mic permission is not in the app.` The slider, voice, and secret steps succeeded. The pull request stays draft and unmerged.
+- **PR:** https://github.com/stillwaters23/OFFGRID-Compositor/pull/15
+- **Run:** https://github.com/stillwaters23/OFFGRID-Compositor/actions/runs/38023174944
+- **State:** open for Rex's review
+
 ## 2026-10-09 11:13 PM CT — Lane E
 
 - **Bootloader step:** Lane E. Person segmentation. Not a new Bootloader step. Voice stays paused.
@@ -308,3 +385,23 @@ States: passed, waiting for review, blocked, or waiting for Royalty's phone test
 - **PR / commit:** Pull request #13 on `copilot/lane-c-live-remote`. Not merged.
 - **State:** waiting for CI
 - **Next:** Report the new head and the Build debug app run once GitHub finishes.
+
+## 2026-10-10 6:20 PM UTC: Lane A merged final-build
+
+- **What was done:** Merged `origin/final-build` into `copilot/lane-a-panel-ui` with a regular merge commit. Lane E person segmentation, the QA reports, and P1's drum reels and clicker stay. Width and Height drum wheels sit in the top bar. The Size folder keeps the paired reels and the typed fallback. The side panel stays archived. System remains the only theme in the picker. Android Gradle Plugin stays 8.13.2.
+- **Tests:** `./gradlew assembleDebug testDebugUnitTest` from `04 Build`. BUILD SUCCESSFUL in 19s. 103 unit tests, 0 failures, 0 errors, 0 skipped.
+- **PR:** Pull request #15 stays open. It is not merged from this branch.
+- **State:** local build and tests passed. CI is the next check.
+
+## 2026-10-10 6:55 PM UTC: Integration of Lanes A, B, and P2
+
+- **What was done:** Merged Lane B, Lane A, and P2 into `integration_final_lanes` from `final-build` with regular merge commits. Camera and mic toggles, recording, RECORD_AUDIO, live and remote, Send to PC, INTERNET, the panel with drum reels, the mic hard block, Rex voice swap, and the person mask all stay. Rex pitch is stored as `fx.mic.rex.pitch` so the microphone effect pitch stays at 50. One mic capture serves recording and the voice swap. Wi-Fi Direct calls catch a missing permission and report that discovery did not start.
+- **Tests:** `./gradlew assembleDebug testDebugUnitTest lintDebug` from `04 Build`. BUILD SUCCESSFUL in 37s. 218 unit tests, 0 failures, 0 errors, 0 skipped. Lint passed.
+- **PR:** One pull request into `final-build`. Not merged from this branch.
+- **State:** local build, tests, and lint passed. CI is the next check.
+
+## 2026-10-10 7:05 PM UTC: Integration CI permission list
+
+- **What was done:** The first Build debug app run on pull request #36 failed because the merged manifest includes the live overlay permissions. The allowlist now accepts the overlay, the notification, and the foreground service types the live controls already declare. RECORD_AUDIO and INTERNET stay required. ACCESS_NETWORK_STATE and Wi-Fi permissions stay banned.
+- **PR:** Pull request #36. Not merged.
+- **State:** waiting for CI on the new head.

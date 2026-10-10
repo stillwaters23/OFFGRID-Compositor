@@ -32,17 +32,20 @@ class PanelSettingsTest {
     fun aFreshInstallShowsTheStartLook() {
         val store = ThemeStore(context, PanelPrefs(context))
         val look = store.look()
-        assertEquals(Theme.OLED, look.base)
+        assertEquals(Theme.SYSTEM, look.base)
         assertEquals(ToggleStyle.WHITE, look.toggleStyle)
         assertFalse("toggle glow starts off", look.toggleGlow)
         assertEquals(100, store.number(LookKeys.WIDTH))
         assertEquals(100, store.number(LookKeys.HEIGHT))
-        assertEquals(50, store.number(LookKeys.OPACITY))
+        assertEquals(100, store.number(LookKeys.OPACITY))
+        assertEquals(ThemeMode.AUTO, store.themeMode())
         assertEquals(50, store.number(LookKeys.GLOW))
         assertEquals(1, store.number(LookKeys.TYPING))
         assertEquals(4, store.number(LookKeys.CORNERS))
+        assertFalse(store.toggle(LookKeys.FULL_SCREEN))
+        assertFalse(store.toggle(LookKeys.SEE_THROUGH_FULL_SIZE))
         assertFalse(store.toggle(LookKeys.TEST_DIAMOND))
-        assertFalse(store.toggle(LookKeys.PULSE))
+        assertTrue(store.toggle(LookKeys.PULSE))
         assertTrue(store.toggle(LookKeys.GLOW_ON))
         assertEquals(0f, look.cursorGlow, 0f)
         assertEquals(0xFFFFFFFF.toInt(), look.cursor)
@@ -70,15 +73,15 @@ class PanelSettingsTest {
             .putInt(PanelPrefs.LAYOUT, 2)
             .putInt("number.opacity", 85)
             .putInt("number.height", 32)
-            .putString("text.base_theme", Theme.TITANIUM.key)
+            .putString("text.base_theme", ArchivedTheme.TITANIUM.key)
             .putBoolean("toggle.titanium_frame", true)
             .putBoolean("toggle.test.bigo_live.tests.burned_in", true)
             .commit()
         val prefs = PanelPrefs(context)
         assertEquals(PanelPrefs.LAYOUT_NOW, prefs.layoutVersion)
         val store = ThemeStore(context, prefs)
-        assertEquals(Theme.OLED, store.base())
-        assertEquals(50, store.number(LookKeys.OPACITY))
+        assertEquals(Theme.SYSTEM, store.base())
+        assertEquals(100, store.number(LookKeys.OPACITY))
         assertEquals(100, store.number(LookKeys.HEIGHT))
         assertFalse(store.toggle(LookKeys.TITANIUM_FRAME))
         assertTrue("private test marks stay", prefs.toggle("test.bigo_live.tests.burned_in", false))
@@ -88,18 +91,32 @@ class PanelSettingsTest {
     }
 
     @Test
+    fun retiredThemeSelectionMigratesToSystem() {
+        raw().edit()
+            .putInt(PanelPrefs.LAYOUT, PanelPrefs.LAYOUT_NOW)
+            .putString("text.base_theme", "uv_black_light")
+            .commit()
+
+        val store = ThemeStore(context, PanelPrefs(context))
+
+        assertEquals(Theme.SYSTEM, store.base())
+        assertEquals("system", raw().getString("text.base_theme", null))
+    }
+
+    @Test
     fun resetAllBringsBackTheStartAndKeepsTestMarks() {
         val prefs = PanelPrefs(context)
         val store = ThemeStore(context, prefs)
-        store.applyTheme(Theme.TERMUX)
+        store.applyTheme(Theme.SYSTEM)
         store.setNumber(LookKeys.FONT_SIZE, 100)
         store.setChoice(LookKeys.TOGGLE_STYLE, ToggleStyle.BLACK.key)
         prefs.setToggle("test.tiktok.tests.chat_gifts", true)
         store.resetAll()
         val after = ThemeStore(context, PanelPrefs(context))
-        assertEquals(Theme.OLED, after.base())
+        assertEquals(Theme.SYSTEM, after.base())
         assertEquals(50, after.number(LookKeys.FONT_SIZE))
         assertEquals(ToggleStyle.WHITE, after.look().toggleStyle)
+        assertEquals(FolderView.GRID_2, FolderSettings(PanelPrefs(context)).view)
         assertTrue(PanelPrefs(context).toggle("test.tiktok.tests.chat_gifts", false))
         assertEquals(PanelPrefs.LAYOUT_NOW, PanelPrefs(context).layoutVersion)
     }
@@ -109,6 +126,7 @@ class PanelSettingsTest {
         val home = PanelTree.build()
         val settings = FolderSettings(PanelPrefs(context))
         assertEquals(FolderSort.IMPORTANT, settings.sort)
+        assertEquals(FolderView.GRID_2, settings.view)
         assertEquals(listOf("Panel settings"), settings.arrange(home).take(1).map { it.title })
         settings.sort = FolderSort.A_TO_Z
         val names = settings.arrange(home).map { FolderSettings.sortName(it) }
@@ -150,5 +168,27 @@ class PanelSettingsTest {
         val defaults = PanelTree.defaults
         assertEquals(ToggleStyle.WHITE.key, defaults.choices[LookKeys.TOGGLE_STYLE])
         assertEquals(false, defaults.toggles[LookKeys.TOGGLE_GLOW])
+        assertEquals(false, defaults.toggles[LookKeys.FULL_SCREEN])
+        assertEquals(false, defaults.toggles[LookKeys.SEE_THROUGH_FULL_SIZE])
+    }
+
+    @Test
+    fun removedSidePanelSettingsAreDiscardedOnExistingInstall() {
+        raw().edit()
+            .putInt(PanelPrefs.LAYOUT, PanelPrefs.LAYOUT_NOW)
+            .putString("text.side_mode", "list")
+            .putBoolean("system_color.side_text", false)
+            .putInt("custom.side_text", 0xFF00FF00.toInt())
+            .putString("role.side_text", "NEUTRAL1_100")
+            .putString("mix.side_text", "1,2,3")
+            .commit()
+
+        PanelPrefs(context)
+
+        assertFalse(raw().contains("text.side_mode"))
+        assertFalse(raw().contains("system_color.side_text"))
+        assertFalse(raw().contains("custom.side_text"))
+        assertFalse(raw().contains("role.side_text"))
+        assertFalse(raw().contains("mix.side_text"))
     }
 }
