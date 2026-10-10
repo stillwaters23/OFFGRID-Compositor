@@ -150,11 +150,16 @@ test("L3 layout flip is transform and opacity only and reduced motion is instant
   );
   const sortedIntervals = [...frameIntervals].sort((a, b) => a - b);
   const medianFrame = sortedIntervals[Math.floor(sortedIntervals.length / 2)] ?? 0;
+  const meanFrame = sortedIntervals.reduce((sum, interval) => sum + interval, 0) / sortedIntervals.length;
   const p95Frame = sortedIntervals[Math.max(0, Math.ceil(sortedIntervals.length * 0.95) - 1)] ?? 0;
   t.diagnostic(
-    `L3 layout FLIP frame interval: median=${medianFrame.toFixed(3)}ms p95=${p95Frame.toFixed(3)}ms max=${Math.max(...sortedIntervals).toFixed(3)}ms samples=${JSON.stringify(sortedIntervals)}`,
+    `L3 layout FLIP frame interval: mean=${meanFrame.toFixed(3)}ms median=${medianFrame.toFixed(3)}ms p95=${p95Frame.toFixed(3)}ms max=${Math.max(...sortedIntervals).toFixed(3)}ms samples=${JSON.stringify(sortedIntervals)}`,
   );
-  assert.ok(medianFrame < 16.7 && p95Frame <= 25, "layout FLIP frame intervals exceed 60fps target");
+  // A 60Hz tick is 16.667ms. Chromium records that tick as 16.6 or 16.7, and the
+  // 16.7 double sits a few ulps above the literal, so a raw `< 16.7` check also
+  // fails on an empty page. One microsecond covers that representation only.
+  assert.ok(meanFrame < 16.7, "layout FLIP mean frame interval is not under 16.7ms");
+  assert.ok(medianFrame <= 16.7 + 0.001 && p95Frame <= 25, "layout FLIP frame intervals exceed 60fps target");
 
   await page.emulateMedia({ reducedMotion: "reduce" });
   await sheet.getByRole("button", { name: "BIG" }).click();

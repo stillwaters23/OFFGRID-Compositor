@@ -5,6 +5,7 @@ import { FolderSizePopover } from "@/components/auric/folder-size-popover";
 import { FolderIcon3D } from "@/components/auric/folder-icons-3d";
 import { GlassFolder } from "@/components/auric/glass-folder";
 import { folderMetrics, hitZone, LONG_PRESS_MS, MOVE_TOLERANCE_PX, orderFolderIds, type FolderPreferences, type Rect } from "@/lib/folder-layout";
+import { FLIP_DURATION_MS, FLIP_EASING, flipKeyframes, planFolderFlips, type BoxLike } from "@/lib/folder_flip";
 import { clampToSafeArea, springStep } from "@/lib/folder-physics";
 import { classifyGesture, shouldSuppressClick } from "@/lib/folder-gestures";
 import { MODULES, isInstalled, type ModuleId, type ModuleSpec } from "@/lib/modules";
@@ -17,6 +18,7 @@ type FolderGridProps = {
   preferences: FolderPreferences;
   beforeRects: { current: Map<string, DOMRect> };
   onChangePreferences: (next: FolderPreferences) => void;
+  compositorArmed?: boolean;
 };
 
 type Interaction = {
@@ -102,7 +104,21 @@ function springBack(
   window.requestAnimationFrame(step);
 }
 
-export function FolderGrid({ preferences, beforeRects, onChangePreferences }: FolderGridProps) {
+function clipBox(grid: HTMLElement | null): BoxLike {
+  const scrollClip = grid?.closest<HTMLElement>(".tx-scroll")?.getBoundingClientRect();
+  return {
+    left: Math.max(0, scrollClip?.left ?? 0),
+    top: Math.max(0, scrollClip?.top ?? 0),
+    right: Math.min(window.innerWidth, scrollClip?.right ?? window.innerWidth),
+    bottom: Math.min(window.innerHeight, scrollClip?.bottom ?? window.innerHeight),
+  };
+}
+
+function tileButton(item: HTMLElement | undefined): HTMLButtonElement | null {
+  return item?.querySelector<HTMLButtonElement>(".tx-folder-tile") ?? null;
+}
+
+export function FolderGrid({ preferences, beforeRects, onChangePreferences, compositorArmed = false }: FolderGridProps) {
   const installed = useAuric((s) => s.installedModules);
   const glow = useAuric((s) => s.glowIntensity);
   const gridRef = useRef<HTMLUListElement>(null);
@@ -121,84 +137,41 @@ export function FolderGrid({ preferences, beforeRects, onChangePreferences }: Fo
   const updatePreferences = onChangePreferences;
 
   useLayoutEffect(() => {
-    if (beforeRects.current.size) {
-      for (const item of tileRefs.current.values()) {
-        const button = item.querySelector<HTMLButtonElement>(".tx-folder-tile");
-        button?.getAnimations().forEach((animation) => animation.cancel());
+    const root = document.querySelector<HTMLElement>(".tx-root");
+    if (!root) return;
+    if (compositorArmed) root.dataset.folderFlip = "armed";
+    else if (root.dataset.folderFlip === "armed") delete root.dataset.folderFlip;
+  }, [compositorArmed]);
+
+  useLayoutEffect(() => {
+    if (!beforeRects.current.size) return;
+    const buttons = [...tileRefs.current.values()].map((item) => tileButton(item)).filter((button): button is HTMLButtonElement => button !== null);
+    // Writes that clear an in-flight transform happen before the read pass.
+    // After that, every geometry read finishes before the first animation write.
+    for (const button of buttons) button.getAnimations().forEach((animation) => animation.cancel());
+    if (!reducedMotion()) {
+      const clip = clipBox(gridRef.current);
+      const last = new Map<string, BoxLike>();
+      for (const [id, item] of tileRefs.current) {
+        const button = tileButton(item);
+        if (!button) continue;
+        const next = button.getBoundingClientRect();
+        last.set(id, { left: next.left, top: next.top, right: next.right, bottom: next.bottom });
       }
-      if (!reducedMotion()) {
-        const flips: { button: HTMLButtonElement; dx: number; dy: number }[] = [];
-        const scrollClip = gridRef.current?.closest<HTMLElement>(".tx-scroll")?.getBoundingClientRect();
-        const clip = {
-          left: Math.max(0, scrollClip?.left ?? 0),
-          top: Math.max(0, scrollClip?.top ?? 0),
-          right: Math.min(window.innerWidth, scrollClip?.right ?? window.innerWidth),
-          bottom: Math.min(window.innerHeight, scrollClip?.bottom ?? window.innerHeight),
+      const plans = planFolderFlips(beforeRects.current, last, clip);
+      for (const plan of plans) {
+        const button = tileButton(tileRefs.current.get(plan.id));
+        if (!button) continue;
+        button.dataset.flipping = "true";
+        const animation = button.animate(flipKeyframes(plan.x, plan.y), {
+          duration: FLIP_DURATION_MS,
+          easing: FLIP_EASING,
+        });
+        const release = () => {
+          delete button.dataset.flipping;
         };
-        for (const [id, item] of tileRefs.current) {
-          const button = item.querySelector<HTMLButtonElement>(".tx-folder-tile");
-          const old = beforeRects.current.get(id);
-          if (!button || !old) continue;
-          if (old.right <= clip.left || old.left >= clip.right || old.bottom <= clip.top || old.top >= clip.bottom) continue;
-          const next = button.getBoundingClientRect();
-          if (
-            next.right <= clip.left ||
-            next.left >= clip.right ||
-            next.bottom <= clip.top ||
-            next.top >= clip.bottom
-          ) continue;
-          const dx = old.left - next.left;
-          const dy = old.top - next.top;
-          if (dx || dy) {
-            flips.push({ button, dx, dy });
-          }
-        }
-        let restoreDecorations = () => {};
-        if (flips.length) {
-          const root = document.querySelector(".tx-root");
-          const competingAnimations = root?.getAnimations({ subtree: true }).filter((animation) =>
-            !flips.some(({ button }) => button.getAnimations().includes(animation)),
-          ) ?? [];
-          competingAnimations.forEach((animation) => animation.pause());
-          const rows = flips
-            .map(({ button }) => button.querySelector<HTMLElement>(".tx-folder-row"))
-            .filter((row): row is HTMLElement => row !== null);
-          const previousBackdrops = rows.map((row) => row.style.backdropFilter);
-          rows.forEach((row) => {
-            row.style.backdropFilter = "none";
-          });
-          restoreDecorations = () => {
-            rows.forEach((row, index) => {
-              row.style.backdropFilter = previousBackdrops[index];
-            });
-            competingAnimations.forEach((animation) => {
-              if (animation.playState === "paused") animation.play();
-            });
-          };
-        }
-        let remaining = flips.length;
-        for (const { button, dx, dy } of flips) {
-          button.dataset.flipping = "true";
-          const animation = button.animate(
-            [{ transform: `translate(${dx}px, ${dy}px)`, opacity: 0.78 }, { transform: "translate(0, 0)", opacity: 1 }],
-            { duration: 320, easing: "cubic-bezier(.2,.8,.2,1)" },
-          );
-          let released = false;
-          const releaseLayer = (defer = false) => {
-            if (released) return;
-            released = true;
-            const cleanup = () => {
-              delete button.dataset.flipping;
-              remaining -= 1;
-              if (remaining === 0) restoreDecorations();
-            };
-            if (defer) window.requestAnimationFrame(() => window.requestAnimationFrame(cleanup));
-            else cleanup();
-          };
-          animation.finished.then(() => releaseLayer(true), () => releaseLayer());
-          animation.addEventListener("finish", () => releaseLayer(true), { once: true });
-          animation.addEventListener("cancel", () => releaseLayer(), { once: true });
-        }
+        animation.addEventListener("finish", release, { once: true });
+        animation.addEventListener("cancel", release, { once: true });
       }
     }
     beforeRects.current.clear();
@@ -379,6 +352,7 @@ export function FolderGrid({ preferences, beforeRects, onChangePreferences }: Fo
             <li
               key={spec.id}
               data-folder-id={spec.id}
+              data-metrics={preferences.layout === "big" && size !== 50 ? "custom" : undefined}
               ref={(element) => {
                 if (element) tileRefs.current.set(spec.id, element);
                 else tileRefs.current.delete(spec.id);

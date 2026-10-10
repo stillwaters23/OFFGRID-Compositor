@@ -279,6 +279,7 @@ function HomeDesk({ alerts }: { alerts: number }) {
               preferences={folderPreferences}
               beforeRects={folderBeforeRects}
               onChangePreferences={updateFolderPreferences}
+              compositorArmed={folderSettingsOpen}
             />
             <FolderLayoutSheet
               open={folderSettingsOpen}
