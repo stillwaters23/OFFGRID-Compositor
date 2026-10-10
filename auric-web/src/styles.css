@@ -624,6 +624,7 @@
   left: 0;
   right: 0;
   height: 2px;
+  opacity: var(--laser-core-opacity, 1);
   background: linear-gradient(
     90deg,
     transparent,

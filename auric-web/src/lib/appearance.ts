@@ -7,6 +7,10 @@ import type { CSSProperties } from "react";
 
 export type AppearanceMode = "system" | "light" | "dark";
 
+export type NumberColor = { dark: string | null; light: string | null };
+export type FolderLayout = "grid" | "big" | "single";
+export type FolderIconStyle = "3d" | "flat" | "etched";
+
 export type AppearanceDraft = {
   palette: Palette;
   glowIntensity: number;
@@ -20,6 +24,16 @@ export type AppearanceDraft = {
   glowMode: boolean;
   floorId: FloorId;
   floorCustom: string;
+  laserEnabled: boolean;
+  laserIntensity: number;
+  laserColor: string;
+  numberColor: NumberColor;
+  folderSizeAll: number;
+  folderSizes: Record<string, number>;
+  folderLayout: FolderLayout;
+  folderIconStyle: Record<string, FolderIconStyle>;
+  folderNames: Record<string, string>;
+  folderOrder: string[];
 };
 
 export const SAFE_DARK: Palette = { ...BLUE_DIAMOND };
@@ -168,6 +182,17 @@ export function draftsDiffer(a: AppearanceDraft, b: AppearanceDraft): boolean {
     a.houseOpacity !== b.houseOpacity ||
     a.digitFont !== b.digitFont ||
     a.digitScale !== b.digitScale ||
+    a.laserEnabled !== b.laserEnabled ||
+    a.laserIntensity !== b.laserIntensity ||
+    a.laserColor !== b.laserColor ||
+    a.numberColor.dark !== b.numberColor.dark ||
+    a.numberColor.light !== b.numberColor.light ||
+    a.folderSizeAll !== b.folderSizeAll ||
+    JSON.stringify(a.folderSizes) !== JSON.stringify(b.folderSizes) ||
+    a.folderLayout !== b.folderLayout ||
+    JSON.stringify(a.folderIconStyle) !== JSON.stringify(b.folderIconStyle) ||
+    JSON.stringify(a.folderNames) !== JSON.stringify(b.folderNames) ||
+    JSON.stringify(a.folderOrder) !== JSON.stringify(b.folderOrder) ||
     a.palette.id !== b.palette.id ||
     a.palette.felt !== b.palette.felt ||
     a.palette.chrome !== b.palette.chrome ||

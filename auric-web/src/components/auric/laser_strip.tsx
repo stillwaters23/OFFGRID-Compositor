@@ -5,6 +5,7 @@ type LaserStripProps = {
   bankRef: RefObject<HTMLDivElement | null>;
 };
 
+/** Timer span reels. Lane 1 positions this bar across the selected row. */
 export function LaserStrip({ hostRef, bankRef }: LaserStripProps) {
   const stripRef = useRef<HTMLDivElement>(null);
 
@@ -42,4 +43,19 @@ export function LaserStrip({ hostRef, bankRef }: LaserStripProps) {
   }, [bankRef, hostRef]);
 
   return <div ref={stripRef} className="laser-strip" data-laser-strip aria-hidden="true" />;
+}
+
+/** Settings witness. The live preview has no barrel host, so it draws the beam in place. */
+export function ReelLookWitness() {
+  return (
+    <>
+      <span className="reel-look-hairline" data-laser-hairline="" aria-hidden />
+      <span className="reel-look-beam" data-laser-beam="" aria-hidden>
+        <span className="reel-look-beam-shimmer">
+          <span className="reel-look-beam-bloom" />
+          <span className="reel-look-beam-core" />
+        </span>
+      </span>
+    </>
+  );
 }
