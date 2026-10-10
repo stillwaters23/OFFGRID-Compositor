@@ -399,3 +399,9 @@ States: passed, waiting for review, blocked, or waiting for Royalty's phone test
 - **Tests:** `./gradlew assembleDebug testDebugUnitTest lintDebug` from `04 Build`. BUILD SUCCESSFUL in 37s. 218 unit tests, 0 failures, 0 errors, 0 skipped. Lint passed.
 - **PR:** One pull request into `final-build`. Not merged from this branch.
 - **State:** local build, tests, and lint passed. CI is the next check.
+
+## 2026-10-10 7:05 PM UTC: Integration CI permission list
+
+- **What was done:** The first Build debug app run on pull request #36 failed because the merged manifest includes the live overlay permissions. The allowlist now accepts the overlay, the notification, and the foreground service types the live controls already declare. RECORD_AUDIO and INTERNET stay required. ACCESS_NETWORK_STATE and Wi-Fi permissions stay banned.
+- **PR:** Pull request #36. Not merged.
+- **State:** waiting for CI on the new head.
