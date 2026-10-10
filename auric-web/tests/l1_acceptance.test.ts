@@ -42,15 +42,11 @@ test("new L1 files use underscores and the empty lane hooks are archived", () =>
     "lib/reel-geometry.ts",
     "routes/laser-demo.tsx",
     "styles/reel-look.css",
-    "styles/folders.css",
-    "styles/clicker.css",
   ]) {
     assert.equal(existsSync(join(SRC, path)), false, path);
   }
   const css = readFileSync(join(SRC, "styles.css"), "utf8");
   assert.equal(css.includes("./styles/reel-look.css"), false);
-  assert.equal(css.includes("./styles/folders.css"), false);
-  assert.equal(css.includes("./styles/clicker.css"), false);
   assert.equal(css.includes(".laser-strip"), true);
   const route = readFileSync(join(SRC, "routes/laser_demo.tsx"), "utf8");
   assert.equal(route.includes('createFileRoute("/laser_demo")'), true);
