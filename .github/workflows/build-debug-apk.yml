@@ -119,11 +119,8 @@ jobs:
         working-directory: 04 Build
         run: ./gradlew testDebugUnitTest --stacktrace
 
-      # Royalty approved the mic and Send to PC. CAMERA, RECORD_AUDIO, and INTERNET
-      # are allowed. The floating live controls also need the overlay, a notification,
-      # and a foreground service typed for the camera and the mic. ACCESS_NETWORK_STATE
-      # and Wi-Fi permissions stay banned. androidx.core adds one package permission;
-      # that exact name is accepted. The person mask still has no server call.
+      # Anything not named below is banned, including ACCESS_NETWORK_STATE and Wi-Fi.
+      # The person mask still has no server call.
       - name: Check the built app only asks for allowed permissions
         run: |
           set -euo pipefail
@@ -133,18 +130,22 @@ jobs:
           import sys
           import xml.etree.ElementTree as ET
           allowed = {
-              "CAMERA",
-              "RECORD_AUDIO",
-              "INTERNET",
-              "SYSTEM_ALERT_WINDOW",
-              "POST_NOTIFICATIONS",
-              "FOREGROUND_SERVICE",
-              "FOREGROUND_SERVICE_SPECIAL_USE",
-              "FOREGROUND_SERVICE_CAMERA",
-              "FOREGROUND_SERVICE_MICROPHONE",
+              "CAMERA",  # The front camera.
+              "RECORD_AUDIO",  # Videos and the mic toggle. Royalty approved the mic.
+              "INTERNET",  # Local Send to PC and the direct phone link only.
+              "SYSTEM_ALERT_WINDOW",  # The floating overlay.
+              "FOREGROUND_SERVICE",  # The live overlay service.
+              "FOREGROUND_SERVICE_CAMERA",  # Live streaming keeps the camera in that service.
+              "FOREGROUND_SERVICE_MICROPHONE",  # Recording and live audio keep the mic in that service.
+              "FOREGROUND_SERVICE_SPECIAL_USE",  # The floating control overlay.
+              "POST_NOTIFICATIONS",  # The foreground-service notification on Android 13 and newer.
           }
           banned = {
               "android.permission.ACCESS_NETWORK_STATE",
+              "android.permission.ACCESS_WIFI_STATE",
+              "android.permission.CHANGE_WIFI_STATE",
+              "android.permission.CHANGE_WIFI_MULTICAST_STATE",
+              "android.permission.NEARBY_WIFI_DEVICES",
           }
           name = "{http://schemas.android.com/apk/res/android}name"
           root = ET.parse(sys.argv[1]).getroot()
@@ -164,7 +165,10 @@ jobs:
               print("Send to PC and the direct phone link need INTERNET.")
               sys.exit(1)
           print("INTERNET is only for local Send to PC and the direct phone link.")
-          exact = {"com.offgrid.compositor.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"}
+          exact = {
+              # AndroidX generates this package permission. It is not a device permission.
+              "com.offgrid.compositor.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",
+          }
           extra = [
               p for p in found
               if p in banned
