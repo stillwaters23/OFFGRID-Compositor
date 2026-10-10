@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -16,6 +16,7 @@ import {
 const execFileAsync = promisify(execFile);
 const WRAPPER = join(projectRoot(), "scripts/with-app-env.mjs");
 const PRINT_FLAG = "process.stdout.write(String(process.env.VITE_AUTH_ENABLED));";
+const TEMPLATE_APP_ENV = join(projectRoot(), APP_ENV_REL_PATH);
 
 function makeWorkspace(appEnvJson) {
   const root = mkdtempSync(join(tmpdir(), "app-env-"));
@@ -59,7 +60,11 @@ test("an explicit process-env override wins over the file", () => {
   assert.equal(merged.PATH, "/usr/bin");
 });
 
-test("the template ships auth off", () => {
+test("the template ships auth off", {
+  skip: existsSync(TEMPLATE_APP_ENV)
+    ? false
+    : "Grok injects .grok/app-env.json at runtime; it is intentionally absent from source checkouts.",
+}, () => {
   assert.deepEqual(readAppEnv(projectRoot()), { VITE_AUTH_ENABLED: "false" });
 });
 
@@ -80,7 +85,8 @@ test("the wrapped command runs with the app env applied", async () => {
     "-e",
     PRINT_FLAG,
   ]);
-  assert.equal(stdout, "false");
+  const expected = mergeAppEnv(readAppEnv(projectRoot()), process.env).VITE_AUTH_ENABLED;
+  assert.equal(stdout, String(expected));
 });
 
 test("the wrapped command sees an explicit override, not the file value", async () => {
@@ -124,5 +130,6 @@ test("the CLI still runs when invoked through a symlinked path", async () => {
     "-e",
     PRINT_FLAG,
   ]);
-  assert.equal(stdout, "false");
+  const expected = mergeAppEnv(readAppEnv(projectRoot()), process.env).VITE_AUTH_ENABLED;
+  assert.equal(stdout, String(expected));
 });

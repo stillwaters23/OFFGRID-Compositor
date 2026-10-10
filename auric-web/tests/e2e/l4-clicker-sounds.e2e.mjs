@@ -90,7 +90,49 @@ test("Clicker Sounds lists, selects, previews, and stays within the viewport", a
     await page.getByRole("slider", { name: "Seconds" }).press("ArrowUp");
     assert.equal(await page.evaluate(() => window.__auricOscillatorStarts) - startsBeforeNotch, 1);
     assert.equal((await page.evaluate(() => window.__auricFrequencies)).at(-1), 1346);
+
+    await page.locator(".tx-front-layer").getByRole("button", { name: "HOME" }).click();
+    await page.evaluate(() => {
+      const state = window.__auric.getState();
+      window.__auric.setState({ installedModules: [...state.installedModules, "timer-sounds"] });
+    });
+    await page.getByRole("button", { name: "timer-sounds unlocked" }).click();
+    const soundFamilies = page.locator(".tx-core-line");
+    assert.equal(await soundFamilies.count(), 7);
+    const startsBeforeTimerSounds = await page.evaluate(() => window.__auricOscillatorStarts);
+    await soundFamilies.filter({ hasText: "Ice" }).click();
+    assert.equal(await page.evaluate(() => window.__auric.getState().reelSound), "ice-01");
+    assert.equal(await page.evaluate(() => window.__auricOscillatorStarts), startsBeforeTimerSounds);
+    await soundFamilies.filter({ hasText: "Click" }).click();
+    assert.equal(await page.evaluate(() => window.__auric.getState().reelSound), "click-01");
+
+    await page.evaluate(async () => {
+      const [{ default: React }, { default: ReactDOM }, { Pavilion }, { useAuric }] = await Promise.all([
+        import("/node_modules/.vite/deps/react.js"),
+        import("/node_modules/.vite/deps/react-dom_client.js"),
+        import("/src/components/auric/pavilion.tsx"),
+        import("/src/lib/store.ts"),
+      ]);
+      const host = document.createElement("div");
+      host.id = "pavilion-wheel-browser-check";
+      document.body.append(host);
+      const root = ReactDOM.createRoot(host);
+      window.__pavilionWheelRoot = root;
+      useAuric.getState().setHouseOpen(true);
+      useAuric.getState().enterRoom("tick");
+      root.render(React.createElement(Pavilion));
+    });
+    const pavilion = page.locator("#pavilion-wheel-browser-check");
+    await pavilion.getByText("The Wheel", { exact: true }).waitFor();
+    const wheel = pavilion.getByRole("slider", { name: "Choose option" }).first();
+    assert.equal(await wheel.getAttribute("aria-valuemax"), "76");
+    await page.waitForTimeout(100);
+    const startsBeforeWheel = await page.evaluate(() => window.__auricOscillatorStarts);
+    await wheel.press("ArrowUp");
+    assert.equal(await page.evaluate(() => window.__auric.getState().reelSound), "click-02");
+    assert.equal(await page.evaluate(() => window.__auricOscillatorStarts) - startsBeforeWheel, 1);
     assert.deepEqual(pageErrors, []);
+    await page.evaluate(() => window.__pavilionWheelRoot.unmount());
   } finally {
     await browser.close();
   }
