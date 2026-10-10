@@ -3,7 +3,7 @@ import { committedPalette, previewPalette } from "@/lib/appearance";
 import { hexToRgb, isValidHex, normalizeHex } from "@/lib/color";
 import { LASER_PRESETS, checkNumberColor, laserVars, resolveReelNumberColor } from "@/lib/contrast_guard";
 import { useAuric } from "@/lib/store";
-import { LaserStrip } from "@/components/auric/laser_strip";
+import { ReelLookWitness } from "@/components/auric/laser_strip";
 import { OrbToggle } from "@/components/auric/switch";
 import "@/styles/reel_look.css";
 
@@ -82,7 +82,7 @@ export function ReelLookFolder() {
             <span className="font-digits text-base" style={{ color: readout }}>:</span>
             <span className="reel-look-drum">16</span>
           </div>
-          <LaserStrip />
+          <ReelLookWitness />
         </div>
       </div>
 

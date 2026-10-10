@@ -166,6 +166,12 @@
   color: var(--reel-number, var(--digit));
 }
 
+/* Lane 1 paints selector-none drums white across the laser. A committed custom
+   number color is the only case that replaces that white. */
+:root:not([data-number-color="custom"]) .barrel[data-reel-selector="none"] [data-selected="1"] {
+  color: #fff;
+}
+
 :root[data-number-color="custom"] .tx-root .reel-time-plaque span.digit-cut {
   color: var(--reel-number, var(--digit));
 }
