@@ -22,5 +22,8 @@ class ClickerSoundSynthTest {
         assertEquals(0, ClickerSoundSynth.variantFor(0))
         assertEquals(76, ClickerSoundSynth.variantFor(100))
         assertEquals(76, ClickerSoundSynth.variantFor(101))
+        assertEquals(50, ClickerSoundSynth.mixTone(0, 100))
+        assertEquals(0, ClickerSoundSynth.mixTone(-4, 0))
+        assertEquals(100, ClickerSoundSynth.mixTone(100, 120))
     }
 }

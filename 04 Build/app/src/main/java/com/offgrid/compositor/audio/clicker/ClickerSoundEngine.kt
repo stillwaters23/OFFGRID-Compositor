@@ -19,6 +19,10 @@ internal object ClickerSoundSynth {
     fun variantFor(value: Int): Int =
         ((value.coerceIn(0, 100) * (VARIANT_COUNT - 1) + 50) / 100).coerceIn(0, VARIANT_COUNT - 1)
 
+    /** The saved tone and the wheel notch share the 77 procedural pitches. */
+    fun mixTone(tone: Int, notch: Int): Int =
+        (tone.coerceIn(0, 100) + notch.coerceIn(0, 100)) / 2
+
     fun make(style: Int, variant: Int): ShortArray {
         require(style in 0 until STYLE_COUNT)
         require(variant in 0 until VARIANT_COUNT)

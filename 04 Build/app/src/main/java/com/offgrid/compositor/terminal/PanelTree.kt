@@ -280,6 +280,7 @@ internal object PanelTree {
         notes = listOf(
             "Width and Height are also at the top of the panel.",
             "Turn the drum wheel to pick a whole number. Pinch or drag the corner lines to resize too.",
+            "Type the number under a wheel if you cannot turn it. The laser is one line across both wheels.",
         ),
     )
 

@@ -1,5 +1,6 @@
 package com.offgrid.compositor.terminal
 
+import com.offgrid.compositor.ui.wheel.LaserStrip
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
@@ -10,6 +11,19 @@ internal object NumberColorGuard {
     const val LIGHT_BACKGROUND = 0xFFFFFFFF.toInt()
 
     fun accepts(color: Int, background: Int): Boolean = contrastRatio(color, background) >= MIN_CONTRAST
+
+    /**
+     * The color painted on the selected number. It keeps [color] when that already
+     * clears 4.5:1 on the laser bloom, and otherwise picks black or white.
+     */
+    fun colorOnBeam(color: Int, background: Int, laser: Int, dimmer: Int): Int {
+        val beam = LaserStrip.bloomBackground(background, laser, dimmer)
+        val preferred = color or 0xFF000000.toInt()
+        if (accepts(preferred, beam)) return preferred
+        val white = 0xFFFFFFFF.toInt()
+        val black = 0xFF000000.toInt()
+        return if (contrastRatio(white, beam) >= contrastRatio(black, beam)) white else black
+    }
 
     fun visibleColor(color: Int, background: Int): Int {
         if (accepts(color, background)) return color

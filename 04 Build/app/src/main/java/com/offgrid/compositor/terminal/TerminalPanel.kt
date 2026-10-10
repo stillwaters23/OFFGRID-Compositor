@@ -132,6 +132,7 @@ class TerminalPanel @JvmOverloads constructor(
 
     /** Width and Height reels inside the open Size folder, kept in step with the top number boxes. */
     private val sizeReels = ArrayList<Pair<String, WheelNumberRow>>()
+    private var sizeBank: SizeReelBank? = null
     private var headingRing: HoloRingView? = null
     private var guidance: LaserTypeView? = null
     private var openFolder: PanelFolder? = null
@@ -1082,8 +1083,10 @@ class TerminalPanel @JvmOverloads constructor(
         }
         show(widthBox.box, widthPercent)
         show(heightBox.box, heightPercent)
+        sizeBank?.show(LookKeys.WIDTH, widthPercent)
+        sizeBank?.show(LookKeys.HEIGHT, heightPercent)
         for ((key, row) in sizeReels) {
-            if (!row.reel.isInteracting) row.show(if (key == LookKeys.WIDTH) widthPercent else heightPercent)
+            row.show(if (key == LookKeys.WIDTH) widthPercent else heightPercent)
         }
     }
 
@@ -1680,6 +1683,7 @@ class TerminalPanel @JvmOverloads constructor(
         headingRing = null
         themeRows.clear()
         sizeReels.clear()
+        sizeBank = null
         subFolders = null
     }
 
@@ -1764,6 +1768,7 @@ class TerminalPanel @JvmOverloads constructor(
         detailContent.removeAllViews()
         themeRows.clear()
         sizeReels.clear()
+        sizeBank = null
         subFolders = null
         headingRing = null
         detailContent.addView(pathBar(folder), LinearLayout.LayoutParams(MATCH, WRAP))
@@ -1790,8 +1795,32 @@ class TerminalPanel @JvmOverloads constructor(
         }
         if (folder.items.isNotEmpty()) {
             detailContent.addView(sectionLabel(sectionFor(folder)))
-            for (item in folder.items) {
-                detailContent.addView(itemView(folder, item), LinearLayout.LayoutParams(MATCH, WRAP))
+            var index = 0
+            val items = folder.items
+            while (index < items.size) {
+                val item = items[index]
+                val next = items.getOrNull(index + 1)
+                if (item is NumberItem && next is NumberItem &&
+                    item.key == LookKeys.WIDTH && next.key == LookKeys.HEIGHT
+                ) {
+                    val bank = SizeReelBank(
+                        context,
+                        item,
+                        next,
+                        store.number(item.key),
+                        store.number(next.key),
+                        laserSource = { auricLaserColor() to store.number(PanelTree.AURIC_LASER_DIMMER) },
+                        onChange = { key, number, announce -> setSizePercent(key, number, announce) },
+                        onNotch = ::playWheelClick,
+                        onProblem = { say(it) },
+                    )
+                    sizeBank = bank
+                    detailContent.addView(bank, LinearLayout.LayoutParams(MATCH, WRAP))
+                    index += 2
+                } else {
+                    detailContent.addView(itemView(folder, item), LinearLayout.LayoutParams(MATCH, WRAP))
+                    index += 1
+                }
             }
         }
         // Final build: every folder with settings has its own Reset at the bottom.
@@ -1823,10 +1852,10 @@ class TerminalPanel @JvmOverloads constructor(
                 context,
                 item,
                 store.number(item.key),
-                laserColor = auricLaserColor(),
-                dimmer = store.number(PanelTree.AURIC_LASER_DIMMER),
+                laserSource = { auricLaserColor() to store.number(PanelTree.AURIC_LASER_DIMMER) },
                 onChange = { value, announce -> setSizePercent(item.key, value, announce) },
                 onNotch = ::playWheelClick,
+                onProblem = { say(it) },
             ).also { row ->
                 sizeReels += item.key to row
                 row.applyLook(look)
@@ -1887,7 +1916,7 @@ class TerminalPanel @JvmOverloads constructor(
         if (!clickerEnabled) return
         clickerSounds.play(
             clickerStyle.coerceIn(0, ClickerSoundSynth.STYLE_COUNT - 1),
-            clickerVariant,
+            ClickerSoundSynth.mixTone(clickerVariant, value),
             clickerVolume,
         )
     }
