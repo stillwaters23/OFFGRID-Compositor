@@ -1,0 +1,249 @@
+{
+  "mood": "light",
+  "laserColor": "#FF0000",
+  "laserCore": "#FFFFFF",
+  "laserSpread": "48px",
+  "laserOn": "1",
+  "laserEnabled": "true",
+  "strips": [
+    {
+      "className": "laser-strip",
+      "text": "",
+      "x": 41,
+      "y": 400.14,
+      "w": 308,
+      "h": 48,
+      "color": "rgb(22, 24, 22)",
+      "shadow": "none",
+      "boxShadow": "color(srgb 1 0 0 / 0.3) 0px 0px 16px 0px, color(srgb 1 0 0 / 0.18) 0px 0px 32px 0px",
+      "blend": "screen",
+      "beforeH": "2px",
+      "beforeBg": "linear-gradient(90deg, rgba(0, 0, 0, 0), color(srgb 1 0.6 0.6) 6%, rgb(255, 255,"
+    },
+    {
+      "className": "laser-strip",
+      "text": "",
+      "x": 37,
+      "y": 777.39,
+      "w": 316,
+      "h": 48,
+      "color": "rgb(22, 24, 22)",
+      "shadow": "none",
+      "boxShadow": "color(srgb 1 0 0 / 0.3) 0px 0px 16px 0px, color(srgb 1 0 0 / 0.18) 0px 0px 32px 0px",
+      "blend": "screen",
+      "beforeH": "2px",
+      "beforeBg": "linear-gradient(90deg, rgba(0, 0, 0, 0), color(srgb 1 0.6 0.6) 6%, rgb(255, 255,"
+    }
+  ],
+  "hairlines": [],
+  "barrels": [
+    {
+      "className": "barrel relative min-w-0 select-none touch-none overflow-hidden w-full max-w-full flex-none",
+      "text": "22 23 00 01 02",
+      "x": 57,
+      "y": 327.39,
+      "w": 82,
+      "h": 193.5,
+      "color": "rgb(22, 24, 22)",
+      "shadow": "none",
+      "boxShadow": "oklab(0.325549 -0.0142963 -0.0530346) 0px 0px 0px 1px, oklab(0.825212 0.00152827 0.0111896) 0px 0px 0px 3px, oklab(0.206299 0.00176432 0.0105445 / 0.42) 0px 1px 0px 0px inset, okla",
+      "blend": "normal",
+      "reel": "none",
+      "size": "trio",
+      "selected": [
+        {
+          "className": "absolute inset-x-0 top-1/2 -mt-[0.58em] z-[1] text-center leading-none text-digit/70 whitespace-nowrap data-[selected=1]:text-digit data-[se",
+          "text": "00",
+          "x": 78.56,
+          "y": 403.28,
+          "w": 38.88,
+          "h": 41.74,
+          "color": "rgb(64, 55, 45)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 8px, rgb(255, 0, 0) 0px 0px 16px",
+          "boxShadow": "none",
+          "blend": "normal"
+        }
+      ]
+    },
+    {
+      "className": "barrel relative min-w-0 select-none touch-none overflow-hidden w-full max-w-full flex-none",
+      "text": "58 59 00 01 02",
+      "x": 154,
+      "y": 327.39,
+      "w": 82,
+      "h": 193.5,
+      "color": "rgb(22, 24, 22)",
+      "shadow": "none",
+      "boxShadow": "oklab(0.325549 -0.0142963 -0.0530346) 0px 0px 0px 1px, oklab(0.825212 0.00152827 0.0111896) 0px 0px 0px 3px, oklab(0.206299 0.00176432 0.0105445 / 0.42) 0px 1px 0px 0px inset, okla",
+      "blend": "normal",
+      "reel": "none",
+      "size": "trio",
+      "selected": [
+        {
+          "className": "absolute inset-x-0 top-1/2 -mt-[0.58em] z-[1] text-center leading-none text-digit/70 whitespace-nowrap data-[selected=1]:text-digit data-[se",
+          "text": "00",
+          "x": 175.56,
+          "y": 403.28,
+          "w": 38.88,
+          "h": 41.74,
+          "color": "rgb(64, 55, 45)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 8px, rgb(255, 0, 0) 0px 0px 16px",
+          "boxShadow": "none",
+          "blend": "normal"
+        }
+      ]
+    },
+    {
+      "className": "barrel relative min-w-0 select-none touch-none overflow-hidden w-full max-w-full flex-none",
+      "text": "58 59 00 01 02",
+      "x": 251,
+      "y": 327.39,
+      "w": 82,
+      "h": 193.5,
+      "color": "rgb(22, 24, 22)",
+      "shadow": "none",
+      "boxShadow": "oklab(0.325549 -0.0142963 -0.0530346) 0px 0px 0px 1px, oklab(0.825212 0.00152827 0.0111896) 0px 0px 0px 3px, oklab(0.206299 0.00176432 0.0105445 / 0.42) 0px 1px 0px 0px inset, okla",
+      "blend": "normal",
+      "reel": "none",
+      "size": "trio",
+      "selected": [
+        {
+          "className": "absolute inset-x-0 top-1/2 -mt-[0.58em] z-[1] text-center leading-none text-digit/70 whitespace-nowrap data-[selected=1]:text-digit data-[se",
+          "text": "00",
+          "x": 272.56,
+          "y": 403.28,
+          "w": 38.88,
+          "h": 41.74,
+          "color": "rgb(64, 55, 45)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 8px, rgb(255, 0, 0) 0px 0px 16px",
+          "boxShadow": "none",
+          "blend": "normal"
+        }
+      ]
+    },
+    {
+      "className": "barrel relative min-w-0 select-none touch-none overflow-hidden w-full max-w-full flex-none",
+      "text": "05 06 00 01 02",
+      "x": 53,
+      "y": 736.89,
+      "w": 68,
+      "h": 129,
+      "color": "rgb(22, 24, 22)",
+      "shadow": "none",
+      "boxShadow": "oklab(0.325549 -0.0142963 -0.0530346) 0px 0px 0px 1px, oklab(0.825212 0.00152827 0.0111896) 0px 0px 0px 3px, oklab(0.206299 0.00176432 0.0105445 / 0.42) 0px 1px 0px 0px inset, okla",
+      "blend": "normal",
+      "reel": "none",
+      "size": "sm",
+      "selected": [
+        {
+          "className": "absolute inset-x-0 top-1/2 -mt-[0.58em] z-[1] text-center leading-none text-digit/70 whitespace-nowrap data-[selected=1]:text-digit data-[se",
+          "text": "00",
+          "x": 76.33,
+          "y": 789.36,
+          "w": 21.33,
+          "h": 24.06,
+          "color": "rgb(64, 55, 45)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 8px, rgb(255, 0, 0) 0px 0px 16px",
+          "boxShadow": "none",
+          "blend": "normal"
+        }
+      ]
+    },
+    {
+      "className": "barrel relative min-w-0 select-none touch-none overflow-hidden w-full max-w-full flex-none",
+      "text": "03 04 00 01 02",
+      "x": 125,
+      "y": 736.89,
+      "w": 68,
+      "h": 129,
+      "color": "rgb(22, 24, 22)",
+      "shadow": "none",
+      "boxShadow": "oklab(0.325549 -0.0142963 -0.0530346) 0px 0px 0px 1px, oklab(0.825212 0.00152827 0.0111896) 0px 0px 0px 3px, oklab(0.206299 0.00176432 0.0105445 / 0.42) 0px 1px 0px 0px inset, okla",
+      "blend": "normal",
+      "reel": "none",
+      "size": "sm",
+      "selected": [
+        {
+          "className": "absolute inset-x-0 top-1/2 -mt-[0.58em] z-[1] text-center leading-none text-digit/70 whitespace-nowrap data-[selected=1]:text-digit data-[se",
+          "text": "00",
+          "x": 148.33,
+          "y": 789.36,
+          "w": 21.33,
+          "h": 24.06,
+          "color": "rgb(64, 55, 45)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 8px, rgb(255, 0, 0) 0px 0px 16px",
+          "boxShadow": "none",
+          "blend": "normal"
+        }
+      ]
+    },
+    {
+      "className": "barrel relative min-w-0 select-none touch-none overflow-hidden w-full max-w-full flex-none",
+      "text": "10 11 00 01 02",
+      "x": 197,
+      "y": 736.89,
+      "w": 68,
+      "h": 129,
+      "color": "rgb(22, 24, 22)",
+      "shadow": "none",
+      "boxShadow": "oklab(0.325549 -0.0142963 -0.0530346) 0px 0px 0px 1px, oklab(0.825212 0.00152827 0.0111896) 0px 0px 0px 3px, oklab(0.206299 0.00176432 0.0105445 / 0.42) 0px 1px 0px 0px inset, okla",
+      "blend": "normal",
+      "reel": "none",
+      "size": "sm",
+      "selected": [
+        {
+          "className": "absolute inset-x-0 top-1/2 -mt-[0.58em] z-[1] text-center leading-none text-digit/70 whitespace-nowrap data-[selected=1]:text-digit data-[se",
+          "text": "00",
+          "x": 220.33,
+          "y": 789.36,
+          "w": 21.33,
+          "h": 24.06,
+          "color": "rgb(64, 55, 45)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 8px, rgb(255, 0, 0) 0px 0px 16px",
+          "boxShadow": "none",
+          "blend": "normal"
+        }
+      ]
+    },
+    {
+      "className": "barrel relative min-w-0 select-none touch-none overflow-hidden w-full max-w-full flex-none",
+      "text": "76 77 00 01 02",
+      "x": 269,
+      "y": 736.89,
+      "w": 68,
+      "h": 129,
+      "color": "rgb(22, 24, 22)",
+      "shadow": "none",
+      "boxShadow": "oklab(0.325549 -0.0142963 -0.0530346) 0px 0px 0px 1px, oklab(0.825212 0.00152827 0.0111896) 0px 0px 0px 3px, oklab(0.206299 0.00176432 0.0105445 / 0.42) 0px 1px 0px 0px inset, okla",
+      "blend": "normal",
+      "reel": "none",
+      "size": "sm",
+      "selected": [
+        {
+          "className": "absolute inset-x-0 top-1/2 -mt-[0.58em] z-[1] text-center leading-none text-digit/70 whitespace-nowrap data-[selected=1]:text-digit data-[se",
+          "text": "00",
+          "x": 292.33,
+          "y": 789.36,
+          "w": 21.33,
+          "h": 24.06,
+          "color": "rgb(64, 55, 45)",
+          "shadow": "rgb(255, 255, 255) 0px 0px 8px, rgb(255, 0, 0) 0px 0px 16px",
+          "boxShadow": "none",
+          "blend": "normal"
+        }
+      ]
+    }
+  ],
+  "heading": {
+    "className": "tx-prompt",
+    "text": "~ $ auric --help",
+    "x": 39.48,
+    "y": 288.42,
+    "w": 311.04,
+    "h": 19.48,
+    "color": "rgb(20, 107, 58)",
+    "shadow": "none",
+    "boxShadow": "none",
+    "blend": "normal"
+  }
+}

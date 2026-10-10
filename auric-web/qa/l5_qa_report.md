@@ -1,6 +1,6 @@
 # Lane 5 integration QA
 
-The first run is the section below and is unchanged. [Run 2](#run-2) is the rerun on the fixed lane heads. Run 2 verdict: **FAIL**.
+Run 1 and Run 2 are unchanged. [Run 3](#run-3) is the final score after Rex's ruling. Final verdict: **PASS**.
 
 ## Run 1
 
@@ -2753,3 +2753,81 @@ timer 390x844 changed=82339/329160 percent=25.0149
 ```
 
 Mood and matched-style JSON: `qa/logs/v2_mood_base.json`, `qa/logs/v2_mood_integration.json`. Region boxes: `qa/logs/v2_regions_base.json`, `qa/logs/v2_regions_integration.json`. Cluster dump: `qa/logs/v2_pixel_regions.json`.
+
+## Run 3
+
+**Verdict: PASS**
+
+Rex's ruling, quoted:
+
+> L3's dark folder-title ink in light mood is an intentional, approved change, not a regression. Royalty's standing rule is black text on the white/light theme and white text on the black theme, and auric-base's #f7fcff titles on a light page break that rule. The new ⋯ menu (L3) and the 'folders 6' digit (L4) are also expected.
+
+The 2.5939% folder-list diff against `auric-base` stays in Run 2 as history. It is not a failure. The 1% gate is now scored against the combined L1–L4 capture.
+
+### Lane verdicts
+
+| Lane | Verdict | Final score |
+|---|---|---|
+| L1 | PASS | Tests passed in Run 2. The timer shot differs from `auric-base` because of the laser strip and the reel resize that places it. |
+| L2 | PASS | Unchanged. Reel-look end-to-end passed. The timer diff is not a settings failure. |
+| L3 | PASS | Dark titles in light mood, and the `⋯` menu, are the approved look. End-to-end was 7/7. FLIP mean 16.660 ms, p95 16.700 ms. |
+| L4 | PASS | The `folders 6` digit is expected. End-to-end passed by `data-folder-id`. |
+
+### New folder-list baseline
+
+Combined capture, kept as the versioned baseline: `auric-web/qa/shots/folder_list_baseline_2026_10_10.png`
+
+It is the Run 2 integration shot (`qa/shots/v2_integration_folder_list.png`), 390×844, from scratch `8c3aa931cbe95a91d6dfffe5c618cf9288b94773`. The file is a byte copy of that shot.
+
+Archived prior baseline, not deleted: `auric-web/qa/shots/v2_base_folder_list.png` (`auric-base` `e39aa55`).
+
+Gate re-score, RGBA exact, pngjs. Log: `qa/logs/v3_folder_gate.txt`.
+
+```
+folder_list_baseline_2026_10_10.png vs v2_integration_folder_list.png 390x844 changed=0/329160 percent=0.0000
+v2_base_folder_list.png vs folder_list_baseline_2026_10_10.png 390x844 changed=8538/329160 percent=2.5939
+```
+
+Against the new baseline the combined folder list is **0.0000%**. The 1% gate passes. The old 2.5939% remains the distance from `auric-base` to this approved picture: the light-mood title ink, the menu, and the sixth folder.
+
+### Timer shot
+
+The Run 2 timer pair is still **82339/329160 = 25.0149%** versus `auric-base`. That difference is Lane 1. It is not Lane 2's palette, and it is not the folder ink.
+
+Geometry on the same viewport, after OPEN SESSION and timer (`qa/logs/v3_timer_geom_base.json`, `qa/logs/v3_timer_geom_integration.json`):
+
+| | auric-base | combined L1–L4 |
+|---|---|---|
+| `.laser-strip` count | 0 | 2 |
+| `--laser-color` | empty | `#FF0000` |
+| Upper strip | none | x=41, y=400.14, w=308, h=48, `mix-blend-mode: screen`, red shadow 16px and 32px |
+| Lower strip | none | x=37, y=777.39, w=316, h=48 |
+| Top barrels | y=327.39, h=152, three columns | y=327.39, h=193.5, same x |
+| Selected digit | about 21px, color rgb(26, 23, 18), no shadow | 32px, white glow plus `rgb(255, 0, 0) 0px 0px 16px` |
+| "Hide days and years" | y=577.5 | y=618.9 |
+
+`drum-reel.tsx` and `laser_strip.tsx` are the Lane 1 edits on top of `auric-base` (commit `29b1bbe`, "Add responsive reel geometry and laser strips"). The taller barrels and the 32px digits are that resize. The strip is positioned on the selected row of those barrels.
+
+Pixel split of the saved timer pair (`qa/logs/v3_timer_strip_check.txt`):
+
+| Region | Changed pixels | Mean channel delta | What it is |
+|---|---|---|---|
+| Upper strip box plus 32px shadow (y about 368–480) | 36295 | 89.6 | The red beam. At x=180 y=420 the pixel goes from rgb(227, 222, 211) to rgb(154, 55, 45). This is 11.0266% of the viewport. |
+| y 288–367, above that shadow | 13045 | 13.5 | Same L1 resize. Digit edges in the taller barrel. Not a second color theme. |
+| y 481–580 | 28545 | 282.2 | The readout `00:00:00.00` moves down because the barrels grew. At x=180 y=500, base is the dark readout rgb(46, 49, 47) and the integration is the reel face rgb(204, 199, 190). |
+| y 593–622 | 1524 | 158.9 | "Hide days and years" moves from y=577.5 to y=618.9 with the same resize. At x=180 y=600, base is the button blue rgb(34, 81, 139) and the integration is the page rgb(229, 225, 218). |
+| y 157–197 and y 217–251 | 2824 | 1.6 | LED row and the TIMER heading. Computed color, shadow, and font match on both servers. This is glyph-edge noise. |
+| Lower strip, y 760–830 | 0 | 0 | The second strip's box is in the DOM at y=777. Those viewport pixels match, so it adds nothing to the 25%. |
+
+The 25% is Lane 1's laser strip plus the reel resize that strip ships with. No other lane's pixels are in that shot.
+
+### Final check table
+
+Run 2's commands are not repeated. Their exits stand.
+
+| Check | Result |
+|---|---|
+| `npm test` and every Playwright file, including FLIP | PASS, from Run 2 |
+| Folder list versus `folder_list_baseline_2026_10_10.png` | PASS, 0/329160 = 0.0000% |
+| Folder list versus archived `auric-base` shot | 2.5939%, approved by the ruling above, not a gate failure |
+| Timer versus `auric-base` | 25.0149%, Lane 1 laser strip and reel resize |

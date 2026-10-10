@@ -1,0 +1,17 @@
+timer 390x844 changed=82339/329160 percent=25.0149
+upper strip box x=41 y=400.140625 w=308 h=48 tight=15089 plus32shadow=36295
+lower strip box x=37 y=777.390625 w=316 h=48 tight=0 plus32shadow=0
+inside either strip plus 32px shadow=36295 (44.08% of changed, 11.0266% of viewport)
+outside=46044 (55.92% of changed, 13.9883% of viewport)
+y 157-197 changed=1606 meanChannelDelta=1.6
+y 217-251 changed=1218 meanChannelDelta=1.6
+y 288-367 changed=13045 meanChannelDelta=13.5
+y 368-480 changed=36295 meanChannelDelta=89.6
+y 481-580 changed=28545 meanChannelDelta=282.2
+y 593-622 changed=1524 meanChannelDelta=158.9
+y 760-830 changed=0 meanChannelDelta=0
+sample beam x=180 y=420 base 227,222,211 integration 154,55,45
+sample above reel x=180 y=340 base 199,191,180 integration 192,186,174
+sample readout row x=180 y=500 base 46,49,47 integration 204,199,190
+sample moved button x=180 y=600 base 34,81,139 integration 229,225,218
+sample lower strip x=180 y=790 base 152,150,147 integration 152,150,147
