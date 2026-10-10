@@ -1,0 +1,11 @@
+folder_name_count=16
+folder_labels=["timer unlocked","stopwatch unlocked","alarm unlocked","House Clicks unlocked","device unlocked","tutorial unlocked","themes locked","sizing locked","opacity locked","icons locked","alarm-sounds locked","timer-sounds locked","haptics locked","heartbeat locked","heartbeat-log locked","logs-exports locked"]
+clicker_name=House Clicks
+clicker_size=72
+clicker_style=etched
+preview_delta=1 last_frequency=1346 reelSound=click-02
+timer_before={"strips":2,"color":"#FF0000","on":"true","reelNumber":"#40372D"}
+wheel_notch_starts=6 delta=1 last_frequency=1346 reelSound=click-02
+timer_after_laser={"color":"#00E5FC","opacity":"1","spread":"48px","background":"linear-gradient(rgba(0, 0, 0, 0), color(srgb 0 0.898039 0.988235 / 0.55), rgba(0, 0, 0, 0))"}
+reel_look_witness={"beam":1,"hairline":1,"wheelStrips":0}
+page_errors=[]

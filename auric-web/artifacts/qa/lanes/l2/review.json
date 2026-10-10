@@ -1,0 +1,51 @@
+{
+  "reviewed_pr": 29,
+  "issue": 28,
+  "head": "a51baaed",
+  "required_base": "auric-base",
+  "verdict": "CHANGES-NEEDED",
+  "criteria": [
+    {"id":"L2-1","status":"FAIL","evidence":"E2E verifies presets and --laser-color, but PR branch lacks L1 LaserStrip; no live beam can be observed."},
+    {"id":"L2-2","status":"PASS","evidence":"E2E accepts #RGB/#RRGGBB; rejects #GGG, red, empty; Discard restores the prior value."},
+    {"id":"L2-3","status":"PASS","evidence":"tests/l2-contrast-guard.test.ts focused suite passes and exercises theme/ratio examples."},
+    {"id":"L2-4","status":"PASS","evidence":"Focused unit tests cover wheel samples and palette-dependent contrast."},
+    {"id":"L2-5","status":"PASS","evidence":"E2E checks alert and disabled Apply; state unit test confirms rejection leaves state unchanged."},
+    {"id":"L2-6","status":"PASS","evidence":"Focused unit test exercises laser-bloom contrast rejection."},
+    {"id":"L2-7","status":"PASS","evidence":"Unit loop checks black/near-black resolved number colors over curated palettes and both moods."},
+    {"id":"L2-8","status":"NOT-VERIFIED","evidence":"Enabled state is tested, but the real beam and neutral hairline cannot be checked until L1 LaserStrip is integrated."},
+    {"id":"L2-9","status":"PASS","evidence":"E2E reload restores #FF00A6, intensity 40, disabled state, and #EAF3FF; v21 migration unit test passes."},
+    {"id":"L2-10","status":"PASS","evidence":"State tests cover all ten persisted fields, validation/bounds, order, names, and v21 hydration."},
+    {"id":"L2-11","status":"PASS","evidence":"Apply/Discard/Restore tests pass; independent 390px timer screenshot diff vs auric-base is 0.350%; shots/base-timer-base.png and shots/l2-timer-base.png."},
+    {"id":"L2-12","status":"FAIL","evidence":"npm ci/full npm test fail; src/styles/reel-look.css adds off-grid font-size:20px. Width/mood E2E matrix passes."}
+  ],
+  "write_target_audit": [
+    {"path":"auric-web/screenshots/l2/laser-settings.png","status":"OK"},
+    {"path":"auric-web/screenshots/l2/number-contrast.png","status":"OK"},
+    {"path":"auric-web/src/components/auric/appearance-studio.tsx","status":"OK"},
+    {"path":"auric-web/src/components/auric/glow.tsx","status":"OK"},
+    {"path":"auric-web/src/components/auric/reel-look-folder.tsx","status":"OK"},
+    {"path":"auric-web/src/lib/appearance.ts","status":"OK"},
+    {"path":"auric-web/src/lib/contrast-guard.ts","status":"OK"},
+    {"path":"auric-web/src/lib/store.ts","status":"OK"},
+    {"path":"auric-web/src/styles/reel-look.css","status":"OK"},
+    {"path":"auric-web/tests/e2e/l2-reel-look.e2e.mjs","status":"OK"},
+    {"path":"auric-web/tests/l2-contrast-guard.test.ts","status":"OK"},
+    {"path":"auric-web/tests/l2-state.test.ts","status":"OK"}
+  ],
+  "global_audit": {
+    "clean_install":"FAIL on baseline and lane heads: package-lock.json omits lru-cache@11.5.3.",
+    "typecheck":"PASS",
+    "lint":"PASS with existing warning at src/components/auric/termux-chrome.tsx:169",
+    "full_test":"FAIL: 184 passed, 11 failed; same failures on auric-base.",
+    "build":"PASS",
+    "focused_tests":"PASS: 13/13",
+    "e2e":"PASS: 1/1 focused Playwright test.",
+    "browser_smoke":"NOT-VERIFIED: HTTP 200/no page errors/no overflow; external DNS failures make script exit 2 and reproduce on baseline.",
+    "eight_dp":"FAIL: reel-look.css font-size 20px.",
+    "acceptance_reporting":"FAIL: PR description says no implementation changes despite 12 changed paths and lacks per-criterion verdicts/evidence.",
+    "dependencies_and_costs":"PASS: no new dependencies, paid APIs, or cloud services.",
+    "reduced_motion":"NOT-VERIFIED",
+    "baseline_visual":"PASS: 0.350% pixel delta vs auric-base at 390px; L1 is absent from both compared branches."
+  },
+  "shots": ["shots/laser-settings.png","shots/number-contrast.png","shots/base-timer-base.png","shots/l2-timer-base.png"]
+}

@@ -1,0 +1,2 @@
+folder_list_baseline_2026_10_10.png vs v2_integration_folder_list.png 390x844 changed=0/329160 percent=0.0000
+v2_base_folder_list.png vs folder_list_baseline_2026_10_10.png 390x844 changed=8538/329160 percent=2.5939

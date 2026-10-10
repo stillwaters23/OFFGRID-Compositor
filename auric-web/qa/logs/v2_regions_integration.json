@@ -1,0 +1,181 @@
+{
+  "label": "integration",
+  "timer": {
+    "strips": 2,
+    "color": "#FF0000",
+    "stripBoxes": [
+      {
+        "x": 41,
+        "y": 400.140625,
+        "width": 308,
+        "height": 48
+      },
+      {
+        "x": 37,
+        "y": 777.390625,
+        "width": 316,
+        "height": 48
+      }
+    ]
+  },
+  "regions": {
+    "menu": {
+      "x": 309,
+      "y": 346.03125,
+      "width": 48,
+      "height": 48,
+      "text": "⋯"
+    },
+    "command": {
+      "x": 33,
+      "y": 352.875,
+      "width": 324,
+      "height": 34.296875,
+      "text": "~ $ ls folders ⋯"
+    },
+    "grid": {
+      "x": 33,
+      "y": 397.171875,
+      "width": 324,
+      "height": 1566,
+      "text": "timer unlocked › stopwatch unlocked › alarm unlocked › clicker-sounds unlocked ›"
+    },
+    "prompt": {
+      "x": 33,
+      "y": 360.875,
+      "width": 112,
+      "height": 20.296875,
+      "text": "~ $ ls folders"
+    },
+    "tiles": [
+      {
+        "id": "timer",
+        "x": 33,
+        "y": 405.171875,
+        "width": 324,
+        "height": 84,
+        "text": "timer unlocked ›"
+      },
+      {
+        "id": "stopwatch",
+        "x": 33,
+        "y": 503.171875,
+        "width": 324,
+        "height": 84,
+        "text": "stopwatch unlocked ›"
+      },
+      {
+        "id": "alarm",
+        "x": 33,
+        "y": 601.171875,
+        "width": 324,
+        "height": 84,
+        "text": "alarm unlocked ›"
+      },
+      {
+        "id": "clicker-sounds",
+        "x": 33,
+        "y": 699.171875,
+        "width": 324,
+        "height": 84,
+        "text": "clicker-sounds unlocked ›"
+      },
+      {
+        "id": "device",
+        "x": 33,
+        "y": 797.171875,
+        "width": 324,
+        "height": 84,
+        "text": "device unlocked ›"
+      },
+      {
+        "id": "tutorial",
+        "x": 33,
+        "y": 895.171875,
+        "width": 324,
+        "height": 84,
+        "text": "? tutorial unlocked ›"
+      },
+      {
+        "id": "themes",
+        "x": 33,
+        "y": 993.171875,
+        "width": 324,
+        "height": 84,
+        "text": "themes locked ›"
+      },
+      {
+        "id": "sizing",
+        "x": 33,
+        "y": 1091.171875,
+        "width": 324,
+        "height": 84,
+        "text": "A A sizing locked ›"
+      },
+      {
+        "id": "opacity",
+        "x": 33,
+        "y": 1189.171875,
+        "width": 324,
+        "height": 84,
+        "text": "opacity locked ›"
+      },
+      {
+        "id": "icons",
+        "x": 33,
+        "y": 1287.171875,
+        "width": 324,
+        "height": 84,
+        "text": "icons locked ›"
+      },
+      {
+        "id": "alarm-sounds",
+        "x": 33,
+        "y": 1385.171875,
+        "width": 324,
+        "height": 84,
+        "text": "alarm-sounds locked ›"
+      },
+      {
+        "id": "timer-sounds",
+        "x": 33,
+        "y": 1483.171875,
+        "width": 324,
+        "height": 84,
+        "text": "timer-sounds locked ›"
+      },
+      {
+        "id": "haptics",
+        "x": 33,
+        "y": 1581.171875,
+        "width": 324,
+        "height": 84,
+        "text": "haptics locked ›"
+      },
+      {
+        "id": "heartbeat",
+        "x": 33,
+        "y": 1679.171875,
+        "width": 324,
+        "height": 84,
+        "text": "heartbeat locked ›"
+      },
+      {
+        "id": "heartbeat-log",
+        "x": 33,
+        "y": 1777.171875,
+        "width": 324,
+        "height": 84,
+        "text": "heartbeat-log locked ›"
+      },
+      {
+        "id": "logs-exports",
+        "x": 33,
+        "y": 1875.171875,
+        "width": 324,
+        "height": 84,
+        "text": "logs-exports locked ›"
+      }
+    ]
+  }
+}

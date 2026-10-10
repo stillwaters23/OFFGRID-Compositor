@@ -1,0 +1,31 @@
+Lane screenshot baselines (committed on each lane) versus the same files after the integration e2e rewrote them.
+Comparator: pngjs, per-pixel RGBA.
+
+app-builder-built-mobile.png 390x844 changed=0/329160 percent=0.0000
+l1/laser_demo.png 1280x3846 changed=9275/4922880 percent=0.1884
+l1/laser_light.png 1280x3846 changed=0/4922880 percent=0.0000
+l1/laser_strip.png 332x49 changed=0/16268 percent=0.0000
+l2/beam_on_dark.png 390x844 changed=22795/329160 percent=6.9252
+l2/laser_settings.png 390x844 changed=22487/329160 percent=6.8316
+l2/number_contrast.png 390x844 changed=13801/329160 percent=4.1928
+l3/icons_3d.png SIZE 324x1469 -> 324x1567
+l3/icons_etched.png SIZE 324x1469 -> 324x1567
+l4/clicker_folder.png 390x844 changed=0/329160 percent=0.0000
+note: l4/clicker_folder.png was not rewritten. The L4 e2e failed before it could capture a new shot, so this 0% is the untouched committed file.
+
+Changed-row counts on the red overlay:
+l2/laser_settings.png changed_rows 317 of 844
+l1/laser_demo.png changed_rows 80 of 3846
+l2/number_contrast.png changed_rows 258 of 844
+
+Default-state captures at 390x844, animations disabled.
+auric-base server: http://127.0.0.1:8090 (origin/auric-base e39aa55)
+integration server: http://127.0.0.1:8080 (scratch d521a24)
+
+base timer probe: {"strips":0,"color":""}
+folder_list.png 390x844 vs 390x844 common 390x844 changed=8538/329160 percent=2.5939
+timer.png 390x844 vs 390x844 common 390x844 changed=82339/329160 percent=25.0149
+
+Timer row bands with more than 8 changed pixels:
+[157,197], [217,251], [288,579], [593,605], [618,621]
+The reel block is y 288-579. Masking every changed band leaves 0.1073% elsewhere. That mask is wider than the laser row, so it is not the L2-11 exclusion.

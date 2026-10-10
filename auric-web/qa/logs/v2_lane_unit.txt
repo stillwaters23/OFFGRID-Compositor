@@ -1,0 +1,198 @@
+TAP version 13
+# (node:9936) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: wheel samples are opaque colors and respond to palette surface changes
+ok 1 - wheel samples are opaque colors and respond to palette surface changes
+  ---
+  duration_ms: 2.12847
+  ...
+# Subtest: number-color guard enforces the near-black rule and theme contrast
+ok 2 - number-color guard enforces the near-black rule and theme contrast
+  ---
+  duration_ms: 1.188776
+  ...
+# Subtest: number-color contrast ratios stay pinned to two decimals
+ok 3 - number-color contrast ratios stay pinned to two decimals
+  ---
+  duration_ms: 1.219251
+  ...
+# Subtest: laser bloom is considered when checking selected-row numeral contrast
+ok 4 - laser bloom is considered when checking selected-row numeral contrast
+  ---
+  duration_ms: 0.452953
+  ...
+# Subtest: invalid and translucent number colors are refused
+ok 5 - invalid and translucent number colors are refused
+  ---
+  duration_ms: 0.102791
+  ...
+# Subtest: laser presets stay in brief order
+ok 6 - laser presets stay in brief order
+  ---
+  duration_ms: 0.201376
+  ...
+# Subtest: laser intensity maps linearly and disabling removes its beam opacity
+ok 7 - laser intensity maps linearly and disabling removes its beam opacity
+  ---
+  duration_ms: 0.285126
+  ...
+# Subtest: resolved reel numerals stay guard-approved and away from near-black for curated palettes
+ok 8 - resolved reel numerals stay guard-approved and away from near-black for curated palettes
+  ---
+  duration_ms: 11.102007
+  ...
+# (node:9937) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: L2 state contract defaults and all ten settings persist
+ok 9 - L2 state contract defaults and all ten settings persist
+  ---
+  duration_ms: 5.637845
+  ...
+# Subtest: state setters clamp, validate, and preserve invalid updates
+ok 10 - state setters clamp, validate, and preserve invalid updates
+  ---
+  duration_ms: 2.424495
+  ...
+# Subtest: v21 snapshots hydrate with defaults while preserving existing data
+ok 11 - v21 snapshots hydrate with defaults while preserving existing data
+  ---
+  duration_ms: 0.749244
+  ...
+# Subtest: laser and number choices survive a persistence round trip
+ok 12 - laser and number choices survive a persistence round trip
+  ---
+  duration_ms: 0.964396
+  ...
+# Subtest: hydration clears stored number colors that no longer pass contrast
+ok 13 - hydration clears stored number colors that no longer pass contrast
+  ---
+  duration_ms: 0.37504
+  ...
+# Subtest: empty storage still completes hydration with defaults
+ok 14 - empty storage still completes hydration with defaults
+  ---
+  duration_ms: 0.232673
+  ...
+# (node:9943) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: folder FLIP plans invert only visible tiles that moved
+ok 15 - folder FLIP plans invert only visible tiles that moved
+  ---
+  duration_ms: 1.012412
+  ...
+# Subtest: folder FLIP keyframes animate transform and opacity only
+ok 16 - folder FLIP keyframes animate transform and opacity only
+  ---
+  duration_ms: 0.186845
+  ...
+# Subtest: frame budget matches the 60fps gate and rejects the recorded miss
+ok 17 - frame budget matches the 60fps gate and rejects the recorded miss
+  ---
+  duration_ms: 0.29033
+  ...
+# Subtest: FLIP measurement is one read pass followed by writes
+ok 18 - FLIP measurement is one read pass followed by writes
+  ---
+  duration_ms: 0.091369
+  ...
+# (node:9972) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: gesture classifier separates taps, long-presses, and early drags
+ok 19 - gesture classifier separates taps, long-presses, and early drags
+  ---
+  duration_ms: 0.861013
+  ...
+# (node:9984) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: folder metrics clamp size and choose layout columns by available width
+ok 20 - folder metrics clamp size and choose layout columns by available width
+  ---
+  duration_ms: 0.681382
+  ...
+# Subtest: label hit zone expands to 48px and stays within tile bounds
+ok 21 - label hit zone expands to 48px and stays within tile bounds
+  ---
+  duration_ms: 0.173098
+  ...
+# Subtest: folder preference hydration clamps values and appends newly installed module ids
+ok 22 - folder preference hydration clamps values and appends newly installed module ids
+  ---
+  duration_ms: 0.659455
+  ...
+# (node:9996) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: critical spring settles within 500ms without crossing its target
+ok 23 - critical spring settles within 500ms without crossing its target
+  ---
+  duration_ms: 0.634009
+  ...
+# Subtest: safe-area clamp honors viewport edges and simulated insets
+ok 24 - safe-area clamp honors viewport edges and simulated insets
+  ---
+  duration_ms: 0.192741
+  ...
+# (node:9997) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: a procedural click is scheduled at the context clock with no lookahead
+ok 25 - a procedural click is scheduled at the context clock with no lookahead
+  ---
+  duration_ms: 0.615815
+  ...
+# Subtest: the house click starts once at currentTime on the interactive voice
+ok 26 - the house click starts once at currentTime on the interactive voice
+  ---
+  duration_ms: 0.382096
+  ...
+# Subtest: ten rapid previews retrigger ten oscillators and legacy ids use the house recipe
+ok 27 - ten rapid previews retrigger ten oscillators and legacy ids use the house recipe
+  ---
+  duration_ms: 0.300164
+  ...
+# Subtest: a missing context does not throw and does not invent a start time
+ok 28 - a missing context does not throw and does not invent a start time
+  ---
+  duration_ms: 0.086757
+  ...
+# (node:10020) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: Clicker Sounds is free, uses the existing pulses glyph, and preserves the module order
+ok 29 - Clicker Sounds is free, uses the existing pulses glyph, and preserves the module order
+  ---
+  duration_ms: 0.801631
+  ...
+# Subtest: the seven tick families expose 77 ordered cuts apiece
+ok 30 - the seven tick families expose 77 ordered cuts apiece
+  ---
+  duration_ms: 0.475956
+  ...
+# Subtest: the house click is the default selection and legacy tick ids still resolve
+ok 31 - the house click is the default selection and legacy tick ids still resolve
+  ---
+  duration_ms: 0.140565
+  ...
+# (node:10032) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: clicker-sounds reads Lane 3 size, icon style, and rename
+ok 32 - clicker-sounds reads Lane 3 size, icon style, and rename
+  ---
+  duration_ms: 0.534038
+  ...
+# Subtest: blank names are refused, long names stop at 24, and missing fields use Lane 3 defaults
+ok 33 - blank names are refused, long names stop at 24, and missing fields use Lane 3 defaults
+  ---
+  duration_ms: 0.17522
+  ...
+# Subtest: a new clicker id appends after a saved order that does not know it yet
+ok 34 - a new clicker id appends after a saved order that does not know it yet
+  ---
+  duration_ms: 0.511776
+  ...
+1..34
+# tests 34
+# suites 0
+# pass 34
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 606.523278
