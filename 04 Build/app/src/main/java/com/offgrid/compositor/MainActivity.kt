@@ -260,6 +260,7 @@ class MainActivity : AppCompatActivity() {
         }
         created.testShapeOn = terminalPanel.testDiamondOn
         created.reducedMotion = reducedMotion()
+        created.probe.previewSampler = { describePreviewView() }
         effects.processor = created
         processor = created
         return created
@@ -316,6 +317,13 @@ class MainActivity : AppCompatActivity() {
         val viewPort = ViewPort.Builder(Rational(previewView.width, previewView.height), rotation)
             .setScaleType(ViewPort.FILL_CENTER)
             .build()
+        painter.probe.onBind(
+            bindGeneration,
+            previewView.width,
+            previewView.height,
+            "${viewPort.aspectRatio.numerator}:${viewPort.aspectRatio.denominator}",
+            rotation,
+        )
         val groupBuilder = UseCaseGroup.Builder()
             .setViewPort(viewPort)
             .addUseCase(preview)
@@ -371,6 +379,21 @@ class MainActivity : AppCompatActivity() {
         bindGeneration++
         cameraProvider?.unbindAll()
         videoCapture = null
+    }
+
+    /**
+     * Phase 0.5 probe sample, main thread: the PreviewView's size, its stream state, and the
+     * TextureView child's size and transform. A non-uniform scale here is the stretch.
+     */
+    internal fun describePreviewView(): String {
+        val child = (0 until previewView.childCount).map { previewView.getChildAt(it) }
+            .firstOrNull { it is TextureView } as? TextureView
+        val values = FloatArray(9)
+        child?.getTransform(null)?.getValues(values)
+        val transform = if (child == null) "none" else
+            "scaleX=${values[0]} skewX=${values[1]} transX=${values[2]} skewY=${values[3]} scaleY=${values[4]} transY=${values[5]}"
+        return "previewView=${previewView.width}x${previewView.height} laidOut=${previewView.isLaidOut} " +
+            "stream=${previewView.previewStreamState.value} textureView=${child?.width ?: 0}x${child?.height ?: 0} $transform"
     }
 
     private fun previewResolution(): ResolutionSelector {

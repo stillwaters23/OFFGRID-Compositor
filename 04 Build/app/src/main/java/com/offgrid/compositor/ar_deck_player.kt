@@ -9,6 +9,7 @@ import android.view.Surface
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.common.VideoSize
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -23,9 +24,16 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 internal class ArDeckPlayer(
     context: Context,
     private val handler: Handler,
+    /** The clip's real picture size (width, height, pixel width to height ratio). Drawing thread. */
+    private val onVideoSize: ((Int, Int, Float) -> Unit)? = null,
 ) {
     private val appContext = context.applicationContext
     private var player: ExoPlayer? = null
+    private val sizeListener = object : Player.Listener {
+        override fun onVideoSizeChanged(videoSize: VideoSize) {
+            onVideoSize?.invoke(videoSize.width, videoSize.height, videoSize.pixelWidthHeightRatio)
+        }
+    }
     private var surface: Surface? = null
     private var loop = true
 
@@ -79,9 +87,11 @@ internal class ArDeckPlayer(
         val source = DefaultMediaSourceFactory(DefaultDataSource.Factory(appContext))
         return ExoPlayer.Builder(appContext)
             .setMediaSourceFactory(source)
+            .setLooper(handler.looper)
             .setWakeMode(C.WAKE_MODE_NONE)
             .build()
             .also { created ->
+                created.addListener(sizeListener)
                 created.repeatMode = repeatMode(loop)
                 created.playWhenReady = false
                 surface?.let { created.setVideoSurface(it) }

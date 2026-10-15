@@ -41,6 +41,9 @@ class CompositorProcessor internal constructor(
 ) : SurfaceProcessor, SurfaceTexture.OnFrameAvailableListener {
     val effectList = EffectList()
 
+    /** Phase 0.5: the debug-only render probe. Silent on a release build. */
+    internal val probe: RenderProbe = RenderProbe.forContext(appContext)
+
     @Volatile
     var onFirstFrame: (() -> Unit)? = null
 
@@ -199,6 +202,7 @@ class CompositorProcessor internal constructor(
         }
         val textureId = createExternalTexture()
         inputSize = request.resolution
+        probe.onInput(request.resolution.width, request.resolution.height)
         val surfaceTexture = SurfaceTexture(textureId)
         surfaceTexture.setDefaultBufferSize(request.resolution.width, request.resolution.height)
         val surface = Surface(surfaceTexture)
@@ -246,12 +250,14 @@ class CompositorProcessor internal constructor(
             fail("Output surface failed")
             return
         }
-        outputs.add(OutputSlot(surfaceOutput, eglSurface, size.width, size.height))
+        val slot = OutputSlot(surfaceOutput, eglSurface, size.width, size.height)
+        outputs.add(slot)
         pictureSize = outputs.maxBy { it.width * it.height }.let { android.util.Size(it.width, it.height) }
         Log.i(
             TAG,
             "Output ${size.width}x${size.height} targets=${surfaceOutput.targets}",
         )
+        probe.onOutput(size.width, size.height, surfaceOutput.targets, slot.isPreview)
     }
 
     override fun onFrameAvailable(surfaceTexture: SurfaceTexture) {
@@ -489,6 +495,7 @@ class CompositorProcessor internal constructor(
         val scale = minOf(1f, MAX_STAGE_SIDE / maxOf(main.width, main.height).toFloat())
         val stageWidth = maxOf(2, (main.width * scale).toInt())
         val stageHeight = maxOf(2, (main.height * scale).toInt())
+        probe.onStage(main.width, main.height, main.isPreview, stageWidth, stageHeight)
         overlay?.latch()
         overlay?.request(stageWidth, stageHeight)
         val drawn = overlay != null && overlay.hasPicture
@@ -632,7 +639,10 @@ class CompositorProcessor internal constructor(
             fail("Could not draw a frame")
             return
         }
-        if (!toldFirstFrame && slot.surfaceOutput.targets and CameraEffect.PREVIEW != 0) {
+        if (slot.isPreview) {
+            probe.onPreviewFrame(slot.width, slot.height, painted?.width ?: 0, painted?.height ?: 0)
+        }
+        if (!toldFirstFrame && slot.isPreview) {
             toldFirstFrame = true
             mainHandler.post { onFirstFrame?.invoke() }
         }
@@ -727,7 +737,9 @@ class CompositorProcessor internal constructor(
             val deck = ArDeckSurface(textureId, texture)
             texture.setOnFrameAvailableListener({ onArFrame(it) }, handler)
             arDeck = deck
-            val player = ArDeckPlayer(ctx, handler)
+            val player = ArDeckPlayer(ctx, handler) { width, height, ratio ->
+                probe.onClipSize(width, height, ratio)
+            }
             arPlayer = player
             player.attachSurface(deck.surface)
             player.setLoop(deckLoop)
@@ -890,7 +902,11 @@ class CompositorProcessor internal constructor(
         val eglSurface: android.opengl.EGLSurface,
         val width: Int,
         val height: Int,
-    )
+    ) {
+        /** True when this output goes to the screen (CameraX PREVIEW target). */
+        val isPreview: Boolean
+            get() = surfaceOutput.targets and CameraEffect.PREVIEW != 0
+    }
 
     private companion object {
         const val TAG = "OffgridCompositor"
