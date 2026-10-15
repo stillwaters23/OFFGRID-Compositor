@@ -47,6 +47,7 @@ import com.offgrid.compositor.audio.MicKeys
 import com.offgrid.compositor.audio.MicPipeline
 import com.offgrid.compositor.effects.EffectEngine
 import com.offgrid.compositor.effects.EffectLayers
+import com.offgrid.compositor.effects.StageGeometry
 import com.offgrid.compositor.audio.voice.VoiceAudioOutput
 import com.offgrid.compositor.terminal.TerminalPanel
 
@@ -82,6 +83,10 @@ class MainActivity : AppCompatActivity() {
     internal var videoCapture: VideoCapture<Recorder>? = null
     internal var activeRecording: Recording? = null
     internal var bindGeneration = 0
+
+    /** Phase 1.1: the view size the camera was bound at, and the one-rebind rule for a changed shape. */
+    internal val rebindGate = StageGeometry.RebindGate()
+    internal val rebindTask = Runnable { rebindForNewShape() }
     private var permissionAsked = false
     internal val capture = CaptureSwitch()
     internal lateinit var mic: MicPipeline
@@ -181,6 +186,9 @@ class MainActivity : AppCompatActivity() {
             insets
         }
         darkStage = DarkStage(this, findViewById(R.id.root), previewView) { processor }
+        previewView.addOnLayoutChangeListener { _, left, top, right, bottom, _, _, _, _ ->
+            onPreviewLayout(right - left, bottom - top)
+        }
         recordButton.setOnClickListener { toggleRecording() }
         playButton.setOnClickListener { showPlayback() }
         backButton.setOnClickListener { hidePlayback() }
@@ -216,6 +224,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        mainHandler.removeCallbacks(rebindTask)
         mic.stop()
         darkStage.hide()
         effects.release()
@@ -274,6 +283,7 @@ class MainActivity : AppCompatActivity() {
     ) {
         val painter = ensureProcessor()
         faces.outputAspect = previewView.width.toFloat() / previewView.height
+        rebindGate.bound(previewView.width, previewView.height)
         val effect = CompositorEffect(
             painter.executor,
             painter,

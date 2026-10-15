@@ -101,6 +101,15 @@ internal object EffectFolders {
                 "How solid the clip is. 0 is clear. 100 covers the selfie.",
                 100,
             ),
+            ChoiceItem(
+                FxKeys.AR_FIT,
+                "Clip shape",
+                listOf(
+                    Choice(FxKeys.AR_FIT_FILL, "Fill the stage", "Cuts the clip's sides or top so it covers the stage. Nothing is stretched."),
+                    Choice(FxKeys.AR_FIT_FIT, "Show the whole clip", "The whole clip in a centered box. The selfie shows around it."),
+                ),
+                FxKeys.AR_FIT_FILL,
+            ),
             TextItem(FxKeys.AR_CLIP, "Clip id", "Filled when you pick a video. Phone 2 can send this short id.", "", 32),
         ),
         notes = listOf(

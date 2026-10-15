@@ -64,6 +64,16 @@ internal class OverlayRenderer(
     private var wantHeight = 0
     private var sizeWidth = 0
     private var sizeHeight = 0
+
+    /**
+     * Phase 1.1: counts stage size changes. A drawing made for an older size is skipped at
+     * [latch] instead of being stretched over the new stage for one frame.
+     */
+    @Volatile
+    private var sizeGeneration = 0
+
+    @Volatile
+    private var postedGeneration = 0
     private var toldFailure = false
     private val active = BooleanArray(layers.size)
 
@@ -89,6 +99,7 @@ internal class OverlayRenderer(
         if (width != sizeWidth || height != sizeHeight) {
             sizeWidth = width
             sizeHeight = height
+            sizeGeneration++
             surfaceTexture.setDefaultBufferSize(width, height)
         }
         wantWidth = width
@@ -109,7 +120,8 @@ internal class OverlayRenderer(
         try {
             surfaceTexture.updateTexImage()
             surfaceTexture.getTransformMatrix(matrix)
-            hasPicture = !postedEmpty
+            // A drawing for an older stage size would be stretched to the new one. Skip it; the next one fits.
+            hasPicture = !postedEmpty && postedGeneration == sizeGeneration
         } catch (error: RuntimeException) {
             Log.w(TAG, "Effects picture was not ready", error)
             hasPicture = false
@@ -135,6 +147,7 @@ internal class OverlayRenderer(
     }
 
     private fun drawLayers() {
+        val generation = sizeGeneration
         val width = wantWidth
         val height = wantHeight
         val frame = engine.frame(width, height, reducedMotion)
@@ -165,6 +178,7 @@ internal class OverlayRenderer(
             }
         } finally {
             postedEmpty = !any
+            postedGeneration = generation
             try {
                 surface.unlockCanvasAndPost(canvas)
             } catch (error: RuntimeException) {

@@ -130,6 +130,10 @@ class StagePlan {
     var arClip = ""
         private set
 
+    /** True to show the whole clip in a centered box (fit). False cuts it to the stage's shape (fill). */
+    var arFit = false
+        private set
+
     /** True when the camera picture goes out exactly as it came in, with nothing done to it. */
     val plain: Boolean
         get() = !mirror && holdId == 0L && brightness >= 1f && mode == FxKeys.MODE_LIVE && modeMix >= 1f &&
@@ -163,6 +167,7 @@ class StagePlan {
         arLoop = s.on(FxKeys.AR_LOOP, true)
         arOpacity = s.value(FxKeys.AR_OPACITY)
         arClip = s.text(FxKeys.AR_CLIP)
+        arFit = s.choice(FxKeys.AR_FIT) == FxKeys.AR_FIT_FIT
     }
 
     private fun planMode(time: Float, s: EffectSnapshot, changedAt: Float, before: String) {

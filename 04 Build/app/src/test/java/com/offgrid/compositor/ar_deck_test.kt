@@ -6,6 +6,7 @@ import com.offgrid.compositor.effects.EffectSnapshot
 import com.offgrid.compositor.effects.FxKeys
 import com.offgrid.compositor.effects.StagePlan
 import com.offgrid.compositor.terminal.ActionItem
+import com.offgrid.compositor.terminal.ChoiceItem
 import com.offgrid.compositor.terminal.NumberItem
 import com.offgrid.compositor.terminal.PanelAction
 import com.offgrid.compositor.terminal.PanelTree
@@ -82,6 +83,30 @@ class ArDeckTest {
         assertEquals(0.4f, on.arOpacity, 0.001f)
         assertEquals("c1", on.arClip)
         assertFalse(on.plain)
+        assertFalse(on.arFit)
+    }
+
+    @Test
+    fun clipShapeDefaultsToFillAndCanBeFit() {
+        val folder = PanelTree.build().folders.single { it.id == "ar_video_deck" }
+        val shape = folder.items.filterIsInstance<ChoiceItem>().single { it.key == FxKeys.AR_FIT }
+        assertEquals(FxKeys.AR_FIT_FILL, shape.default)
+        assertEquals(listOf(FxKeys.AR_FIT_FILL, FxKeys.AR_FIT_FIT), shape.choices.map { it.value })
+
+        val fit = StagePlan().update(
+            1f,
+            EffectSnapshot(
+                numbers = emptyMap(),
+                toggles = mapOf(FxKeys.AR_ON to true),
+                choices = mapOf(FxKeys.AR_FIT to FxKeys.AR_FIT_FIT),
+                texts = emptyMap(),
+            ),
+            emptyList(),
+            null,
+            -100f,
+            FxKeys.MODE_LIVE,
+        )
+        assertTrue(fit.arFit)
     }
 
     @Test

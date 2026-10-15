@@ -5,6 +5,7 @@ import android.opengl.GLES20
 import com.offgrid.compositor.effects.EffectTimes
 import com.offgrid.compositor.effects.FxKeys
 import com.offgrid.compositor.effects.ShatterMesh
+import com.offgrid.compositor.effects.StageGeometry
 import com.offgrid.compositor.effects.StagePlan
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -80,7 +81,8 @@ internal class StagePainter {
      * Paints one picture into a stage picture of [w] by [h] and returns it.
      * [cameraTexture] is the camera with [cameraMatrix]. [overlayTexture] is the drawn effects
      * (0 when none) with [overlayMatrix]. [mask] is the person cutout, or null when that look is off.
-     * [arTexture] is the looping clip (0 when none) with [arMatrix] from its SurfaceTexture.
+     * [arTexture] is the looping clip (0 when none) with [arMatrix] from its SurfaceTexture and
+     * its real size [arVideoWidth] by [arVideoHeight]; the clip is skipped while that size is 0.
      */
     fun paint(
         cameraTexture: Int,
@@ -94,6 +96,8 @@ internal class StagePainter {
         mask: MaskFrame? = null,
         arTexture: Int = 0,
         arMatrix: FloatArray = NO_AR,
+        arVideoWidth: Int = 0,
+        arVideoHeight: Int = 0,
     ): GlTarget {
         width = w
         height = h
@@ -170,7 +174,7 @@ internal class StagePainter {
         }
 
         // 6b. The AR clip sits over the selfie. Flip stays 0: the clip matrix already orients it.
-        source = drawAr(source, plan, arTexture, arMatrix)
+        source = drawAr(source, plan, arTexture, arMatrix, arVideoWidth, arVideoHeight, w, h)
 
         // 7. The drawn effects go on top, so they shatter and push out with the picture.
         if (overlayTexture != 0) {
@@ -198,17 +202,17 @@ internal class StagePainter {
         return source
     }
 
-    /** Draws [target] filling the current output, cut to fit its shape without stretching. */
+    /**
+     * Draws [target] filling the current output, cut to its shape without stretching. The cut is
+     * [StageGeometry.fillCrop], the same rule the AR clip uses, so the screen, the video, the replay,
+     * and the live outputs all show the same centered part of the stage.
+     */
     fun present(target: GlTarget, outputWidth: Int, outputHeight: Int) {
         GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
         GLES20.glViewport(0, 0, outputWidth, outputHeight)
         GLES20.glDisable(GLES20.GL_BLEND)
-        val pictureAspect = target.width.toFloat() / target.height
-        val outputAspect = outputWidth.toFloat() / outputHeight
-        var sx = 1f
-        var sy = 1f
-        if (pictureAspect > outputAspect) sx = outputAspect / pictureAspect else sy = pictureAspect / outputAspect
-        drawPicture(target, rectX = (1f - sx) / 2f, rectY = (1f - sy) / 2f, rectW = sx, rectH = sy)
+        val crop = StageGeometry.fillCrop(target.width, target.height, outputWidth, outputHeight).rect
+        drawPicture(target, rectX = crop.x, rectY = crop.y, rectW = crop.width, rectH = crop.height)
     }
 
     /** Draws the camera straight to the current output, for when no effect changes it. */
@@ -589,9 +593,24 @@ internal class StagePainter {
         GlShapes.drawFull(camera)
     }
 
-    /** Draws the clip over [source] without baking it into a held still. */
-    private fun drawAr(source: GlTarget, plan: StagePlan, texture: Int, matrix: FloatArray): GlTarget {
+    /**
+     * Draws the clip over [source] without baking it into a held still. Phase 1.1: the clip keeps
+     * its own shape. Fill cuts the centered part of the clip that has the stage's shape (through
+     * the texture matrix). Fit draws the whole clip into a centered box with the clip's shape.
+     * Nothing is drawn until the clip's real size ([videoWidth] by [videoHeight]) is known.
+     */
+    private fun drawAr(
+        source: GlTarget,
+        plan: StagePlan,
+        texture: Int,
+        matrix: FloatArray,
+        videoWidth: Int,
+        videoHeight: Int,
+        stageWidth: Int,
+        stageHeight: Int,
+    ): GlTarget {
         if (!plan.arOn || texture == 0 || plan.arOpacity <= 0f) return source
+        if (videoWidth <= 0 || videoHeight <= 0) return source
         val into = if (source === live || source === workA || source === workB) {
             source
         } else {
@@ -600,9 +619,34 @@ internal class StagePainter {
         into.bind()
         GLES20.glEnable(GLES20.GL_BLEND)
         GLES20.glBlendFunc(GLES20.GL_ONE, GLES20.GL_ONE_MINUS_SRC_ALPHA)
-        drawCamera(texture, matrix, 0f, plan.arOpacity)
+        if (plan.arFit) {
+            val box = StageGeometry.fitRect(videoWidth, videoHeight, stageWidth, stageHeight).rect
+            setQuad(box.x, box.y, box.width, box.height)
+            drawCameraAt(texture, matrix, plan.arOpacity)
+        } else {
+            val crop = StageGeometry.fillCrop(videoWidth, videoHeight, stageWidth, stageHeight).rect
+            StageGeometry.cropMatrix(crop, arCrop)
+            android.opengl.Matrix.multiplyMM(arCropMatrix, 0, matrix, 0, arCrop, 0)
+            drawCamera(texture, arCropMatrix, 0f, plan.arOpacity)
+        }
         GLES20.glDisable(GLES20.GL_BLEND)
         return into
+    }
+
+    /** The clip's centered crop, and its texture matrix times that crop. Rebuilt each frame, no garbage. */
+    private val arCrop = FloatArray(16)
+    private val arCropMatrix = FloatArray(16)
+
+    /** Like [drawCamera], into the quad last set by [setQuad] instead of the whole box. */
+    private fun drawCameraAt(texture: Int, matrix: FloatArray, alpha: Float) {
+        camera.use()
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
+        GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, texture)
+        camera.set1i("sTexture", 0)
+        camera.setMatrix("uTexMatrix", matrix)
+        camera.set1f("uFlipX", 0f)
+        camera.set1f("uAlpha", alpha)
+        GlShapes.draw(camera, quad, 2, quadTex, GLES20.GL_TRIANGLE_STRIP, 4)
     }
 
     private fun drawOverlay(texture: Int, matrix: FloatArray) {

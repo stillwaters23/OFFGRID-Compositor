@@ -101,12 +101,19 @@ object StageGeometry {
      * The 4 by 4 column-major matrix that maps the whole texture (0..1) onto [crop]. Multiply a
      * SurfaceTexture transform by this (transform × crop) to sample only the cropped part.
      */
-    fun cropMatrix(crop: Rect): FloatArray = floatArrayOf(
-        crop.width, 0f, 0f, 0f,
-        0f, crop.height, 0f, 0f,
-        0f, 0f, 1f, 0f,
-        crop.x, crop.y, 0f, 1f,
-    )
+    fun cropMatrix(crop: Rect): FloatArray = cropMatrix(crop, FloatArray(16))
+
+    /** Same as [cropMatrix], written into [out] (16 floats) so a drawing loop makes no garbage. */
+    fun cropMatrix(crop: Rect, out: FloatArray): FloatArray {
+        out.fill(0f)
+        out[0] = crop.width
+        out[5] = crop.height
+        out[10] = 1f
+        out[12] = crop.x
+        out[13] = crop.y
+        out[15] = 1f
+        return out
+    }
 
     /** True when two shapes differ by more than [tolerance] (1 percent by default) of the first. */
     fun aspectDiffers(width1: Int, height1: Int, width2: Int, height2: Int, tolerance: Float = ASPECT_TOLERANCE): Boolean {
