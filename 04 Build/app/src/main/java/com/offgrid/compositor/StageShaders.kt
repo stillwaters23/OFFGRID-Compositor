@@ -7,7 +7,13 @@ package com.offgrid.compositor
  * so a typo here can't reach the phone as a black screen.
  */
 internal object StageShaders {
-    /** The camera, from its own texture. [uFlipX] 1 mirrors left and right (mirror plus scan). */
+    /**
+     * The camera, from its own texture.
+     * Apply CameraX / SurfaceTexture [uTexMatrix] first (sensor crop + rotation), then
+     * [uFlipX] mirrors left/right in display space. Flipping before the matrix turns a
+     * selfie mirror into upside-down when the transform includes a 90° rotation.
+     * [uFlipX] 1 = selfie / front-camera mirror. Mirror-plus-scan passes 0 (already mirrored).
+     */
     const val CAMERA_VERTEX = """
         attribute vec2 aPosition;
         attribute vec2 aTexCoord;
@@ -16,8 +22,8 @@ internal object StageShaders {
         varying vec2 vTexCoord;
         void main() {
             gl_Position = vec4(aPosition, 0.0, 1.0);
-            vec2 tc = vec2(mix(aTexCoord.x, 1.0 - aTexCoord.x, uFlipX), aTexCoord.y);
-            vTexCoord = (uTexMatrix * vec4(tc, 0.0, 1.0)).xy;
+            vec2 tc = (uTexMatrix * vec4(aTexCoord, 0.0, 1.0)).xy;
+            vTexCoord = vec2(mix(tc.x, 1.0 - tc.x, uFlipX), tc.y);
         }
     """
 

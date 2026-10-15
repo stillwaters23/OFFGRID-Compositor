@@ -58,11 +58,12 @@ class RemotePreviewActivity : Activity(), SurfaceHolder.Callback {
                 sendSetting("fx.camera.mode", mode)
             }, marginTop(8))
         }
-        for (action in FIRE_ACTIONS) {
+        for (action in RemoteMessage.FIRE_ACTIONS) {
             root.addView(button("Fire $action") {
                 link?.sendControl(RemoteMessage("", "fire", action))
             }, marginTop(8))
         }
+        addArDeckStrip(root)
         pairing.loadKey(
             onLoaded = { key, fingerprint ->
                 pairingKey = key
@@ -178,6 +179,20 @@ class RemotePreviewActivity : Activity(), SurfaceHolder.Callback {
         setOnClickListener { action() }
     }
 
+    /** Minimal Phone 2 clip strip. The camera phone owns the files; these only send commands. */
+    private fun addArDeckStrip(root: LinearLayout) {
+        root.addView(label("AR Video Deck", 16, true), marginTop(16))
+        val strip = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        for ((title, action) in AR_THUMBS) {
+            val thumb = button(title) {
+                link?.sendControl(RemoteMessage("", "fire", action))
+            }
+            thumb.contentDescription = "AR thumbnail $title"
+            strip.addView(thumb, LinearLayout.LayoutParams(dp(88), dp(48)).apply { marginEnd = dp(8) })
+        }
+        root.addView(strip, marginTop(8))
+    }
+
     private fun marginTop(value: Int) = LinearLayout.LayoutParams(
         ViewGroup.LayoutParams.MATCH_PARENT,
         ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -200,6 +215,10 @@ class RemotePreviewActivity : Activity(), SurfaceHolder.Callback {
             "fx.border.on" to "Glow Border",
         )
         val CAMERA_MODES = listOf("live", "blackout", "cloak", "status", "ghost")
-        val FIRE_ACTIONS = listOf("shatter", "freeze", "quiet", "fireworks", "red_sweep", "laser_writing")
+        val AR_THUMBS = listOf(
+            "Play" to "ar_play",
+            "Pause" to "ar_pause",
+            "Next" to "ar_next",
+        )
     }
 }

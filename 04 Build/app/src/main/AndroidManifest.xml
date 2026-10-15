@@ -9,6 +9,10 @@
     <uses-permission
         android:name="android.permission.ACCESS_NETWORK_STATE"
         tools:node="remove" />
+    <!-- Media3 declares a wake lock. The AR clip plays only while this screen is open. -->
+    <uses-permission
+        android:name="android.permission.WAKE_LOCK"
+        tools:node="remove" />
     <!-- Lane E took INTERNET out so MediaPipe's logging library cannot upload frames.
          That removal is archived in 04 Build/archive/lane_e_internet_remove.xml.
          Lane C keeps INTERNET for local Send to PC and the direct phone link.

@@ -289,7 +289,10 @@ internal class ThemeStore(private val context: Context, private val prefs: Panel
     fun systemColor(part: ColorPart): Int = part(part).role.resolve(context)
 
     fun color(part: ColorPart): Int {
-        if (base() == Theme.SYSTEM) {
+        val state = part(part)
+        // SYSTEM day/night black-and-white only while "Use system color" is on.
+        // A custom swatch (setCustom / system off) must win immediately for TEXT, STATUS, and SKIN.
+        if (state.system && base() == Theme.SYSTEM) {
             val dark = when (themeMode()) {
                 ThemeMode.AUTO -> context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK ==
                     Configuration.UI_MODE_NIGHT_YES
@@ -302,7 +305,6 @@ internal class ThemeStore(private val context: Context, private val prefs: Panel
                 else -> Unit
             }
         }
-        val state = part(part)
         return if (state.system) state.role.resolve(context) else state.custom
     }
 

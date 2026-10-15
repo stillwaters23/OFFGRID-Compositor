@@ -6,6 +6,8 @@ import android.os.Handler
 import android.os.Looper
 import android.view.View
 import android.widget.Toast
+import androidx.activity.ComponentActivity
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import com.offgrid.compositor.terminal.TerminalPanel
@@ -18,6 +20,7 @@ import com.offgrid.live.OffgridHost
 import com.offgrid.live.PairingActivity
 import com.offgrid.live.PairingWorkflow
 import com.offgrid.compositor.effects.FxKeys
+import com.offgrid.compositor.terminal.PanelAction
 import com.offgrid.live.LiveActions
 import com.offgrid.live.RemoteMessage
 import com.offgrid.live.RemotePacket
@@ -58,6 +61,13 @@ internal class LiveIntegration(
     private var cleanOutput = false
     private var activity: Activity? = activity
     private var activeRole = "off"
+    private val pickArVideo = (activity as? ComponentActivity)?.registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        if (result.resultCode != Activity.RESULT_OK) return@registerForActivityResult
+        val uri = result.data?.data ?: return@registerForActivityResult
+        onArClipPicked(uri)
+    }
 
     init {
         host.onPcOutputChanged = { enabled -> if (enabled) pc.startFromSettings() else pc.stop() }
@@ -120,7 +130,27 @@ internal class LiveIntegration(
             LiveActions.OPEN_PAIRING -> launch(PairingActivity::class.java)
             LiveActions.OPEN_PREVIEW -> launch(RemotePreviewActivity::class.java)
             LiveActions.SEND_TO_PC -> pc.startFromSettings()
+            PanelAction.AR_PICK_CLIP.name -> pickArVideo?.launch(ArDeckCatalog.pickIntent())
+                ?: showStatus("Open OFFGRID to pick a video.")
         }
+    }
+
+    private fun onArClipPicked(uri: android.net.Uri) {
+        val owner = activity ?: return
+        runCatching {
+            owner.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        val name = runCatching {
+            owner.contentResolver.query(
+                uri,
+                arrayOf(android.provider.OpenableColumns.DISPLAY_NAME),
+                null,
+                null,
+                null,
+            )?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
+        }.getOrNull() ?: uri.lastPathSegment ?: "clip"
+        effects?.addArClip(name, uri.toString())
+        showStatus("AR clip ready.")
     }
 
     private fun restoreCleanOutput() {

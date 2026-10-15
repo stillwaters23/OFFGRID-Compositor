@@ -16,6 +16,7 @@ class CompositorDrawer {
     private val cameraTexCoord: Int
     private val cameraMatrix: Int
     private val cameraSampler: Int
+    private val cameraFlipX: Int
     private val shapePosition: Int
     private val shapeColor: Int
 
@@ -29,10 +30,12 @@ class CompositorDrawer {
     )
     private val quadTexCoords: FloatBuffer = floatBuffer(
         floatArrayOf(
-            1f, 0f,
+            // Identity UVs. CameraX / SurfaceTexture uTexMatrix orients the frame;
+            // uFlipX then mirrors in display space for a stable upright selfie.
             0f, 0f,
-            1f, 1f,
+            1f, 0f,
             0f, 1f,
+            1f, 1f,
         ),
     )
     private val outlineDiamond: FloatBuffer = diamond(0.40f, 0.70f, -0.04f)
@@ -45,19 +48,26 @@ class CompositorDrawer {
         cameraTexCoord = GLES20.glGetAttribLocation(cameraProgram, "aTexCoord")
         cameraMatrix = GLES20.glGetUniformLocation(cameraProgram, "uTexMatrix")
         cameraSampler = GLES20.glGetUniformLocation(cameraProgram, "sTexture")
+        cameraFlipX = GLES20.glGetUniformLocation(cameraProgram, "uFlipX")
         shapePosition = GLES20.glGetAttribLocation(shapeProgram, "aPosition")
         shapeColor = GLES20.glGetUniformLocation(shapeProgram, "uColor")
         GLES20.glDisable(GLES20.GL_DEPTH_TEST)
         GLES20.glDisable(GLES20.GL_CULL_FACE)
     }
 
-    fun drawCamera(textureId: Int, texMatrix: FloatArray) {
+    /**
+     * Draws the front-camera OES texture.
+     * [flipX] 1 (default) mirrors left/right in display space after [texMatrix]
+     * (upright selfie). Pass 0 for an unmirrored feed.
+     */
+    fun drawCamera(textureId: Int, texMatrix: FloatArray, flipX: Float = 1f) {
         GLES20.glDisable(GLES20.GL_BLEND)
         GLES20.glUseProgram(cameraProgram)
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
         GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, textureId)
         GLES20.glUniform1i(cameraSampler, 0)
         GLES20.glUniformMatrix4fv(cameraMatrix, 1, false, texMatrix, 0)
+        GLES20.glUniform1f(cameraFlipX, flipX)
         drawStrip(cameraPosition, quadPositions, cameraTexCoord, quadTexCoords)
     }
 
@@ -157,10 +167,12 @@ class CompositorDrawer {
             attribute vec2 aPosition;
             attribute vec2 aTexCoord;
             uniform mat4 uTexMatrix;
+            uniform float uFlipX;
             varying vec2 vTexCoord;
             void main() {
                 gl_Position = vec4(aPosition, 0.0, 1.0);
-                vTexCoord = (uTexMatrix * vec4(aTexCoord, 0.0, 1.0)).xy;
+                vec2 tc = (uTexMatrix * vec4(aTexCoord, 0.0, 1.0)).xy;
+                vTexCoord = vec2(mix(tc.x, 1.0 - tc.x, uFlipX), tc.y);
             }
         """
 

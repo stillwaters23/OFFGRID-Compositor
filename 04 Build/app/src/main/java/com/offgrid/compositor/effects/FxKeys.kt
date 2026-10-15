@@ -255,4 +255,10 @@ object FxKeys {
     const val RECORD_GALLERY = "fx.record.gallery"
     const val REPLAY_ON = "fx.replay.on"
     const val REPLAY_SECONDS = "fx.replay.seconds"
+
+    // AR Video Deck. A local clip, looped, drawn over the live selfie. No player chrome.
+    const val AR_ON = "fx.ar.on"
+    const val AR_LOOP = "fx.ar.loop"
+    const val AR_OPACITY = "fx.ar.opacity"
+    const val AR_CLIP = "fx.ar.clip"
 }

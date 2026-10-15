@@ -6,6 +6,7 @@ import android.os.Handler
 import android.os.Looper
 import android.view.Surface
 import com.offgrid.compositor.effects.Fire
+import com.offgrid.compositor.effects.FxKeys
 import com.offgrid.compositor.terminal.PanelPrefs
 import com.offgrid.live.FrameSink
 import com.offgrid.live.OffgridHost
@@ -41,10 +42,11 @@ internal class LiveHost(
 
     override fun writeSetting(key: String, value: String) {
         main.post {
-            if (value.toBooleanStrictOrNull() != null) {
-                preferences.setToggle(key, value.toBoolean())
-            } else {
-                preferences.write { text(key, value) }
+            val opacity = if (key == FxKeys.AR_OPACITY) value.toIntOrNull()?.coerceIn(0, 100) else null
+            when {
+                opacity != null -> preferences.setNumber(key, opacity)
+                value.toBooleanStrictOrNull() != null -> preferences.setToggle(key, value.toBoolean())
+                else -> preferences.write { text(key, value) }
             }
             effects?.refresh()
             when (key) {
@@ -60,6 +62,10 @@ internal class LiveHost(
     }
 
     override fun fire(action: String) {
+        if (action == ArDeckCatalog.PLAY || action == ArDeckCatalog.PAUSE || action == ArDeckCatalog.NEXT) {
+            main.post { effects?.arRemote(action) }
+            return
+        }
         val kind = FIRES[action] ?: return
         main.post { effects?.fire(kind) }
     }

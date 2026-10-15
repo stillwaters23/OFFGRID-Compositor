@@ -58,6 +58,11 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:$cameraX")
     implementation("androidx.camera:camera-video:$cameraX")
     implementation("androidx.camera:camera-view:$cameraX")
+    // Headless AR Video Deck. No media3-ui, so there is no player chrome.
+    val media3 = "1.11.1"
+    implementation("androidx.media3:media3-exoplayer:$media3")
+    implementation("androidx.media3:media3-common:$media3")
+    implementation("androidx.media3:media3-datasource:$media3")
     // The only on-device model: MediaPipe Tasks Image Segmenter (selfie / person).
     implementation("com.google.mediapipe:tasks-vision:0.10.35")
     testImplementation("junit:junit:4.13.2")

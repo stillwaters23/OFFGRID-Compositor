@@ -80,6 +80,7 @@ internal class StagePainter {
      * Paints one picture into a stage picture of [w] by [h] and returns it.
      * [cameraTexture] is the camera with [cameraMatrix]. [overlayTexture] is the drawn effects
      * (0 when none) with [overlayMatrix]. [mask] is the person cutout, or null when that look is off.
+     * [arTexture] is the looping clip (0 when none) with [arMatrix] from its SurfaceTexture.
      */
     fun paint(
         cameraTexture: Int,
@@ -91,6 +92,8 @@ internal class StagePainter {
         overlayTexture: Int,
         overlayMatrix: FloatArray,
         mask: MaskFrame? = null,
+        arTexture: Int = 0,
+        arMatrix: FloatArray = NO_AR,
     ): GlTarget {
         width = w
         height = h
@@ -109,7 +112,8 @@ internal class StagePainter {
             return live
         }
 
-        // 1. The camera, mirrored for mirror plus scan.
+        // 1. The camera: selfie-mirrored in display space after the CameraX transform.
+        // Mirror-plus-scan already presents a mirrored feed, so it passes flipX = 0.
         live.bind()
         drawCamera(cameraTexture, cameraMatrix, if (plan.mirror) 0f else 1f)
         live.filled = true
@@ -164,6 +168,9 @@ internal class StagePainter {
             drawPicture(source, brightness = plan.brightness, glitch = plan.glitch, seed = plan.glitchSeed)
             source = into
         }
+
+        // 6b. The AR clip sits over the selfie. Flip stays 0: the clip matrix already orients it.
+        source = drawAr(source, plan, arTexture, arMatrix)
 
         // 7. The drawn effects go on top, so they shatter and push out with the picture.
         if (overlayTexture != 0) {
@@ -567,15 +574,35 @@ internal class StagePainter {
         else -> 1f
     }
 
-    private fun drawCamera(texture: Int, matrix: FloatArray, flipX: Float) {
+    /**
+     * Samples an external texture. [flipX] is applied after [matrix], in display space.
+     * [alpha] is 1 for the camera. The AR clip uses the same shader with a lower alpha.
+     */
+    private fun drawCamera(texture: Int, matrix: FloatArray, flipX: Float, alpha: Float = 1f) {
         camera.use()
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
         GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, texture)
         camera.set1i("sTexture", 0)
         camera.setMatrix("uTexMatrix", matrix)
         camera.set1f("uFlipX", flipX)
-        camera.set1f("uAlpha", 1f)
+        camera.set1f("uAlpha", alpha)
         GlShapes.drawFull(camera)
+    }
+
+    /** Draws the clip over [source] without baking it into a held still. */
+    private fun drawAr(source: GlTarget, plan: StagePlan, texture: Int, matrix: FloatArray): GlTarget {
+        if (!plan.arOn || texture == 0 || plan.arOpacity <= 0f) return source
+        val into = if (source === live || source === workA || source === workB) {
+            source
+        } else {
+            other(source).also { copy(source, it) }
+        }
+        into.bind()
+        GLES20.glEnable(GLES20.GL_BLEND)
+        GLES20.glBlendFunc(GLES20.GL_ONE, GLES20.GL_ONE_MINUS_SRC_ALPHA)
+        drawCamera(texture, matrix, 0f, plan.arOpacity)
+        GLES20.glDisable(GLES20.GL_BLEND)
+        return into
     }
 
     private fun drawOverlay(texture: Int, matrix: FloatArray) {
@@ -685,6 +712,8 @@ internal class StagePainter {
     }
 
     private companion object {
+        val NO_AR = FloatArray(16)
+
         const val QUAD_FLOATS = 8
         const val TILT_FLOATS = 16
         const val OUTLINE_FLOATS = 8

@@ -81,6 +81,35 @@ internal object EffectFolders {
         ),
     )
 
+    /** A local clip, looped with no player chrome, drawn over the live selfie. */
+    fun arVideoDeck() = PanelFolder(
+        id = "ar_video_deck",
+        title = "📁 AR Video Deck",
+        tag = null,
+        kind = FolderKind.EFFECTS,
+        items = listOf(
+            ActionItem(
+                PanelAction.AR_PICK_CLIP,
+                "Pick a video",
+                "Opens the phone's file picker for one video. The app does not scan the library.",
+            ),
+            ToggleItem(FxKeys.AR_ON, "Play", "Show the looping clip over the live selfie.", false, isTest = false),
+            ToggleItem(FxKeys.AR_LOOP, "Loop", "Repeat the current clip with no gap.", true, isTest = false),
+            NumberItem(
+                FxKeys.AR_OPACITY,
+                "Opacity",
+                "How solid the clip is. 0 is clear. 100 covers the selfie.",
+                100,
+            ),
+            TextItem(FxKeys.AR_CLIP, "Clip id", "Filled when you pick a video. Phone 2 can send this short id.", "", 32),
+        ),
+        notes = listOf(
+            "The clip plays inside OFFGRID. There is no player chrome.",
+            "The live selfie stays underneath. Opacity sets how solid the clip is.",
+            "Bigo's screen share shows this picture. OFFGRID does not capture the screen.",
+        ),
+    )
+
     // ---- 📁 Camera: the no-face modes (features 9 to 12, 34) ----
 
     fun camera() = PanelFolder(

@@ -46,7 +46,11 @@ internal class EffectsController(
         set(value) {
             field = value
             pushReplay()
+            pushDeck()
         }
+
+    /** Clips picked on this phone. The painter uses this same list. */
+    internal val deckCatalog = ArDeckCatalog()
 
     /** The last recorded video, for Save last video to gallery. */
     var lastVideo: () -> File? = { null }
@@ -74,6 +78,9 @@ internal class EffectsController(
     private var inkCount = 0
 
     fun start() {
+        val savedClip = panel.store.text(FxKeys.AR_CLIP)
+        val savedUri = panel.store.text(ArDeckCatalog.URI_PREF)
+        if (savedClip.isNotBlank()) deckCatalog.restore(savedClip, savedUri)
         refresh()
         panel.onSettingChanged = { refresh() }
         panel.onToggled = { key, on -> toggled(key, on) }
@@ -90,12 +97,14 @@ internal class EffectsController(
         main.removeCallbacks(radarPing)
         chained?.let { main.removeCallbacks(it) }
         chained = null
+        processor?.setDeckForeground(false)
     }
 
     fun resume() {
         val s = engine.settings
         main.removeCallbacks(radarPing)
         if (s.on(FxKeys.RADAR_ON) || s.on(FxKeys.MIRROR_ON)) main.postDelayed(radarPing, radarTurnMs())
+        processor?.setDeckForeground(true)
     }
 
     /** Reads every effect setting from the panel again and hands it to the effects. */
@@ -105,6 +114,7 @@ internal class EffectsController(
         engine.panelColor = panel.glowColor
         val now = engine.settings
         pushReplay()
+        pushDeck()
         val radar = now.on(FxKeys.RADAR_ON) || now.on(FxKeys.MIRROR_ON)
         val radarBefore = before.on(FxKeys.RADAR_ON) || before.on(FxKeys.MIRROR_ON)
         if (radar && !radarBefore) {
@@ -120,6 +130,37 @@ internal class EffectsController(
     private fun pushReplay() {
         val s = engine.settings
         processor?.setReplay(s.on(FxKeys.REPLAY_ON), s.raw(FxKeys.REPLAY_SECONDS).coerceAtLeast(MIN_REPLAY_SECONDS))
+    }
+
+    private fun pushDeck() {
+        val s = engine.settings
+        processor?.applyDeck(s.on(FxKeys.AR_ON), s.on(FxKeys.AR_LOOP), s.text(FxKeys.AR_CLIP))
+    }
+
+    /** A video chosen with the system file picker. The id is what Phone 2 sends. */
+    fun addArClip(name: String, uri: String) {
+        if (!ArDeckCatalog.isLocal(uri)) return
+        val clip = deckCatalog.add(name, uri)
+        panel.store.setText(FxKeys.AR_CLIP, clip.id)
+        panel.store.setText(ArDeckCatalog.URI_PREF, clip.uri)
+        panel.store.setToggle(FxKeys.AR_ON, true)
+        refresh()
+    }
+
+    /** Phone 2: play, pause, or skip, on the existing remote channel. */
+    fun arRemote(action: String) {
+        when (action) {
+            ArDeckCatalog.PLAY -> panel.store.setToggle(FxKeys.AR_ON, true)
+            ArDeckCatalog.PAUSE -> panel.store.setToggle(FxKeys.AR_ON, false)
+            ArDeckCatalog.NEXT -> {
+                val clip = deckCatalog.next() ?: return
+                panel.store.setText(FxKeys.AR_CLIP, clip.id)
+                panel.store.setText(ArDeckCatalog.URI_PREF, clip.uri)
+                panel.store.setToggle(FxKeys.AR_ON, true)
+            }
+            else -> return
+        }
+        refresh()
     }
 
     private fun radarTurnMs(): Long {

@@ -25,8 +25,18 @@ data class RemoteMessage(val key: String, val type: String, val value: String) {
 
     companion object {
         private const val MAX_FIELD_LENGTH = 256
-        private val FIRE_ACTIONS =
-            setOf("shatter", "freeze", "quiet", "fireworks", "red_sweep", "laser_writing")
+        val FIRE_ACTIONS =
+            setOf(
+                "shatter",
+                "freeze",
+                "quiet",
+                "fireworks",
+                "red_sweep",
+                "laser_writing",
+                "ar_play",
+                "ar_pause",
+                "ar_next",
+            )
 
         fun decode(encoded: ByteArray): RemoteMessage {
             require(encoded.size <= MAX_FRAME_SIZE)
