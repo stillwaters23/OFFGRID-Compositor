@@ -118,10 +118,22 @@ class StagePlan {
         get() = mode == FxKeys.MODE_CLOAK || (modeMix < 1f && previousMode == FxKeys.MODE_CLOAK) ||
             (shatterId != 0L && shatterBehind == FxKeys.BEHIND_VOID)
 
+    /** AR Video Deck: a looping clip drawn over the selfie. Off leaves the camera alone. */
+    var arOn = false
+        private set
+    var arLoop = true
+        private set
+
+    /** How solid the clip is, 0 to 1. The selfie stays underneath. */
+    var arOpacity = 1f
+        private set
+    var arClip = ""
+        private set
+
     /** True when the camera picture goes out exactly as it came in, with nothing done to it. */
     val plain: Boolean
         get() = !mirror && holdId == 0L && brightness >= 1f && mode == FxKeys.MODE_LIVE && modeMix >= 1f &&
-            !echoOn && !takeoverOn && depth <= 0f && depthFrame <= 0f && shatterId == 0L && !bodyOn
+            !echoOn && !takeoverOn && depth <= 0f && depthFrame <= 0f && shatterId == 0L && !bodyOn && !arOn
 
     /**
      * Works out the plan for the picture at [time]. [face] is where the camera sees the face
@@ -142,7 +154,15 @@ class StagePlan {
         planTakeover(settings, face)
         planDepth(time, settings, fired)
         planShatter(time, settings, fired)
+        planAr(settings)
         return this
+    }
+
+    private fun planAr(s: EffectSnapshot) {
+        arOn = s.on(FxKeys.AR_ON)
+        arLoop = s.on(FxKeys.AR_LOOP, true)
+        arOpacity = s.value(FxKeys.AR_OPACITY)
+        arClip = s.text(FxKeys.AR_CLIP)
     }
 
     private fun planMode(time: Float, s: EffectSnapshot, changedAt: Float, before: String) {

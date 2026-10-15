@@ -99,6 +99,9 @@ internal enum class PanelAction {
     REMOTE_OPEN_PREVIEW,
     LIVE_SEND_TO_PC,
     OPEN_EFFECT_LINK,
+
+    /** Opens the system file picker for one local AR clip. No library permission. */
+    AR_PICK_CLIP,
 }
 
 /** Final build: the saved looks (theme, colors, glow, cursor, toggle style, size), with save, load, rename, delete. */
@@ -229,6 +232,7 @@ internal object PanelTree {
         val top = listOf(
             settingsFolder(),
             EffectFolders.camera(),
+            EffectFolders.arVideoDeck(),
             EffectFolders.microphone(),
             EffectFolders.effects(),
             EffectFolders.record(),

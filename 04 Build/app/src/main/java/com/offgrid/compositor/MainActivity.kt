@@ -237,7 +237,12 @@ class MainActivity : AppCompatActivity() {
 
     internal fun ensureProcessor(): CompositorProcessor {
         processor?.let { return it }
-        val created = CompositorProcessor(effects.engine, EffectLayers.all())
+        val created = CompositorProcessor(
+            effects.engine,
+            EffectLayers.all(),
+            applicationContext,
+            effects.deckCatalog,
+        )
         created.useMasks(masks)
         created.onFirstFrame = {
             created.inputSize?.let { size ->

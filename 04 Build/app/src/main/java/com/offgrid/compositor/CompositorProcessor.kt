@@ -1,5 +1,6 @@
 package com.offgrid.compositor
 
+import android.content.Context
 import android.graphics.SurfaceTexture
 import android.opengl.EGL14
 import android.opengl.EGLExt
@@ -32,9 +33,11 @@ import java.util.concurrent.atomic.AtomicBoolean
  * drawn effects from [layers] go on top. Both follow [engine]. The same finished picture
  * goes to the screen and the video, so what Royalty sees is what viewers get.
  */
-class CompositorProcessor(
+class CompositorProcessor internal constructor(
     private val engine: EffectEngine = EffectEngine(),
     private val layers: List<OverlayLayer> = emptyList(),
+    private val appContext: Context? = null,
+    private val deckCatalog: ArDeckCatalog = ArDeckCatalog(),
 ) : SurfaceProcessor, SurfaceTexture.OnFrameAvailableListener {
     val effectList = EffectList()
 
@@ -163,6 +166,13 @@ class CompositorProcessor(
 
     private var inputTexture: SurfaceTexture? = null
     internal var inputTextureId = 0
+    private var arDeck: ArDeckSurface? = null
+    private var arPlayer: ArDeckPlayer? = null
+    private var deckOn = false
+    private var deckLoop = true
+    private var deckClip = ""
+    private var deckForeground = true
+    private var playingUri = ""
     internal val textureTransform = FloatArray(16)
     internal val updatedTransform = FloatArray(16)
     private val outputs = mutableListOf<OutputSlot>()
@@ -255,7 +265,27 @@ class CompositorProcessor(
             Log.e(TAG, "Picture frame failed", error)
             return
         }
-        val stamp = surfaceTexture.timestamp
+        presentCamera(surfaceTexture.timestamp)
+    }
+
+    /** A new clip frame. Sampled on this drawing thread, then the stage is drawn again. */
+    private fun onArFrame(surfaceTexture: SurfaceTexture) {
+        val deck = arDeck ?: return
+        if (released || surfaceTexture !== deck.surfaceTexture) return
+        try {
+            deck.updateTexImage()
+        } catch (error: RuntimeException) {
+            Log.e(TAG, "AR frame failed", error)
+            return
+        }
+        if (cameraOff) {
+            drawDark()
+            return
+        }
+        presentCamera(surfaceTexture.timestamp)
+    }
+
+    private fun presentCamera(stamp: Long) {
         val snapshot = outputs.toList()
         val painted = paintStage(snapshot)
         for (slot in snapshot) {
@@ -299,7 +329,7 @@ class CompositorProcessor(
         val fxActive = !plan.plain || engine.ink().isNotEmpty() || engine.firedNow().any { engine.now() - it.at < 15f } ||
             listOf(FxKeys.EMOJI_ON, FxKeys.INK_ON, FxKeys.BORDER_ON, FxKeys.PORTAL_ON, FxKeys.HEROES_ON,
                 FxKeys.COASTER_ON, FxKeys.CLOUDS_ON, FxKeys.BEACH_ON, FxKeys.ILLUSION_ON, FxKeys.RADAR_ON,
-                FxKeys.ECHO_ON, FxKeys.MIRROR_ON, FxKeys.TAKEOVER_ON).any { s.on(it) }
+                FxKeys.ECHO_ON, FxKeys.MIRROR_ON, FxKeys.TAKEOVER_ON, FxKeys.AR_ON).any { s.on(it) }
         if (micActive || fxActive) return null
         return when (s.choice(FxKeys.AUTO_CURTAIN_MODE)) {
             FxKeys.CURTAIN_WHITE -> 0xFFFFFFFF.toInt()
@@ -486,6 +516,8 @@ class CompositorProcessor(
                 overlayTexture = if (drawn) overlay?.texture ?: 0 else 0,
                 overlayMatrix = overlay?.matrix ?: updatedTransform,
                 mask = mask,
+                arTexture = arTextureId(),
+                arMatrix = arMatrix(),
             )
         } catch (error: RuntimeException) {
             Log.e(TAG, "Effects stage failed", error)
@@ -570,6 +602,8 @@ class CompositorProcessor(
                 time = time,
                 overlayTexture = if (drawn) overlay?.texture ?: 0 else 0,
                 overlayMatrix = overlay?.matrix ?: IDENTITY,
+                arTexture = arTextureId(),
+                arMatrix = arMatrix(),
             )
         } catch (error: RuntimeException) {
             Log.e(TAG, "Effects stage failed", error)
@@ -680,7 +714,82 @@ class CompositorProcessor(
             stage = null
             effectsFailed()
         }
+        startArDeck()
         ready = true
+    }
+
+    /** Second external texture, same handler as the camera, for the looping clip. */
+    private fun startArDeck() {
+        val ctx = appContext ?: return
+        try {
+            val textureId = createExternalTexture()
+            val texture = SurfaceTexture(textureId)
+            val deck = ArDeckSurface(textureId, texture)
+            texture.setOnFrameAvailableListener({ onArFrame(it) }, handler)
+            arDeck = deck
+            val player = ArDeckPlayer(ctx, handler)
+            arPlayer = player
+            player.attachSurface(deck.surface)
+            player.setLoop(deckLoop)
+            if (deckOn) playResolved(deckClip)
+        } catch (error: RuntimeException) {
+            Log.e(TAG, "AR deck could not start", error)
+        }
+    }
+
+    /**
+     * Follows the panel: play, pause, loop, and which clip. Any thread.
+     * The player swaps the clip without rebuilding the GL texture.
+     */
+    internal fun applyDeck(on: Boolean, loop: Boolean, clipId: String) {
+        executor.execute {
+            if (released) return@execute
+            deckOn = on
+            if (loop != deckLoop) {
+                deckLoop = loop
+                arPlayer?.setLoop(loop)
+            }
+            if (clipId != deckClip) {
+                deckClip = clipId
+                playingUri = ""
+            }
+            if (deckForeground && on) playResolved(clipId) else arPlayer?.pause()
+        }
+    }
+
+    /** Pauses the clip while the app is in the background, without changing the panel toggle. */
+    internal fun setDeckForeground(foreground: Boolean) {
+        executor.execute {
+            if (released) return@execute
+            deckForeground = foreground
+            if (foreground && deckOn) arPlayer?.resume() else arPlayer?.pause()
+        }
+    }
+
+    private fun playResolved(clipId: String) {
+        val uri = deckCatalog.resolve(clipId) ?: return
+        val player = arPlayer ?: return
+        if (uri != playingUri) {
+            playingUri = uri
+            player.playUri(uri)
+        } else {
+            player.resume()
+        }
+    }
+
+    private fun arTextureId(): Int = arDeck?.takeIf { it.hasFrame }?.textureId ?: 0
+
+    private fun arMatrix(): FloatArray = arDeck?.texMatrix ?: IDENTITY
+
+    private fun releaseArDeck() {
+        arPlayer?.releaseAndJoin()
+        arPlayer = null
+        val deck = arDeck
+        arDeck = null
+        if (deck != null) {
+            deck.releaseGl()
+            deleteTexture(deck.textureId)
+        }
     }
 
     private fun releaseOnThread() {
@@ -710,6 +819,7 @@ class CompositorProcessor(
             endRecorder()
             blackCamera?.release()
             blackCamera = null
+            releaseArDeck()
             if (darkScreen != EGL14.EGL_NO_SURFACE) {
                 EGL14.eglDestroySurface(display, darkScreen)
                 darkScreen = EGL14.EGL_NO_SURFACE

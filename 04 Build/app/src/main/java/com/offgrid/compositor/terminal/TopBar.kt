@@ -117,10 +117,25 @@ internal class TopBar(
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val available = MeasureSpec.getSize(widthMeasureSpec)
+        // Prefer a slightly wider W/H box, but keep the title on a narrow phone.
+        val paddingH = paddingLeft + paddingRight
+        val gaps = sideGap * 7
+        val fixedControls = controlWidth * 5
+        val roomForTitleAndBoxes = available - paddingH - gaps - fixedControls
+        val box = minOf(sizeBoxWidth, maxOf(controlWidth, (roomForTitleAndBoxes - 1) / 2))
+        resizeBox(widthControl, box)
+        resizeBox(heightControl, box)
         widthControl.visibility = VISIBLE
         heightControl.visibility = VISIBLE
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
         laidOutWidth = available
+    }
+
+    private fun resizeBox(view: View, width: Int) {
+        val params = view.layoutParams ?: return
+        if (params.width == width) return
+        params.width = width
+        view.layoutParams = params
     }
 
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
