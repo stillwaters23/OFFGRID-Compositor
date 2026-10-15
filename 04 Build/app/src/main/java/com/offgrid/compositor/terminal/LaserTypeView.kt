@@ -2,6 +2,7 @@ package com.offgrid.compositor.terminal
 
 import android.animation.ValueAnimator
 import android.content.Context
+import android.content.res.ColorStateList
 import android.graphics.Bitmap
 import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
@@ -115,6 +116,19 @@ internal class LaserTypeView(context: Context) : AppCompatTextView(context) {
         typeface = Hud.mono(context)
         setLineSpacing(0f, 1.12f)
         setOnClickListener { finishNow() }
+    }
+
+    /** Theme color changes must redraw laser glow immediately, not wait for a retype. */
+    override fun setTextColor(color: Int) {
+        super.setTextColor(color)
+        dropGlowCache()
+        invalidate()
+    }
+
+    override fun setTextColor(colors: ColorStateList?) {
+        super.setTextColor(colors)
+        dropGlowCache()
+        invalidate()
     }
 
     /** Types [text] letter by letter. */

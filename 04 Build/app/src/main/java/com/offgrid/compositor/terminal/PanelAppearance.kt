@@ -80,6 +80,7 @@ internal fun TerminalPanel.styleTyper(typer: LaserTypeView, color: Int, baseSp: 
     typer.glowBoost = current.glowBoost
     typer.speed = current.lettersPerSecond
     typer.animateTyping = current.laserTyping
+    typer.invalidate()
 }
 
 internal fun TerminalPanel.styleGuidance(typer: LaserTypeView) {

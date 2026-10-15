@@ -109,7 +109,8 @@ internal class StagePainter {
             return live
         }
 
-        // 1. The camera, mirrored for mirror plus scan.
+        // 1. The camera: selfie-mirrored in display space after the CameraX transform.
+        // Mirror-plus-scan already presents a mirrored feed, so it passes flipX = 0.
         live.bind()
         drawCamera(cameraTexture, cameraMatrix, if (plan.mirror) 0f else 1f)
         live.filled = true

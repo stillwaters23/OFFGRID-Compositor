@@ -110,6 +110,10 @@ class PanelUiTest {
                 val boxesVisible = (bar.widthInput.parent as View).visibility == View.VISIBLE &&
                     (bar.heightInput.parent as View).visibility == View.VISIBLE
                 assertTrue(boxesVisible)
+                assertEquals(View.VISIBLE, bar.widthInput.visibility)
+                assertEquals(View.VISIBLE, bar.heightInput.visibility)
+                assertEquals(View.GONE, bar.widthReel.visibility)
+                assertEquals(View.GONE, bar.heightReel.visibility)
             }
         }
     }
@@ -260,6 +264,25 @@ class PanelUiTest {
         assertEquals(0xFF000000.toInt(), store.color(ColorPart.TEXT))
         assertEquals(0xFF000000.toInt(), store.color(ColorPart.STATUS))
         assertEquals(ThemeMode.DAY, ThemeStore(context, PanelPrefs(context)).themeMode())
+    }
+
+    @Test
+    fun customTypewriterTextColorOverridesSystemDayNightAndLook() {
+        val store = ThemeStore(context, PanelPrefs(context))
+        store.setThemeMode(ThemeMode.NIGHT)
+        assertEquals(0xFFFFFFFF.toInt(), store.color(ColorPart.TEXT))
+
+        val neon = 0xFF39FF14.toInt()
+        store.setCustom(ColorPart.TEXT, neon, RainbowMix.split(neon))
+        assertEquals(neon or 0xFF000000.toInt(), store.color(ColorPart.TEXT))
+        assertEquals(neon or 0xFF000000.toInt(), store.look().text)
+
+        // Status stays on system day/night until its own swatch is customized.
+        assertEquals(0xFFFFFFFF.toInt(), store.color(ColorPart.STATUS))
+
+        val statusNeon = 0xFFFF00FF.toInt()
+        store.setCustom(ColorPart.STATUS, statusNeon, RainbowMix.split(statusNeon))
+        assertEquals(statusNeon or 0xFF000000.toInt(), store.look().status)
     }
 
     @Test

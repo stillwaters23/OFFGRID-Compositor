@@ -51,6 +51,7 @@ internal class TopBar(
     private var laidOutWidth = 0
     private val sideGap = Hud.dpi(context, 8f)
     private val controlWidth = Hud.dpi(context, 40f)
+    private val sizeBoxWidth = Hud.dpi(context, 48f)
 
     init {
         orientation = HORIZONTAL
@@ -88,13 +89,13 @@ internal class TopBar(
         widthCaption = dimensionCaption(context, "W")
         widthPlate = dimensionPlate(context)
         widthControl = dimensionControl(context, widthCaption, widthPlate, widthReel, widthInput)
-        addControl(widthControl, controlWidth)
+        addControl(widthControl, sizeBoxWidth)
         heightInput = dimensionInput(context, "Height", height) { onDimensionChanged(LookKeys.HEIGHT, it) }
         heightReel = sizeReel(context, "Height", height, LookKeys.HEIGHT)
         heightCaption = dimensionCaption(context, "H")
         heightPlate = dimensionPlate(context)
         heightControl = dimensionControl(context, heightCaption, heightPlate, heightReel, heightInput)
-        addControl(heightControl, controlWidth)
+        addControl(heightControl, sizeBoxWidth)
 
         moreButton = MoreButton(context).apply {
             contentDescription = context.getString(R.string.terminal_menu_button)
@@ -196,6 +197,7 @@ internal class TopBar(
         setTextColor(Hud.WHITE)
         gravity = Gravity.CENTER
         inputType = InputType.TYPE_CLASS_NUMBER
+        imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_DONE
         filters = arrayOf(InputFilter.LengthFilter(3))
         maxLines = 1
         contentDescription = label
@@ -227,7 +229,7 @@ internal class TopBar(
         setTextColor(Hud.WHITE)
         gravity = Gravity.CENTER
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
-        visibility = INVISIBLE
+        visibility = VISIBLE
     }
 
     private fun dimensionPlate(context: Context) = GradientDrawable().apply {
@@ -257,13 +259,40 @@ internal class TopBar(
         reel: DrumReelView,
         field: EditText,
     ) = FrameLayout(context).apply {
+        // Compact tap-to-type W / H boxes on the header. Laser scroll reels stay in settings folders only.
         clipChildren = false
         val inset = Hud.dpi(context, 2f)
         background = InsetDrawable(plate, inset, inset, inset, inset)
-        addView(reel, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
-        addView(caption, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP))
-        field.visibility = GONE
-        addView(field, FrameLayout.LayoutParams(1, 1))
+        reel.visibility = GONE
+        addView(reel, FrameLayout.LayoutParams(1, 1))
+        caption.visibility = VISIBLE
+        addView(
+            caption,
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.TOP or Gravity.CENTER_HORIZONTAL,
+            ),
+        )
+        field.visibility = VISIBLE
+        field.isFocusable = true
+        field.isFocusableInTouchMode = true
+        addView(
+            field,
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            ).apply {
+                topMargin = Hud.dpi(context, 11f)
+                bottomMargin = Hud.dpi(context, 1f)
+            },
+        )
+        setOnClickListener {
+            field.requestFocus()
+            val imm = context.getSystemService(android.content.Context.INPUT_METHOD_SERVICE)
+                as? android.view.inputmethod.InputMethodManager
+            imm?.showSoftInput(field, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+        }
     }
 
     private companion object {
