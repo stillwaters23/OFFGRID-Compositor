@@ -45,8 +45,14 @@ class RemotePreviewActivity : Activity(), SurfaceHolder.Callback {
             dp(240),
         ).apply { topMargin = dp(16) })
         root.addView(button("Find camera phone") { findCamera() }, marginTop(8))
+        root.addView(button("Auto Blackout Gate on / off") { toggle("fx.live.curtain.on", true) }, marginTop(8))
+        root.addView(button("Idle Color: Black") { sendSetting("fx.live.curtain.mode", "black") }, marginTop(8))
+        root.addView(button("Idle Color: White") { sendSetting("fx.live.curtain.mode", "white") }, marginTop(8))
         root.addView(button("Camera on / off") { toggle("fx.cam.on", true) }, marginTop(8))
         root.addView(button("Mic on / off") { toggle("fx.mic.on", false) }, marginTop(8))
+        for ((key, title) in EFFECT_TOGGLES) {
+            root.addView(button("Effect: $title") { toggle(key, false) }, marginTop(8))
+        }
         for (mode in CAMERA_MODES) {
             root.addView(button("Camera mode: $mode") {
                 sendSetting("fx.camera.mode", mode)
@@ -182,6 +188,17 @@ class RemotePreviewActivity : Activity(), SurfaceHolder.Callback {
     private companion object {
         const val WHITE = 0xfff4f4f4.toInt()
         const val UV = 0xff9b5cff.toInt()
+        val EFFECT_TOGGLES = listOf(
+            "fx.coaster.on" to "Roller Coaster",
+            "fx.heroes.on" to "Flying Heroes",
+            "fx.portal.on" to "Portal",
+            "fx.clouds.on" to "Clouds",
+            "fx.beach.on" to "Beach",
+            "fx.emoji.on" to "Emoji Rain",
+            "fx.radar.on" to "Radar Sweep",
+            "fx.illusion.on" to "Optical Illusion",
+            "fx.border.on" to "Glow Border",
+        )
         val CAMERA_MODES = listOf("live", "blackout", "cloak", "status", "ghost")
         val FIRE_ACTIONS = listOf("shatter", "freeze", "quiet", "fireworks", "red_sweep", "laser_writing")
     }

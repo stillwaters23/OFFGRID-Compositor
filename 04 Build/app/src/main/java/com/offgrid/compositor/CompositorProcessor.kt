@@ -292,20 +292,42 @@ class CompositorProcessor(
      * Draws one finished picture into [target]: the stage picture, or the plain camera when no
      * effect changes it, then the old effect list and the test diamond. Returns false if the target could not be used.
      */
+    internal fun idleCurtainColor(): Int? {
+        val s = engine.settings
+        if (!s.on(FxKeys.AUTO_CURTAIN_ON, true) || testShapeOn) return null
+        val micActive = s.on(FxKeys.MIC_ON) && !s.on(FxKeys.MIC_BLOCKED)
+        val fxActive = !plan.plain || engine.ink().isNotEmpty() || engine.firedNow().any { engine.now() - it.at < 15f } ||
+            listOf(FxKeys.EMOJI_ON, FxKeys.INK_ON, FxKeys.BORDER_ON, FxKeys.PORTAL_ON, FxKeys.HEROES_ON,
+                FxKeys.COASTER_ON, FxKeys.CLOUDS_ON, FxKeys.BEACH_ON, FxKeys.ILLUSION_ON, FxKeys.RADAR_ON,
+                FxKeys.ECHO_ON, FxKeys.MIRROR_ON, FxKeys.TAKEOVER_ON).any { s.on(it) }
+        if (micActive || fxActive) return null
+        return when (s.choice(FxKeys.AUTO_CURTAIN_MODE)) {
+            FxKeys.CURTAIN_WHITE -> 0xFFFFFFFF.toInt()
+            FxKeys.CURTAIN_CUSTOM -> runCatching { android.graphics.Color.parseColor(s.text(FxKeys.AUTO_CURTAIN_HEX).trim()) }.getOrDefault(0xFF000000.toInt())
+            else -> 0xFF000000.toInt()
+        }
+    }
+
     private fun drawFinal(target: android.opengl.EGLSurface, w: Int, h: Int, stamp: Long, painted: GlTarget?, camera: OutputSlot?): Boolean {
         if (!EGL14.eglMakeCurrent(display, target, target, context)) {
             return false
         }
+        val curtain = idleCurtainColor()
+        val cr = if (curtain != null) ((curtain shr 16) and 0xFF) / 255f else 0f
+        val cg = if (curtain != null) ((curtain shr 8) and 0xFF) / 255f else 0f
+        val cb = if (curtain != null) (curtain and 0xFF) / 255f else 0f
         GLES20.glViewport(0, 0, w, h)
-        GLES20.glClearColor(0f, 0f, 0f, 1f)
+        GLES20.glClearColor(cr, cg, cb, 1f)
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
         val painter = drawer ?: return true
         val staged = stage
-        if (painted != null && staged != null) {
-            staged.present(painted, w, h)
-        } else if (camera != null && inputTextureId != 0 && !coverFace) {
-            camera.surfaceOutput.updateTransformMatrix(updatedTransform, textureTransform)
-            painter.drawCamera(inputTextureId, updatedTransform)
+        if (curtain == null) {
+            if (painted != null && staged != null) {
+                staged.present(painted, w, h)
+            } else if (camera != null && inputTextureId != 0 && !coverFace) {
+                camera.surfaceOutput.updateTransformMatrix(updatedTransform, textureTransform)
+                painter.drawCamera(inputTextureId, updatedTransform)
+            }
         }
         GLES20.glEnable(GLES20.GL_BLEND)
         GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)

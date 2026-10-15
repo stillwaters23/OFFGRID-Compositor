@@ -21,6 +21,18 @@ internal object EffectFolders {
         tag = null,
         kind = FolderKind.EFFECTS,
         items = listOf(
+            ToggleItem(FxKeys.AUTO_CURTAIN_ON, "Auto blackout when idle", "Turns the stream solid black, white, or your color when no effect or mic is on.", true, isTest = false),
+            ChoiceItem(
+                FxKeys.AUTO_CURTAIN_MODE,
+                "Idle screen color",
+                listOf(
+                    Choice(FxKeys.CURTAIN_BLACK, "Solid black", "Pure black screen when idle."),
+                    Choice(FxKeys.CURTAIN_WHITE, "Solid white", "Pure white screen when idle."),
+                    Choice(FxKeys.CURTAIN_CUSTOM, "Custom color", "Uses the hex color below."),
+                ),
+                FxKeys.CURTAIN_BLACK,
+            ),
+            TextItem(FxKeys.AUTO_CURTAIN_HEX, "Idle color hex", "Type a 6-character color like #000000 or #FFFFFF.", "#000000", 7),
             ToggleItem(FxKeys.LIVE_OVERLAY, "Floating overlay", "Show the small OFFGRID controls above other apps.", false, isTest = false),
             ActionItem(PanelAction.LIVE_OPEN_OVERLAY_SETTINGS, "Overlay settings", "Allow OFFGRID to draw its small controls over other apps."),
             ActionItem(PanelAction.LIVE_CLEAN_OUTPUT, "Clean screen share", "Hide the record bar and shrink the panel to its bubble."),

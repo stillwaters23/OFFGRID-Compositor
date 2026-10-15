@@ -29,10 +29,10 @@ class CompositorDrawer {
     )
     private val quadTexCoords: FloatBuffer = floatBuffer(
         floatArrayOf(
-            0f, 0f,
             1f, 0f,
-            0f, 1f,
+            0f, 0f,
             1f, 1f,
+            0f, 1f,
         ),
     )
     private val outlineDiamond: FloatBuffer = diamond(0.40f, 0.70f, -0.04f)

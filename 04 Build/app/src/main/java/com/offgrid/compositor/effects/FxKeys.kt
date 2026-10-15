@@ -21,6 +21,12 @@ object FxKeys {
     const val LIVE_PC_PORT = "fx.live.pc.port"
     const val LIVE_PC_RES = "fx.live.pc.res"
     const val LIVE_PC_BITRATE = "fx.live.pc.bitrate"
+    const val AUTO_CURTAIN_ON = "fx.live.curtain.on"
+    const val AUTO_CURTAIN_MODE = "fx.live.curtain.mode"
+    const val AUTO_CURTAIN_HEX = "fx.live.curtain.hex"
+    const val CURTAIN_BLACK = "black"
+    const val CURTAIN_WHITE = "white"
+    const val CURTAIN_CUSTOM = "custom"
 
     const val CAMERA_ON = "fx.cam.on"
     const val MIC_ON = "fx.mic.on"

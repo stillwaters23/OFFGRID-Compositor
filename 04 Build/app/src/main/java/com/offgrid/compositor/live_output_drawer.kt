@@ -53,15 +53,21 @@ internal class LiveOutputDrawer {
             if (!EGL14.eglMakeCurrent(processor.display, slot.eglSurface, slot.eglSurface, processor.context)) {
                 continue
             }
+            val curtain = processor.idleCurtainColor()
+            val cr = if (curtain != null) ((curtain shr 16) and 0xFF) / 255f else 0f
+            val cg = if (curtain != null) ((curtain shr 8) and 0xFF) / 255f else 0f
+            val cb = if (curtain != null) (curtain and 0xFF) / 255f else 0f
             GLES20.glViewport(0, 0, slot.width, slot.height)
-            GLES20.glClearColor(0f, 0f, 0f, 1f)
+            GLES20.glClearColor(cr, cg, cb, 1f)
             GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
             val stage = processor.stage
-            if (painted != null && stage != null) {
-                stage.present(painted, slot.width, slot.height)
-            } else if (!processor.coverFace && main != null && processor.drawer != null) {
-                main.updateTransformMatrix(processor.updatedTransform, processor.textureTransform)
-                processor.drawer?.drawCamera(processor.inputTextureId, processor.updatedTransform)
+            if (curtain == null) {
+                if (painted != null && stage != null) {
+                    stage.present(painted, slot.width, slot.height)
+                } else if (!processor.coverFace && main != null && processor.drawer != null) {
+                    main.updateTransformMatrix(processor.updatedTransform, processor.textureTransform)
+                    processor.drawer?.drawCamera(processor.inputTextureId, processor.updatedTransform)
+                }
             }
             GLES20.glEnable(GLES20.GL_BLEND)
             GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)

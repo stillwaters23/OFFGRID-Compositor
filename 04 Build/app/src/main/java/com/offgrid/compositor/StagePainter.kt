@@ -111,7 +111,7 @@ internal class StagePainter {
 
         // 1. The camera, mirrored for mirror plus scan.
         live.bind()
-        drawCamera(cameraTexture, cameraMatrix, if (plan.mirror) 1f else 0f)
+        drawCamera(cameraTexture, cameraMatrix, if (plan.mirror) 0f else 1f)
         live.filled = true
         var source = live
 
