@@ -3,7 +3,6 @@ package com.offgrid.live
 import android.content.Context
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
-import android.net.wifi.WifiManager
 import android.net.wifi.p2p.WifiP2pConfig
 import android.net.wifi.p2p.WifiP2pManager
 import java.net.Inet4Address
@@ -33,15 +32,21 @@ object LocalAddressPolicy {
             ?: throw IllegalStateException("No private Wi-Fi address is available")
 }
 
+/**
+ * Finds and advertises the camera phone on the local Wi-Fi with platform NSD (mDNS).
+ *
+ * Phase 0.4: no multicast lock. The system's own mDNS stack answers service discovery, so the
+ * app never needs CHANGE_WIFI_MULTICAST_STATE, which the CI allowlist bans. When discovery
+ * still fails on a network, the remote phone types the camera phone's address instead
+ * ([ManualAddress]).
+ */
 class RemoteServiceDiscovery(
     context: Context,
     private val onFailure: (String) -> Unit,
 ) {
     private val manager = context.getSystemService(NsdManager::class.java)
-    private val wifiManager = context.getSystemService(WifiManager::class.java)
     private var registration: NsdManager.RegistrationListener? = null
     private var discovery: NsdManager.DiscoveryListener? = null
-    private var multicastLock: WifiManager.MulticastLock? = null
 
     fun advertise(port: Int) {
         require(port in 1..65535)
@@ -84,27 +89,15 @@ class RemoteServiceDiscovery(
 
     fun discover(onFound: (InetSocketAddress) -> Unit) {
         stopDiscovery()
-        try {
-            multicastLock = wifiManager.createMulticastLock("offgrid-remote-discovery").apply {
-                setReferenceCounted(false)
-                acquire()
-            }
-        } catch (error: SecurityException) {
-            releaseMulticastLock()
-            onFailure("Local network permission is missing.")
-            return
-        }
         val listener = object : NsdManager.DiscoveryListener {
             override fun onDiscoveryStarted(serviceType: String) = Unit
             override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) {
-                onFailure("Could not search this Wi-Fi network.")
+                onFailure(SEARCH_FAILED)
                 discovery = null
-                releaseMulticastLock()
             }
             override fun onStopDiscoveryFailed(serviceType: String, errorCode: Int) {
                 onFailure("Could not stop local remote discovery.")
                 discovery = null
-                releaseMulticastLock()
             }
             override fun onDiscoveryStopped(serviceType: String) = Unit
             override fun onServiceLost(serviceInfo: NsdServiceInfo) = Unit
@@ -128,8 +121,7 @@ class RemoteServiceDiscovery(
             manager.discoverServices(SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, listener)
         } catch (error: SecurityException) {
             discovery = null
-            releaseMulticastLock()
-            onFailure("Local network permission is missing.")
+            onFailure(SEARCH_FAILED)
         }
     }
 
@@ -142,17 +134,12 @@ class RemoteServiceDiscovery(
             }
         }
         discovery = null
-        releaseMulticastLock()
-    }
-
-    private fun releaseMulticastLock() {
-        multicastLock?.let { if (it.isHeld) it.release() }
-        multicastLock = null
     }
 
     companion object {
         const val SERVICE_TYPE = "_offgrid._tcp."
         const val SERVICE_NAME = "OFFGRID Remote"
+        const val SEARCH_FAILED = "Could not search this Wi-Fi network. Type the camera phone's address instead."
     }
 }
 

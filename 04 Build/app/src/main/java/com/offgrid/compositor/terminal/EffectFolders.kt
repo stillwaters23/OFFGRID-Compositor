@@ -46,8 +46,8 @@ internal object EffectFolders {
                 ),
                 FxKeys.REMOTE_ROLE_OFF,
             ),
-            ActionItem(PanelAction.REMOTE_OPEN_PAIRING, "Pairing", "Make, paste, forget, or replace a secure local key."),
-            ActionItem(PanelAction.REMOTE_OPEN_PREVIEW, "Remote preview", "Connect to the camera phone on this Wi-Fi network."),
+            ActionItem(PanelAction.REMOTE_OPEN_PAIRING, "Pairing", "Make, paste, forget, or replace a secure local key. Shows this phone's Wi-Fi address and port for the remote phone."),
+            ActionItem(PanelAction.REMOTE_OPEN_PREVIEW, "Remote preview", "Find the camera phone on this Wi-Fi network, or type its address from the Pairing screen."),
             ToggleItem(FxKeys.LIVE_PC_ON, "Send to PC", "Send the finished picture to OBS on your local network.", false, isTest = false),
             ChoiceItem(
                 FxKeys.LIVE_PC_PROTOCOL,

@@ -2,11 +2,13 @@ package com.offgrid.live
 
 import android.app.Activity
 import android.os.Bundle
+import android.text.InputType
 import android.view.Gravity
 import android.view.Surface
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import android.view.ViewGroup
+import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -18,6 +20,7 @@ class RemotePreviewActivity : Activity(), SurfaceHolder.Callback {
     private lateinit var discovery: RemoteServiceDiscovery
     private lateinit var status: TextView
     private lateinit var surfaceView: SurfaceView
+    private lateinit var typedAddress: EditText
     private var pairingKey: String? = null
     private var previewSurface: Surface? = null
     private var link: RemoteLink? = null
@@ -45,6 +48,19 @@ class RemotePreviewActivity : Activity(), SurfaceHolder.Callback {
             dp(240),
         ).apply { topMargin = dp(16) })
         root.addView(button("Find camera phone") { findCamera() }, marginTop(8))
+        root.addView(label("If searching fails, type the address shown on the camera phone's Pairing screen.", 12), marginTop(12))
+        typedAddress = EditText(this).apply {
+            hint = "Camera phone address, like 192.168.1.5:${CameraRemoteServer.DEFAULT_PORT}"
+            setTextColor(WHITE)
+            setHintTextColor(DIM)
+            setBackgroundColor(GLASS)
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            maxLines = 1
+            minHeight = dp(48)
+            contentDescription = "Camera phone address"
+        }
+        root.addView(typedAddress, marginTop(8))
+        root.addView(button("Connect to typed address") { connectTyped() }, marginTop(8))
         root.addView(button("Auto Blackout Gate on / off") { toggle("fx.live.curtain.on", true) }, marginTop(8))
         root.addView(button("Idle Color: Black") { sendSetting("fx.live.curtain.mode", "black") }, marginTop(8))
         root.addView(button("Idle Color: White") { sendSetting("fx.live.curtain.mode", "white") }, marginTop(8))
@@ -80,13 +96,34 @@ class RemotePreviewActivity : Activity(), SurfaceHolder.Callback {
             return
         }
         closeLink()
-        status.text = "Searching this Wi-Fi network."
+        status.text = "Searching this Wi-Fi network. If nothing is found, type the camera phone's address below."
         discovery.discover { address -> connect(address, key) }
     }
 
-    private fun connect(address: InetSocketAddress, key: String) {
+    /** Phase 0.4: the always-works path when Wi-Fi discovery is blocked or slow. */
+    private fun connectTyped() {
+        val key = pairingKey
+        if (key == null) {
+            status.text = "Make or paste a pairing key first."
+            return
+        }
+        val address = try {
+            ManualAddress.parse(typedAddress.text?.toString().orEmpty())
+        } catch (error: IllegalArgumentException) {
+            status.text = error.message ?: "Type the camera phone's address."
+            return
+        }
+        closeLink()
+        connect(address, key, found = false)
+    }
+
+    private fun connect(address: InetSocketAddress, key: String, found: Boolean = true) {
         discovery.stopDiscovery()
-        runOnUiThread { status.text = "Found camera phone. Connecting securely." }
+        val where = ManualAddress.describe(address.address, address.port)
+        runOnUiThread {
+            status.text = if (found) "Found camera phone at $where. Connecting securely."
+            else "Connecting securely to $where."
+        }
         val remote = RemoteLink(
             address = address,
             pairingKey = key,
@@ -202,6 +239,8 @@ class RemotePreviewActivity : Activity(), SurfaceHolder.Callback {
 
     private companion object {
         const val WHITE = 0xfff4f4f4.toInt()
+        const val DIM = 0xff777777.toInt()
+        const val GLASS = 0xff080808.toInt()
         const val UV = 0xff9b5cff.toInt()
         val EFFECT_TOGGLES = listOf(
             "fx.coaster.on" to "Roller Coaster",

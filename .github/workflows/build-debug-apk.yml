@@ -117,7 +117,7 @@ jobs:
 
       # Phase 0.3: the emoji guard. It warns in Phase 1 and is flipped to fail in Phase 2 by
       # changing EMOJI_GUARD_MODE to "fail". The allowlist keeps the typographic symbols the
-      # panel already uses: the menu dots, the color editor circles, the laser caret, and minus.
+      # panel already uses: the menu dots, the color editor circles, the laser caret, minus, and degrees.
       - name: Check for OS emoji in the panel sources (warn mode)
         env:
           EMOJI_GUARD_MODE: warn

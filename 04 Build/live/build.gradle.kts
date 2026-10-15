@@ -16,6 +16,13 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+
+    testOptions {
+        unitTests {
+            // Phase 0.4: the discovery test runs the real NsdManager call path under Robolectric.
+            isIncludeAndroidResources = true
+        }
+    }
 }
 
 kotlin {
@@ -27,4 +34,5 @@ kotlin {
 dependencies {
     implementation("androidx.core:core-ktx:1.16.0")
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.17")
 }
