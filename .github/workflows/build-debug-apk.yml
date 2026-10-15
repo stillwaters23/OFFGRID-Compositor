@@ -99,13 +99,73 @@ jobs:
             exit 1
           fi
 
-      - name: Check there are no sliders
+      # Phase 0.2 (Royalty approved 2026-10-15): the stock Android and Material sliders stay banned.
+      # The only slider class allowed anywhere in the sources is OFFGRID's own BioSliderView
+      # (terminal/bio_slider_view.kt), which Phase 2.4 builds out. Any other "Slider" fails.
+      - name: Check there are no sliders except BioSliderView
         run: |
           set -euo pipefail
-          if grep -R -n -E "SeekBar|RangeSlider|material\.slider|<Slider|Slider\(" "04 Build"/*/src; then
-            echo "Every number is typed. Sliders are not allowed."
+          if grep -R -n -E "SeekBar|RangeSlider|material\.slider" "04 Build"/*/src; then
+            echo "The stock Android and Material sliders are not allowed. Only BioSliderView is."
             exit 1
           fi
+          if grep -R -n -E "Slider\b" "04 Build"/*/src | sed -E 's/BioSliderView//g' | grep -n -E "Slider\b"; then
+            echo "Only BioSliderView is allowed. Every other slider class is banned."
+            exit 1
+          fi
+          echo "No slider other than BioSliderView is in the sources."
+
+      # Phase 0.3: the emoji guard. It warns in Phase 1 and is flipped to fail in Phase 2 by
+      # changing EMOJI_GUARD_MODE to "fail". The allowlist keeps the typographic symbols the
+      # panel already uses: the menu dots, the color editor circles, the laser caret, and minus.
+      - name: Check for OS emoji in the panel sources (warn mode)
+        env:
+          EMOJI_GUARD_MODE: warn
+        run: |
+          python3 - << 'PY'
+          import os
+          import sys
+          import unicodedata
+          mode = os.environ.get("EMOJI_GUARD_MODE", "warn")
+          allowed = set("\u22ee\u25cb\u25cf\u2588\u2212\u00b0")  # ⋮ ○ ● █ − and the degree sign
+          roots = ["04 Build/app/src/main", "04 Build/live/src/main"]
+          findings = []
+          for root in roots:
+              for dirpath, dirnames, filenames in os.walk(root):
+                  dirnames[:] = [name for name in dirnames if name not in ("build", "assets", "font")]
+                  for name in filenames:
+                      if not (name.endswith(".kt") or name.endswith(".xml")):
+                          continue
+                      path = os.path.join(dirpath, name)
+                      try:
+                          lines = open(path, encoding="utf-8", errors="ignore").read().splitlines()
+                      except OSError:
+                          continue
+                      for number, line in enumerate(lines, 1):
+                          hits = sorted({
+                              ch for ch in line
+                              if ch not in allowed and (
+                                  unicodedata.category(ch) == "So" or 0x1F000 <= ord(ch) <= 0x1FAFF
+                              )
+                          })
+                          if hits:
+                              findings.append((path, number, "".join(hits)))
+          if not findings:
+              print("No OS emoji in the panel sources.")
+              sys.exit(0)
+          by_file = {}
+          for path, _, _ in findings:
+              by_file[path] = by_file.get(path, 0) + 1
+          print("OS emoji found on %d lines in %d files:" % (len(findings), len(by_file)))
+          for path in sorted(by_file):
+              print("  %s: %d lines" % (path, by_file[path]))
+          for path, number, hits in findings[:40]:
+              print("::warning file=%s,line=%d::OS emoji %s" % (path, number, hits))
+          if mode == "fail":
+              print("Phase 2: OS emoji are not allowed in the panel sources.")
+              sys.exit(1)
+          print("Warn mode: the build continues. Phase 2 flips EMOJI_GUARD_MODE to fail.")
+          PY
 
       - name: Build the debug app
         working-directory: 04 Build
@@ -139,6 +199,10 @@ jobs:
               "FOREGROUND_SERVICE_MICROPHONE",  # Recording and live audio keep the mic in that service.
               "FOREGROUND_SERVICE_SPECIAL_USE",  # The floating control overlay.
               "POST_NOTIFICATIONS",  # The foreground-service notification on Android 13 and newer.
+              # Broadcast Lock auto trigger (Royalty approved 2026-10-15). Normal protection level, no prompt.
+              # Android 15 reports when OFFGRID is inside a screen recording or share, so the panel can hide.
+              # The manifest declares it in Phase 1.3. Nothing else may be added here without Royalty's approval.
+              "DETECT_SCREEN_RECORDING",
           }
           banned = {
               "android.permission.ACCESS_NETWORK_STATE",
