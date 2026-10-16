@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.camera.core.CameraSelector
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
+import com.offgrid.compositor.effects.StageGeometry
 
 private const val CAMERA_TAG = "OffgridCompositor"
 
@@ -53,6 +54,11 @@ internal fun MainActivity.rebindForNewShape() {
     if (isFinishing || isDestroyed || !resumed || !capture.cameraRunning || !hasCameraPermission()) return
     if (cameraProvider == null) return
     if (!rebindGate.boundWidth.let { it > 0 }) return
+    if (!StageGeometry.aspectDiffers(rebindGate.boundWidth, rebindGate.boundHeight, previewView.width, previewView.height)) {
+        // The burst ended back at the bound shape (A to B to A): no bind, and the gate may ask again.
+        rebindGate.bound(rebindGate.boundWidth, rebindGate.boundHeight)
+        return
+    }
     Log.i(
         CAMERA_TAG,
         "View shape changed from ${rebindGate.boundWidth}x${rebindGate.boundHeight} to " +

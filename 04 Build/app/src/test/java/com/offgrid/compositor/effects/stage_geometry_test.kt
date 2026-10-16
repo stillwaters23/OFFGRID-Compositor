@@ -134,6 +134,18 @@ class StageGeometryTest {
     }
 
     @Test
+    fun aBurstThatReturnsToTheBoundShapeCanAskAgainLater() {
+        val gate = StageGeometry.RebindGate()
+        gate.bound(1440, 3120)
+        assertTrue(gate.onLayout(1440, 2900))
+        assertFalse(gate.onLayout(1440, 3120))
+        // The debounced rebind sees the bound shape again and only resets the gate.
+        assertFalse(StageGeometry.aspectDiffers(1440, 3120, 1440, 3120))
+        gate.bound(gate.boundWidth, gate.boundHeight)
+        assertTrue(gate.onLayout(1440, 2900))
+    }
+
+    @Test
     fun gateIsQuietBeforeTheFirstBind() {
         val gate = StageGeometry.RebindGate()
         assertFalse(gate.onLayout(1440, 3120))
