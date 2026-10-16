@@ -394,16 +394,29 @@ class MainActivity : AppCompatActivity() {
     /**
      * Phase 0.5 probe sample, main thread: the PreviewView's size, its stream state, and the
      * TextureView child's size and transform. A non-uniform scale here is the stretch.
+     *
+     * PreviewView (COMPATIBLE mode) sizes the TextureView to the stream resolution and fits it
+     * with View scaleX/scaleY/translation; setTransform() only carries the rotation correction.
+     * Both are logged, and shown= is the on-screen box those View properties produce.
      */
     internal fun describePreviewView(): String {
         val child = (0 until previewView.childCount).map { previewView.getChildAt(it) }
             .firstOrNull { it is TextureView } as? TextureView
+        if (child == null) {
+            return "previewView=${previewView.width}x${previewView.height} laidOut=${previewView.isLaidOut} " +
+                "stream=${previewView.previewStreamState.value} textureView=none"
+        }
         val values = FloatArray(9)
-        child?.getTransform(null)?.getValues(values)
-        val transform = if (child == null) "none" else
-            "scaleX=${values[0]} skewX=${values[1]} transX=${values[2]} skewY=${values[3]} scaleY=${values[4]} transY=${values[5]}"
+        child.getTransform(null).getValues(values)
+        val matrix = "matrix(scaleX=${values[0]} skewX=${values[1]} transX=${values[2]} " +
+            "skewY=${values[3]} scaleY=${values[4]} transY=${values[5]})"
+        val view = "view(scaleX=${child.scaleX} scaleY=${child.scaleY} " +
+            "translationX=${child.translationX} translationY=${child.translationY} " +
+            "pivot=${child.pivotX},${child.pivotY} rotation=${child.rotation})"
+        val shown = "shown=${child.width * child.scaleX}x${child.height * child.scaleY}"
         return "previewView=${previewView.width}x${previewView.height} laidOut=${previewView.isLaidOut} " +
-            "stream=${previewView.previewStreamState.value} textureView=${child?.width ?: 0}x${child?.height ?: 0} $transform"
+            "stream=${previewView.previewStreamState.value} textureView=${child.width}x${child.height} " +
+            "$view $shown $matrix"
     }
 
     private fun previewResolution(): ResolutionSelector {
