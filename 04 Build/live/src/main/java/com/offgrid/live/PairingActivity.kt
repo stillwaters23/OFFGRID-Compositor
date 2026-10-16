@@ -13,6 +13,7 @@ class PairingActivity : Activity() {
     private lateinit var workflow: PairingWorkflow
     private lateinit var keyText: TextView
     private lateinit var status: TextView
+    private lateinit var addressText: TextView
     private lateinit var pastedKey: EditText
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -31,6 +32,11 @@ class PairingActivity : Activity() {
         content.addView(keyText, marginTop(20))
         status = label("Pairing key stays sealed in Android Keystore.", 13)
         content.addView(status, marginTop(8))
+        addressText = label("Looking up this phone's Wi-Fi address.", 13)
+        addressText.setTextIsSelectable(true)
+        content.addView(addressText, marginTop(16))
+        content.addView(label("On the remote phone, type this address if searching does not find the camera phone.", 12), marginTop(4))
+        showLocalAddress()
         pastedKey = EditText(this).apply {
             hint = "Paste the 100+ character key"
             setTextColor(WHITE)
@@ -89,6 +95,19 @@ class PairingActivity : Activity() {
             },
             onFailure = { status.text = it },
         )
+    }
+
+    /** Phase 0.4: the manual fallback for the two-phone link. Read off the main thread; it walks the network interfaces. */
+    private fun showLocalAddress() {
+        Thread({
+            val line = try {
+                val address = LocalAddressPolicy.siteLocalAddress()
+                "Camera phone address: " + ManualAddress.describe(address, CameraRemoteServer.DEFAULT_PORT)
+            } catch (error: IllegalStateException) {
+                "No private Wi-Fi address yet. Join the same Wi-Fi as the remote phone, then reopen Pairing."
+            }
+            runOnUiThread { if (!isDestroyed) addressText.text = line }
+        }, "offgrid-pairing-address").start()
     }
 
     override fun onDestroy() {

@@ -4,6 +4,7 @@ import android.opengl.EGL14
 import android.opengl.EGLExt
 import android.opengl.GLES20
 import android.view.Surface
+import com.offgrid.compositor.effects.StageGeometry
 
 internal class LiveOutputDrawer {
     private class Slot(
@@ -46,7 +47,7 @@ internal class LiveOutputDrawer {
         painted: GlTarget?,
     ) {
         if (slots.isEmpty() || processor.display == EGL14.EGL_NO_DISPLAY) return
-        val main = slotsOut.maxByOrNull { it.width * it.height }?.surfaceOutput
+        val main = StageGeometry.pickMain(slotsOut, { it.isPreview }, { it.width }, { it.height })?.surfaceOutput
         for (slot in slots.values) {
             if (stamp - slot.lastStamp < slot.intervalNs) continue
             slot.lastStamp = stamp

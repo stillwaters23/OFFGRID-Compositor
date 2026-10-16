@@ -21,6 +21,7 @@ import com.offgrid.compositor.audio.MicEngine
 import com.offgrid.compositor.effects.EffectEngine
 import com.offgrid.compositor.effects.FxKeys
 import com.offgrid.compositor.effects.OverlayLayer
+import com.offgrid.compositor.effects.StageGeometry
 import com.offgrid.compositor.effects.StagePlan
 import java.util.concurrent.Executor
 import java.util.concurrent.atomic.AtomicBoolean
@@ -40,6 +41,9 @@ class CompositorProcessor internal constructor(
     private val deckCatalog: ArDeckCatalog = ArDeckCatalog(),
 ) : SurfaceProcessor, SurfaceTexture.OnFrameAvailableListener {
     val effectList = EffectList()
+
+    /** Phase 0.5: the debug-only render probe. Silent on a release build. */
+    internal val probe: RenderProbe = RenderProbe.forContext(appContext)
 
     @Volatile
     var onFirstFrame: (() -> Unit)? = null
@@ -138,8 +142,8 @@ class CompositorProcessor internal constructor(
     }
 
     /**
-     * The size of the finished picture, from the biggest camera output. Before the camera starts it is a
-     * portrait 720p picture. A recording is made at [recordingSize].
+     * The size of the finished picture, from the master (PREVIEW) camera output. Before the camera
+     * starts it is a portrait 720p picture. A recording is made at [recordingSize].
      */
     @Volatile
     private var pictureSize = android.util.Size(DEFAULT_WIDTH, DEFAULT_HEIGHT)
@@ -199,6 +203,7 @@ class CompositorProcessor internal constructor(
         }
         val textureId = createExternalTexture()
         inputSize = request.resolution
+        probe.onInput(request.resolution.width, request.resolution.height)
         val surfaceTexture = SurfaceTexture(textureId)
         surfaceTexture.setDefaultBufferSize(request.resolution.width, request.resolution.height)
         val surface = Surface(surfaceTexture)
@@ -246,12 +251,14 @@ class CompositorProcessor internal constructor(
             fail("Output surface failed")
             return
         }
-        outputs.add(OutputSlot(surfaceOutput, eglSurface, size.width, size.height))
-        pictureSize = outputs.maxBy { it.width * it.height }.let { android.util.Size(it.width, it.height) }
+        val slot = OutputSlot(surfaceOutput, eglSurface, size.width, size.height)
+        outputs.add(slot)
+        mainSlot(outputs)?.let { pictureSize = android.util.Size(it.width, it.height) }
         Log.i(
             TAG,
             "Output ${size.width}x${size.height} targets=${surfaceOutput.targets}",
         )
+        probe.onOutput(size.width, size.height, surfaceOutput.targets, slot.isPreview)
     }
 
     override fun onFrameAvailable(surfaceTexture: SurfaceTexture) {
@@ -294,8 +301,7 @@ class CompositorProcessor internal constructor(
             }
             drawSlot(slot, stamp, painted)
         }
-        if (snapshot.isNotEmpty()) {
-            val main = snapshot.maxBy { it.width * it.height }
+        mainSlot(snapshot)?.let { main ->
             drawRecorders(main.width, main.height, stampClock.next(StampClock.Source.CAMERA, stamp), painted, main)
         }
         liveOutputs.draw(this, stamp, snapshot, painted)
@@ -484,11 +490,12 @@ class CompositorProcessor internal constructor(
             modeChangedAt = engine.modeChangedAt,
             previousMode = engine.previousMode,
         )
-        // The biggest output sets the stage size. The others get the same picture, scaled.
-        val main = slots.maxBy { it.width * it.height }
-        val scale = minOf(1f, MAX_STAGE_SIDE / maxOf(main.width, main.height).toFloat())
-        val stageWidth = maxOf(2, (main.width * scale).toInt())
-        val stageHeight = maxOf(2, (main.height * scale).toInt())
+        // Phase 1.1: the PREVIEW output is the master for the stage. The others get the same picture, cut to shape.
+        val main = mainSlot(slots) ?: return null
+        val stageSize = StageGeometry.stageSize(main.width, main.height, MAX_STAGE_SIDE)
+        val stageWidth = stageSize.width
+        val stageHeight = stageSize.height
+        probe.onStage(main.width, main.height, main.isPreview, stageWidth, stageHeight)
         overlay?.latch()
         overlay?.request(stageWidth, stageHeight)
         val drawn = overlay != null && overlay.hasPicture
@@ -518,6 +525,8 @@ class CompositorProcessor internal constructor(
                 mask = mask,
                 arTexture = arTextureId(),
                 arMatrix = arMatrix(),
+                arVideoWidth = arVideoWidth(),
+                arVideoHeight = arVideoHeight(),
             )
         } catch (error: RuntimeException) {
             Log.e(TAG, "Effects stage failed", error)
@@ -604,6 +613,8 @@ class CompositorProcessor internal constructor(
                 overlayMatrix = overlay?.matrix ?: IDENTITY,
                 arTexture = arTextureId(),
                 arMatrix = arMatrix(),
+                arVideoWidth = arVideoWidth(),
+                arVideoHeight = arVideoHeight(),
             )
         } catch (error: RuntimeException) {
             Log.e(TAG, "Effects stage failed", error)
@@ -632,15 +643,23 @@ class CompositorProcessor internal constructor(
             fail("Could not draw a frame")
             return
         }
-        if (!toldFirstFrame && slot.surfaceOutput.targets and CameraEffect.PREVIEW != 0) {
+        if (slot.isPreview) {
+            probe.onPreviewFrame(slot.width, slot.height, painted?.width ?: 0, painted?.height ?: 0)
+        }
+        if (!toldFirstFrame && slot.isPreview) {
             toldFirstFrame = true
             mainHandler.post { onFirstFrame?.invoke() }
         }
     }
 
+    /** The PREVIEW output when there is one, otherwise the biggest. See [StageGeometry.pickMain]. */
+    private fun mainSlot(slots: List<OutputSlot>): OutputSlot? =
+        StageGeometry.pickMain(slots, { it.isPreview }, { it.width }, { it.height })
+
     private fun detach(surfaceOutput: SurfaceOutput) {
         val slot = outputs.firstOrNull { it.surfaceOutput === surfaceOutput } ?: return
         outputs.remove(slot)
+        mainSlot(outputs)?.let { pictureSize = android.util.Size(it.width, it.height) }
         if (dummy != EGL14.EGL_NO_SURFACE) {
             EGL14.eglMakeCurrent(display, dummy, dummy, context)
         }
@@ -727,7 +746,10 @@ class CompositorProcessor internal constructor(
             val deck = ArDeckSurface(textureId, texture)
             texture.setOnFrameAvailableListener({ onArFrame(it) }, handler)
             arDeck = deck
-            val player = ArDeckPlayer(ctx, handler)
+            val player = ArDeckPlayer(ctx, handler) { width, height, ratio ->
+                probe.onClipSize(width, height, ratio)
+                arDeck?.setVideoSize(width, height, ratio)
+            }
             arPlayer = player
             player.attachSurface(deck.surface)
             player.setLoop(deckLoop)
@@ -771,15 +793,22 @@ class CompositorProcessor internal constructor(
         val player = arPlayer ?: return
         if (uri != playingUri) {
             playingUri = uri
+            // The new clip's size is not known until Media3 reports it. Until then nothing is drawn.
+            arDeck?.forgetVideoSize()
             player.playUri(uri)
         } else {
             player.resume()
         }
     }
 
-    private fun arTextureId(): Int = arDeck?.takeIf { it.hasFrame }?.textureId ?: 0
+    /** The clip texture, or 0 until a frame and its real size are both known, so a clip is never drawn stretched. */
+    private fun arTextureId(): Int = arDeck?.takeIf { it.hasFrame && it.hasSize }?.textureId ?: 0
 
     private fun arMatrix(): FloatArray = arDeck?.texMatrix ?: IDENTITY
+
+    private fun arVideoWidth(): Int = arDeck?.videoWidth ?: 0
+
+    private fun arVideoHeight(): Int = arDeck?.videoHeight ?: 0
 
     private fun releaseArDeck() {
         arPlayer?.releaseAndJoin()
@@ -890,7 +919,11 @@ class CompositorProcessor internal constructor(
         val eglSurface: android.opengl.EGLSurface,
         val width: Int,
         val height: Int,
-    )
+    ) {
+        /** True when this output goes to the screen (CameraX PREVIEW target). */
+        val isPreview: Boolean
+            get() = surfaceOutput.targets and CameraEffect.PREVIEW != 0
+    }
 
     private companion object {
         const val TAG = "OffgridCompositor"

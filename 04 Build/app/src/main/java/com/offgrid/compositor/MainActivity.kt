@@ -47,6 +47,7 @@ import com.offgrid.compositor.audio.MicKeys
 import com.offgrid.compositor.audio.MicPipeline
 import com.offgrid.compositor.effects.EffectEngine
 import com.offgrid.compositor.effects.EffectLayers
+import com.offgrid.compositor.effects.StageGeometry
 import com.offgrid.compositor.audio.voice.VoiceAudioOutput
 import com.offgrid.compositor.terminal.TerminalPanel
 
@@ -82,6 +83,10 @@ class MainActivity : AppCompatActivity() {
     internal var videoCapture: VideoCapture<Recorder>? = null
     internal var activeRecording: Recording? = null
     internal var bindGeneration = 0
+
+    /** Phase 1.1: the view size the camera was bound at, and the one-rebind rule for a changed shape. */
+    internal val rebindGate = StageGeometry.RebindGate()
+    internal val rebindTask = Runnable { rebindForNewShape() }
     private var permissionAsked = false
     internal val capture = CaptureSwitch()
     internal lateinit var mic: MicPipeline
@@ -181,6 +186,9 @@ class MainActivity : AppCompatActivity() {
             insets
         }
         darkStage = DarkStage(this, findViewById(R.id.root), previewView) { processor }
+        previewView.addOnLayoutChangeListener { _, left, top, right, bottom, _, _, _, _ ->
+            onPreviewLayout(right - left, bottom - top)
+        }
         recordButton.setOnClickListener { toggleRecording() }
         playButton.setOnClickListener { showPlayback() }
         backButton.setOnClickListener { hidePlayback() }
@@ -216,6 +224,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        mainHandler.removeCallbacks(rebindTask)
         mic.stop()
         darkStage.hide()
         effects.release()
@@ -260,6 +269,7 @@ class MainActivity : AppCompatActivity() {
         }
         created.testShapeOn = terminalPanel.testDiamondOn
         created.reducedMotion = reducedMotion()
+        created.probe.previewSampler = { describePreviewView() }
         effects.processor = created
         processor = created
         return created
@@ -273,6 +283,7 @@ class MainActivity : AppCompatActivity() {
     ) {
         val painter = ensureProcessor()
         faces.outputAspect = previewView.width.toFloat() / previewView.height
+        rebindGate.bound(previewView.width, previewView.height)
         val effect = CompositorEffect(
             painter.executor,
             painter,
@@ -316,6 +327,13 @@ class MainActivity : AppCompatActivity() {
         val viewPort = ViewPort.Builder(Rational(previewView.width, previewView.height), rotation)
             .setScaleType(ViewPort.FILL_CENTER)
             .build()
+        painter.probe.onBind(
+            bindGeneration,
+            previewView.width,
+            previewView.height,
+            "${viewPort.aspectRatio.numerator}:${viewPort.aspectRatio.denominator}",
+            rotation,
+        )
         val groupBuilder = UseCaseGroup.Builder()
             .setViewPort(viewPort)
             .addUseCase(preview)
@@ -371,6 +389,34 @@ class MainActivity : AppCompatActivity() {
         bindGeneration++
         cameraProvider?.unbindAll()
         videoCapture = null
+    }
+
+    /**
+     * Phase 0.5 probe sample, main thread: the PreviewView's size, its stream state, and the
+     * TextureView child's size and transform. A non-uniform scale here is the stretch.
+     *
+     * PreviewView (COMPATIBLE mode) sizes the TextureView to the stream resolution and fits it
+     * with View scaleX/scaleY/translation; setTransform() only carries the rotation correction.
+     * Both are logged, and shown= is the on-screen box those View properties produce.
+     */
+    internal fun describePreviewView(): String {
+        val child = (0 until previewView.childCount).map { previewView.getChildAt(it) }
+            .firstOrNull { it is TextureView } as? TextureView
+        if (child == null) {
+            return "previewView=${previewView.width}x${previewView.height} laidOut=${previewView.isLaidOut} " +
+                "stream=${previewView.previewStreamState.value} textureView=none"
+        }
+        val values = FloatArray(9)
+        child.getTransform(null).getValues(values)
+        val matrix = "matrix(scaleX=${values[0]} skewX=${values[1]} transX=${values[2]} " +
+            "skewY=${values[3]} scaleY=${values[4]} transY=${values[5]})"
+        val view = "view(scaleX=${child.scaleX} scaleY=${child.scaleY} " +
+            "translationX=${child.translationX} translationY=${child.translationY} " +
+            "pivot=${child.pivotX},${child.pivotY} rotation=${child.rotation})"
+        val shown = "shown=${child.width * child.scaleX}x${child.height * child.scaleY}"
+        return "previewView=${previewView.width}x${previewView.height} laidOut=${previewView.isLaidOut} " +
+            "stream=${previewView.previewStreamState.value} textureView=${child.width}x${child.height} " +
+            "$view $shown $matrix"
     }
 
     private fun previewResolution(): ResolutionSelector {

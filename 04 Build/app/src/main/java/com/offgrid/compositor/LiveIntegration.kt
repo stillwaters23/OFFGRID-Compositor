@@ -16,6 +16,7 @@ import com.offgrid.live.LiveHostRegistry
 import com.offgrid.live.LiveOverlayController
 import com.offgrid.live.LiveService
 import com.offgrid.live.LocalAddressPolicy
+import com.offgrid.live.ManualAddress
 import com.offgrid.live.OffgridHost
 import com.offgrid.live.PairingActivity
 import com.offgrid.live.PairingWorkflow
@@ -216,8 +217,9 @@ internal class LiveIntegration(
             onLoaded = { key, _ ->
                 worker.execute {
                     try {
+                        val bindAddress = LocalAddressPolicy.siteLocalAddress()
                         val server = CameraRemoteServer(
-                            bindAddress = LocalAddressPolicy.siteLocalAddress(),
+                            bindAddress = bindAddress,
                             pairingKey = { key },
                             onSession = { session ->
                                 val encoder = RemotePreviewEncoder(
@@ -258,7 +260,8 @@ internal class LiveIntegration(
                         remoteServer = server
                         server.start()
                         discovery.advertise(server.port)
-                        showStatus("Camera phone is ready on local Wi-Fi.")
+                        val where = ManualAddress.describe(bindAddress, server.port)
+                        showStatus("Camera phone is ready on local Wi-Fi at $where. Type it on the remote phone if searching fails.")
                     } catch (error: IllegalArgumentException) {
                         showStatus(error.message ?: "Could not start the local camera link.")
                     } catch (error: IllegalStateException) {

@@ -261,4 +261,9 @@ object FxKeys {
     const val AR_LOOP = "fx.ar.loop"
     const val AR_OPACITY = "fx.ar.opacity"
     const val AR_CLIP = "fx.ar.clip"
+
+    /** How the clip meets the stage's shape: fill cuts the clip to the stage, fit shows all of it with bars. */
+    const val AR_FIT = "fx.ar.fit"
+    const val AR_FIT_FILL = "fill"
+    const val AR_FIT_FIT = "fit"
 }

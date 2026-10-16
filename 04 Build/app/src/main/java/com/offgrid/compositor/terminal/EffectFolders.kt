@@ -46,8 +46,8 @@ internal object EffectFolders {
                 ),
                 FxKeys.REMOTE_ROLE_OFF,
             ),
-            ActionItem(PanelAction.REMOTE_OPEN_PAIRING, "Pairing", "Make, paste, forget, or replace a secure local key."),
-            ActionItem(PanelAction.REMOTE_OPEN_PREVIEW, "Remote preview", "Connect to the camera phone on this Wi-Fi network."),
+            ActionItem(PanelAction.REMOTE_OPEN_PAIRING, "Pairing", "Make, paste, forget, or replace a secure local key. Shows this phone's Wi-Fi address and port for the remote phone."),
+            ActionItem(PanelAction.REMOTE_OPEN_PREVIEW, "Remote preview", "Find the camera phone on this Wi-Fi network, or type its address from the Pairing screen."),
             ToggleItem(FxKeys.LIVE_PC_ON, "Send to PC", "Send the finished picture to OBS on your local network.", false, isTest = false),
             ChoiceItem(
                 FxKeys.LIVE_PC_PROTOCOL,
@@ -100,6 +100,15 @@ internal object EffectFolders {
                 "Opacity",
                 "How solid the clip is. 0 is clear. 100 covers the selfie.",
                 100,
+            ),
+            ChoiceItem(
+                FxKeys.AR_FIT,
+                "Clip shape",
+                listOf(
+                    Choice(FxKeys.AR_FIT_FILL, "Fill the stage", "Cuts the clip's sides or top so it covers the stage. Nothing is stretched."),
+                    Choice(FxKeys.AR_FIT_FIT, "Show the whole clip", "The whole clip in a centered box. The selfie shows around it."),
+                ),
+                FxKeys.AR_FIT_FILL,
             ),
             TextItem(FxKeys.AR_CLIP, "Clip id", "Filled when you pick a video. Phone 2 can send this short id.", "", 32),
         ),
