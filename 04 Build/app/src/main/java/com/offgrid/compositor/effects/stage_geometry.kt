@@ -3,9 +3,9 @@ package com.offgrid.compositor.effects
 import kotlin.math.abs
 
 /**
- * The one place the stage's geometry is worked out (Phase 1.1, the "Seam Weld" of the picture
- * path: every surface is cut from the same cloth, so no seam shows between the screen, the
- * video, and the AR clip).
+ * The one place the stage's geometry is worked out (Phase 1.1): every surface is cut by the
+ * same rules, so the screen, the video, and the AR clip never disagree about shape. (Not to be
+ * confused with Seam Weld, the Phase 3.4 loop crossfade.)
  *
  * Pure Kotlin, no Android types, so every rule is unit tested:
  *
