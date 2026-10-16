@@ -109,7 +109,10 @@ jobs:
             echo "The stock Android and Material sliders are not allowed. Only BioSliderView is."
             exit 1
           fi
-          if grep -R -n -E "Slider\b" "04 Build"/*/src | sed -E 's/BioSliderView//g' | grep -n -E "Slider\b"; then
+          # Every identifier that names a Slider (Slider, MySlider, SliderView, GlowSliderView, ...) must be
+          # BioSliderView or start with it (BioSliderViewTest). Plural words like "NoSliders" are not class names.
+          if grep -R -n -o -E "\b[A-Za-z0-9_]*Slider([A-Z0-9_][A-Za-z0-9_]*)?\b" "04 Build"/*/src \
+            | grep -v -E ":BioSliderView[A-Za-z0-9_]*$"; then
             echo "Only BioSliderView is allowed. Every other slider class is banned."
             exit 1
           fi
