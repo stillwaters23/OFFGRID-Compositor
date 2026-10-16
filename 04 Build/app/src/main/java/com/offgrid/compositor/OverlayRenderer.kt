@@ -96,14 +96,16 @@ internal class OverlayRenderer(
     /** Asks for a fresh drawing at [width] by [height]. Skipped if the last one is still drawing. */
     fun request(width: Int, height: Int) {
         if (released || width <= 0 || height <= 0) return
+        // The new size is published before the generation moves, so a drawing that reads the new
+        // generation in drawLayers() always reads the new size too.
+        wantWidth = width
+        wantHeight = height
         if (width != sizeWidth || height != sizeHeight) {
             sizeWidth = width
             sizeHeight = height
-            sizeGeneration++
             surfaceTexture.setDefaultBufferSize(width, height)
+            sizeGeneration++
         }
-        wantWidth = width
-        wantHeight = height
         if (busy) return
         busy = true
         handler.post(drawTask)
