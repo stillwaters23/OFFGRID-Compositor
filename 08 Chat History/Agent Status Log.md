@@ -405,3 +405,10 @@ States: passed, waiting for review, blocked, or waiting for Royalty's phone test
 - **What was done:** The first Build debug app run on pull request #36 failed because the merged manifest includes the live overlay permissions. The allowlist now accepts the overlay, the notification, and the foreground service types the live controls already declare. RECORD_AUDIO and INTERNET stay required. ACCESS_NETWORK_STATE and Wi-Fi permissions stay banned.
 - **PR:** Pull request #36. Not merged.
 - **State:** waiting for CI on the new head.
+
+## 2026-10-15: Phase 0 guardrails, Phone 2 link, and the 1.1 render fix
+
+- **What was done:** On `phase_0_and_1_1` from `final-build`, per the Chief Architect Review's Section 5 build order (0.1 to 0.5 and 1.1 only). CI allows `DETECT_SCREEN_RECORDING`, bans every slider but the new `BioSliderView` stub, and warns on OS emoji. Phone 2 discovery runs with no multicast lock, and the remote phone can type the camera phone's address, which the Pairing screen now shows. A debug-only render probe (`adb logcat -s OffgridProbe`) logs the five stretch numbers for the first three frames after each bind. The PREVIEW output is the stage master, AR clips are drawn fit or fill from their real `VideoSize` and never before the size is known, a stale overlay frame is skipped instead of stretched, and the camera rebinds once when the view's shape changes. Details in `docs/chat_history/2026_10_15_phase_0_and_1_1_progress.md`.
+- **Tests:** `./gradlew testDebugUnitTest assembleDebug lintDebug` from `04 Build`. BUILD SUCCESSFUL. 252 unit tests, 0 failures. The CI guard scripts pass locally.
+- **PR:** "Phase 0 guardrails + Phone 2 link + 1.1 render fix" into `final-build`. Not merged. `main` untouched.
+- **Next:** Royalty's phone test (steps in the progress note) and one `OffgridProbe` log for a cold start and a resume before 1.3 begins.
