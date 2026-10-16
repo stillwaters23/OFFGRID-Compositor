@@ -1,5 +1,6 @@
 package com.offgrid.compositor.terminal
 
+import com.offgrid.compositor.RenderProbeIds
 import com.offgrid.compositor.effects.Fire
 import com.offgrid.compositor.effects.FxKeys
 import com.offgrid.compositor.audio.voice.MicKeys
@@ -799,6 +800,38 @@ internal object EffectFolders {
             "Private test toggles. Viewers never see them.",
             "A lit toggle means on. A dim toggle means off.",
             PanelTree.TEST_MARKERS_LINE,
+        ),
+    )
+
+    /** Debug-only SYSTEM tree (V2). Omitted on non-debuggable builds. */
+    fun system() = PanelFolder(
+        id = "system",
+        title = "SYSTEM",
+        tag = null,
+        kind = FolderKind.SETTINGS,
+        folders = listOf(diagnostics()),
+        notes = listOf(
+            "Diagnostics for this phone. Nothing here is painted on the stage.",
+        ),
+    )
+
+    private fun diagnostics() = PanelFolder(
+        id = "system.diagnostics",
+        title = "Diagnostics",
+        tag = null,
+        kind = FolderKind.SETTINGS,
+        folders = listOf(
+            PanelFolder(
+                id = RenderProbeIds.VIEWER_FOLDER,
+                title = "Render probe",
+                tag = null,
+                kind = FolderKind.SETTINGS,
+                items = listOf(RenderProbeViewerItem()),
+                notes = listOf(
+                    "Stretch numbers from this debug build. Copy or share them from here.",
+                    "Not available while recording.",
+                ),
+            ),
         ),
     )
 

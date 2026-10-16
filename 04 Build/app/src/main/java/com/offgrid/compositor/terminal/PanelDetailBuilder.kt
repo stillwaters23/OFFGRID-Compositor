@@ -134,6 +134,7 @@ internal fun TerminalPanel.itemView(folder: PanelFolder, item: PanelItem): View 
         onProblem = { say(it) },
     )
     is PresetsItem -> PresetRows(context, presets, onLoaded = { lookChanged(folderToShow = openFolder) }, say = ::say)
+    is RenderProbeViewerItem -> renderProbeViewer()
 }
 
 internal fun TerminalPanel.pathBar(folder: PanelFolder): View {

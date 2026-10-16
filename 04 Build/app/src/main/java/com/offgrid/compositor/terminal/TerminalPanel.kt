@@ -57,7 +57,7 @@ class TerminalPanel @JvmOverloads constructor(
 
     internal val prefs = PanelPrefs(context)
     internal val store = ThemeStore(context, prefs)
-    internal val home = PanelTree.build()
+    internal val home = PanelTree.build(context)
     internal val density = resources.displayMetrics.density
 
     /** Room around the glass for the outer glow. Taps there go through to the camera screen. */
@@ -192,6 +192,9 @@ class TerminalPanel @JvmOverloads constructor(
 
     /** Called when the Test diamond toggle changes. The camera screen passes it to the video painter. */
     var onTestDiamond: ((Boolean) -> Unit)? = null
+
+    /** Render probe folder refuses to open when this returns false (recording, future broadcast lock). */
+    var renderProbeMayOpen: () -> Boolean = { true }
 
     /** Called when a button asks the camera screen to do something, like Shatter now or Open TikTok. */
     internal var onAction: ((PanelAction, String?) -> Unit)? = null

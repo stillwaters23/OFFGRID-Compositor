@@ -5,6 +5,7 @@ import android.content.pm.ApplicationInfo
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import java.io.File
 
 /**
  * Phase 0.5 render probe. A silent, debug-only self-check for the stretch bug.
@@ -15,16 +16,21 @@ import android.util.Log
  * PreviewView's TextureView transform for the first [FRAMES_PER_BIND] frames after each bind.
  *
  * On a release build [enabled] is false and every call returns at once. The probe never draws
- * and never changes the picture. Read it with: adb logcat -s OffgridProbe
+ * and never changes the picture. On a debuggable build, recent lines are also kept in memory and
+ * written under `filesDir/probe/` on each bind; open SYSTEM > Diagnostics > Render probe to copy or share.
  */
 internal class RenderProbe(
     val enabled: Boolean,
     private val sink: (String) -> Unit = { Log.d(TAG, it) },
     private val onMain: (Runnable) -> Unit = MAIN_POST,
+    private val captureDir: File? = null,
+    ringCapacity: Int = RING_CAPACITY,
 ) {
+    private val ring = if (enabled) ProbeLineBuffer(ringCapacity) else null
     private val lock = Any()
     private var bind = 0
     private var framesLeft = 0
+    private var coldStartCaptured = false
 
     /** Sampled on the main thread for each probed frame: the TextureView transform and sizes. */
     @Volatile
@@ -38,6 +44,7 @@ internal class RenderProbe(
             framesLeft = FRAMES_PER_BIND
         }
         emit("bind $generation preview=${previewWidth}x$previewHeight viewPort=$viewPort rotation=$rotation")
+        snapshotBindCapture()
     }
 
     /** The camera stream the SurfaceRequest asked for. Drawing thread. */
@@ -98,14 +105,34 @@ internal class RenderProbe(
     private fun emit(line: String) {
         try {
             sink(line)
+            ring?.add(line)
         } catch (error: RuntimeException) {
             // A log line is never worth a crash.
+        }
+    }
+
+    private fun snapshotBindCapture() {
+        val dir = captureDir ?: return
+        val text = ring?.snapshot() ?: return
+        if (text.isEmpty()) return
+        val cold = !coldStartCaptured
+        val name = if (cold) COLD_START_FILE else RESUME_FILE
+        try {
+            dir.mkdirs()
+            File(dir, name).writeText(text)
+            if (cold) coldStartCaptured = true
+        } catch (_: Exception) {
+            // App-private capture is best-effort.
         }
     }
 
     companion object {
         const val TAG = "OffgridProbe"
         const val FRAMES_PER_BIND = 3
+        const val RING_CAPACITY = 200
+        const val PROBE_SUBDIR = "probe"
+        const val COLD_START_FILE = "cold_start.txt"
+        const val RESUME_FILE = "resume.txt"
 
         private val MAIN_POST: (Runnable) -> Unit = { task -> Handler(Looper.getMainLooper()).post(task) }
 
@@ -113,6 +140,17 @@ internal class RenderProbe(
         fun isDebugBuild(context: Context?): Boolean =
             context != null && (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
 
-        fun forContext(context: Context?): RenderProbe = RenderProbe(isDebugBuild(context))
+        fun captureFile(context: Context, name: String): File =
+            File(context.applicationContext.filesDir, "$PROBE_SUBDIR/$name")
+
+        fun forContext(context: Context?): RenderProbe {
+            val enabled = isDebugBuild(context)
+            val dir = if (enabled && context != null) {
+                File(context.applicationContext.filesDir, PROBE_SUBDIR)
+            } else {
+                null
+            }
+            return RenderProbe(enabled = enabled, captureDir = dir)
+        }
     }
 }
