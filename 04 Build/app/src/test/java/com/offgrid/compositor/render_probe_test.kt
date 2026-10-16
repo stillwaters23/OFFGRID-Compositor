@@ -3,6 +3,7 @@ package com.offgrid.compositor
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 /** Phase 0.5: the render probe logs exactly three frames per bind, and nothing on a release build. */
 class RenderProbeTest {
@@ -67,6 +68,27 @@ class RenderProbeTest {
         assertTrue(lines.any { it.contains("output=590x1280 targets=1 preview=true") })
         assertTrue(lines.any { it.contains("output=720x1280 targets=2 preview=false") })
         assertTrue(lines.any { it.contains("videoSize=1920x1080 pixelRatio=1.0") })
+    }
+
+    @Test
+    fun ringFeedsBindCapturesForColdStartAndResume() {
+        val dir = File.createTempFile("probe", null).apply { delete(); mkdirs() }
+        val probe = RenderProbe(
+            enabled = true,
+            sink = { lines.add(it) },
+            onMain = { mainTasks.add(it) },
+            captureDir = dir,
+            ringCapacity = 5,
+        )
+        probe.onBind(1, 1440, 3120, "6:13", 0)
+        val cold = File(dir, RenderProbe.COLD_START_FILE)
+        assertTrue(cold.exists())
+        assertTrue(cold.readText().contains("bind 1 preview="))
+        probe.onBind(2, 1440, 3120, "6:13", 0)
+        val resume = File(dir, RenderProbe.RESUME_FILE)
+        assertTrue(resume.exists())
+        assertTrue(resume.readText().contains("bind 2 preview="))
+        dir.deleteRecursively()
     }
 
     @Test

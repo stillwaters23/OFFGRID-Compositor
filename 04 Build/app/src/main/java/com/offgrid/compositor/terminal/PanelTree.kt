@@ -7,6 +7,8 @@ import android.text.TextPaint
 import android.text.style.CharacterStyle
 import android.text.style.StyleSpan
 import android.text.style.UpdateAppearance
+import android.content.Context
+import com.offgrid.compositor.RenderProbe
 
 /** What kind of folder it is. Settings and premium folders use the special folder color. */
 internal enum class FolderKind { SETTINGS, OFFICE, COLOR, PREMIUM, PLATFORM, EFFECTS, TESTS }
@@ -64,6 +66,9 @@ internal class ActionItem(
     val help: String,
     val arg: String? = null,
 ) : PanelItem()
+
+/** Debug-only viewer row under SYSTEM › Diagnostics › Render probe. */
+internal class RenderProbeViewerItem : PanelItem()
 
 internal enum class PanelAction {
     RESET_ALL,
@@ -228,7 +233,10 @@ internal object PanelTree {
         SettingDefaults(numbers, toggles, choices, texts)
     }
 
-    fun build(): PanelFolder {
+    private fun debugSystemFolder(app: Context?): List<PanelFolder> =
+        if (RenderProbe.isDebugBuild(app)) listOf(EffectFolders.system()) else emptyList()
+
+    fun build(app: Context? = null): PanelFolder {
         val top = listOf(
             settingsFolder(),
             EffectFolders.camera(),
@@ -239,7 +247,7 @@ internal object PanelTree {
             // Lane C hook
             EffectFolders.liveRemote(),
             offgridFolder(),
-        ) + PLATFORMS.mapIndexed { index, platform -> platformFolder(index + 1, platform) }
+        ) + debugSystemFolder(app) + PLATFORMS.mapIndexed { index, platform -> platformFolder(index + 1, platform) }
         return PanelFolder(id = "home", title = "HOME", tag = null, kind = FolderKind.SETTINGS, folders = top)
     }
 

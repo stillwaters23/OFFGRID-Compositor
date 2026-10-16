@@ -198,4 +198,12 @@
     <string name="fx_code_mine">That is your own code.</string>
     <string name="record_gallery_failed">Saved here, but the gallery did not take it. Tap Save last video to gallery in 📁 Record to try again.</string>
     <string name="effects_failed">The effects could not start on this phone. To keep your face hidden, the video stays black. To see the plain camera, pick Live camera and turn off Face diamond in 📁 Camera.</string>
+    <string name="render_probe_section_cold">Cold start capture</string>
+    <string name="render_probe_section_resume">Resume capture</string>
+    <string name="render_probe_empty">No capture yet. Force stop the app, open it again, then return here.</string>
+    <string name="render_probe_copy">Copy</string>
+    <string name="render_probe_share">Share</string>
+    <string name="render_probe_share_chooser">Share render probe</string>
+    <string name="render_probe_clip_label">OFFGRID render probe</string>
+    <string name="render_probe_unavailable">Render probe is not available while recording.</string>
 </resources>

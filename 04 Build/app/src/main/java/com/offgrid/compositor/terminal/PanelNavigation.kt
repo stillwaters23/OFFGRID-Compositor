@@ -15,6 +15,7 @@ import android.view.animation.LinearInterpolator
 import androidx.core.animation.doOnEnd
 import androidx.core.animation.doOnStart
 import com.offgrid.compositor.R
+import com.offgrid.compositor.RenderProbeIds
 
 private const val GRID_FADE_MS = 220L
 private const val CLOSE_MS = 220L
@@ -151,6 +152,10 @@ internal fun TerminalPanel.openFromTop(folder: PanelFolder, from: View) {
 
 internal fun TerminalPanel.showFolder(folder: PanelFolder, from: View?) {
     hideKeyboard()
+    if (folder.id == RenderProbeIds.VIEWER_FOLDER && !renderProbeMayOpen()) {
+        say(context.getString(R.string.render_probe_unavailable))
+        return
+    }
     val (pivotX, pivotY) = pivotIn(detailPane, from)
     val wasOpen = openFolder != null
     openFolder = folder

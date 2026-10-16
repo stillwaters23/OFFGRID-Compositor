@@ -167,6 +167,7 @@ class MainActivity : AppCompatActivity() {
             buttons = listOf(recordButton, playButton, actionButton, backButton),
         )
         terminalPanel.onTestDiamond = { on -> onTestDiamondChanged(on) }
+        terminalPanel.renderProbeMayOpen = { !recording }
         val engine = EffectEngine()
         mic = MicPipeline()
         engine.beatCount = { mic.beats.beats }
