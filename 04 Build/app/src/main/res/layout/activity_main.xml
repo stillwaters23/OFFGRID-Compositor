@@ -29,6 +29,9 @@
         android:contentDescription="@string/playback_picture"
         android:visibility="gone" />
 
+    <!-- Phase 1.2 (V2 7.2): the record bar never shows. Its words go to the panel's status line
+         and to Phone 2. Record and Play are rows in the Record folder. The views stay for the
+         ids the code still binds, but they are GONE for good. -->
     <LinearLayout
         android:id="@+id/control_bar"
         android:layout_width="match_parent"
@@ -39,7 +42,8 @@
         android:paddingStart="16dp"
         android:paddingTop="14dp"
         android:paddingEnd="16dp"
-        android:paddingBottom="20dp">
+        android:paddingBottom="20dp"
+        android:visibility="gone">
 
         <TextView
             android:id="@+id/status_text"
@@ -127,11 +131,14 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-    <!-- Step 2. The floating terminal panel. Royalty's private control, not painted into the video. -->
+    <!-- Step 2. The floating terminal panel. Royalty's private control, not painted into the video.
+         Phase 1.3: it starts GONE. The Broadcast Lock gate reveals it only after the stage has
+         drawn and no screen share is reported, so nothing flashes on a cold start or a resume. -->
     <com.offgrid.compositor.terminal.TerminalPanel
         android:id="@+id/terminal_panel"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_gravity="top|start" />
+        android:layout_gravity="top|start"
+        android:visibility="gone" />
 
 </FrameLayout>

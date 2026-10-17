@@ -199,14 +199,14 @@ internal fun TerminalPanel.showMinimized(value: Boolean, animate: Boolean, save:
         menu.close(animate = false)
     }
     expanded.isVisible = !value
-    pill.isVisible = value
+    // Phase 1.2: the pill is never on the stage. A shrunk panel is off the stage entirely.
+    pill.isVisible = false
     refreshEdgeRoom()
     scanLine.isVisible = !value && look.scanLine
-    pillRing.isVisible = look.ring
-    pillRing.spinning = value && look.ring
-    refreshBack()
+    pillRing.isVisible = false
+    pillRing.spinning = false
+    applyHidden()
     requestLayout()
-    refreshCoveredBars()
     if (animate && !value) {
         post { hologramIn(this, margin.toFloat(), margin.toFloat(), isDetail = false) }
         say(context.getString(R.string.terminal_panel_open))

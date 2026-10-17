@@ -36,7 +36,19 @@ internal object EffectFolders {
             TextItem(FxKeys.AUTO_CURTAIN_HEX, "Idle color hex", "Type a 6-character color like #000000 or #FFFFFF.", "#000000", 7),
             ToggleItem(FxKeys.LIVE_OVERLAY, "Floating overlay", "Show the small OFFGRID controls above other apps.", false, isTest = false),
             ActionItem(PanelAction.LIVE_OPEN_OVERLAY_SETTINGS, "Overlay settings", "Allow OFFGRID to draw its small controls over other apps."),
-            ActionItem(PanelAction.LIVE_CLEAN_OUTPUT, "Clean screen share", "Hide the record bar and shrink the panel to its bubble."),
+            ActionItem(
+                PanelAction.LIVE_CLEAN_OUTPUT,
+                "Lock now",
+                "Broadcast Lock. Hides this panel and the floating overlay. Only the stage stays. " +
+                    "To unlock, hold two fingers still in the middle of the screen for 1.5 seconds, or use Phone 2. " +
+                    "Nothing unlocks while a screen share is live.",
+            ),
+            ActionItem(
+                PanelAction.LOCK_ARM,
+                "Arm the lock",
+                "Locks now and stays locked after the share ends, so a resume or a cold start shows the stage only. " +
+                    "Tap again to disarm.",
+            ),
             ChoiceItem(
                 FxKeys.REMOTE_ROLE,
                 "Remote role",
@@ -700,6 +712,8 @@ internal object EffectFolders {
         tag = null,
         kind = FolderKind.EFFECTS,
         items = listOf(
+            ActionItem(PanelAction.RECORD_TOGGLE, "Record / Stop", "Starts a video with your effects in it. Tap again to stop. The status line above says what is happening."),
+            ActionItem(PanelAction.PLAY_LAST, "Play last video", "Plays your last video over the whole stage. Tap the stage, or press Back, to return to the camera."),
             NumberItem(FxKeys.RECORD_SECONDS, "Record length", "Seconds per video. 0 keeps going until you tap Stop.", 30),
             ToggleItem(FxKeys.RECORD_GALLERY, "Save to gallery", "Each new video is also saved to your phone's gallery.", true, isTest = false),
             ActionItem(PanelAction.SAVE_TO_GALLERY, "Save last video to gallery", "Puts your last video in the gallery, in Movies › OFFGRID."),
