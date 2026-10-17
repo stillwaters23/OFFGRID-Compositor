@@ -4,7 +4,6 @@ import android.app.Activity
 import android.content.Intent
 import android.os.Handler
 import android.os.Looper
-import android.view.View
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
@@ -28,22 +27,28 @@ import com.offgrid.live.RemotePacket
 import com.offgrid.live.RemotePreviewActivity
 import com.offgrid.live.RemotePreviewEncoder
 import com.offgrid.live.RemoteServiceDiscovery
+import com.offgrid.live.RemoteSession
 import java.util.concurrent.Executors
 
 internal class LiveIntegration(
     activity: Activity,
     effects: EffectsController,
     processor: () -> CompositorProcessor?,
-    controlBar: View,
+    private val lock: BroadcastLockStore,
     panel: TerminalPanel,
 ) : DefaultLifecycleObserver {
     private val appContext = activity.applicationContext
     private val main = Handler(Looper.getMainLooper())
     private val worker = Executors.newSingleThreadExecutor()
+
+    /** Phase 1.3: status and lock words for Phone 2 go out on their own thread, never the UI's. */
+    private val phone2 = Executors.newSingleThreadExecutor()
     private val pairing = PairingWorkflow(appContext)
     private var effects: EffectsController? = effects
-    private var controlBar: View? = controlBar
     private var panel: TerminalPanel? = panel
+    @Volatile private var remoteSession: RemoteSession? = null
+    private var resumed = false
+    private val lockListener: (LockState) -> Unit = { state -> onLockChanged(state) }
     private val host = LiveHost(appContext).also {
         it.attach(effects, processor)
         it.onRoleChanged = ::changeRole
@@ -59,7 +64,6 @@ internal class LiveIntegration(
         remoteStillRunning = { remoteServer != null || remoteEncoder != null || streamServiceStarted },
         onStatus = ::showStatus,
     )
-    private var cleanOutput = false
     private var activity: Activity? = activity
     private var activeRole = "off"
     private val pickArVideo = (activity as? ComponentActivity)?.registerForActivityResult(
@@ -73,28 +77,83 @@ internal class LiveIntegration(
     init {
         host.onPcOutputChanged = { enabled -> if (enabled) pc.startFromSettings() else pc.stop() }
         host.onRestoreControls = ::restoreCleanOutput
+        host.onLockCommand = ::onLockCommand
         LiveHostRegistry.host = host
         effects.onLiveAction = ::onAction
         effects.onLiveSettings = ::syncSettings
+        lock.addListener(lockListener)
         syncSettings()
         (activity as? LifecycleOwner)?.lifecycle?.addObserver(this)
     }
 
     private fun onResume() {
-        if (cleanOutput) restoreCleanOutput()
+        resumed = true
         if (host.readSetting(FxKeys.LIVE_PC_ON) == "true") pc.startFromSettings()
-        if (host.readSetting(LIVE_OVERLAY_KEY) == "true") {
-            LiveOverlayController.openOverlay(appContext)
-        }
+        showOverlayIfWanted()
     }
 
     private fun onPause() {
+        resumed = false
         pc.stop()
         if (host.readSetting(LIVE_OVERLAY_KEY) == "true") {
-            LiveOverlayController.openOverlay(appContext)
+            showOverlayIfWanted()
         } else if (remoteServer == null && remoteEncoder == null && !streamServiceStarted) {
             appContext.stopService(Intent(appContext, LiveService::class.java))
         }
+    }
+
+    /** The overlay comes up only while the stage is not locked. Locked, its window stays off. */
+    private fun showOverlayIfWanted() {
+        if (lock.locked) return
+        if (host.readSetting(LIVE_OVERLAY_KEY) == "true") LiveOverlayController.openOverlay(appContext)
+    }
+
+    /**
+     * Phase 1.3: every lock change reaches the overlay and Phone 2. Locked removes the overlay
+     * window (its secure-window flag would black out the broadcast). Unlocked lets it back when wanted.
+     */
+    private fun onLockChanged(state: LockState) {
+        if (state.locked) {
+            LiveOverlayController.lockOverlay(appContext)
+        } else {
+            LiveOverlayController.unlockOverlay(appContext)
+            showOverlayIfWanted()
+        }
+        tellPhone2(RemoteMessage.LOCK_STATE_KEY, state.word)
+    }
+
+    /** Phone 2 sent a lock command over the paired link (fire lock_on, lock_off, or arm). */
+    private fun onLockCommand(action: String) {
+        when (action) {
+            RemoteMessage.LOCK_ON -> {
+                lock.lock(LockSource.REMOTE)
+                tellPhone2Status("Locked from Phone 2.")
+            }
+            RemoteMessage.LOCK_ARM -> {
+                lock.arm()
+                tellPhone2Status("Armed from Phone 2. The stage stays locked after the share ends.")
+            }
+            RemoteMessage.LOCK_OFF -> when (lock.unlock()) {
+                UnlockResult.UNLOCKED -> tellPhone2Status("Unlocked from Phone 2.")
+                UnlockResult.REFUSED_SHARE_VISIBLE -> tellPhone2Status("Unlock refused. A screen share is live on the S25.")
+                UnlockResult.NOTHING_TO_UNLOCK -> tellPhone2Status("The S25 was not locked.")
+            }
+        }
+    }
+
+    /** Sends one display-only setting to Phone 2, off the UI thread. Silent when no phone is linked. */
+    fun tellPhone2(key: String, value: String) {
+        val session = remoteSession ?: return
+        val safe = value.take(MAX_PHONE2_TEXT)
+        phone2.execute {
+            runCatching { session.sendControl(RemoteMessage(key, "setting", safe)) }
+        }
+    }
+
+    /** The status line words, for Phone 2's screen. The panel on the S25 types the same words. */
+    fun tellPhone2Status(message: String) {
+        panel?.announce(message)
+        tellPhone2(RemoteMessage.STATUS_LINE_KEY, message)
     }
 
     fun close() {
@@ -102,12 +161,14 @@ internal class LiveIntegration(
         effects?.onLiveSettings = null
         effects = null
         host.detach()
+        host.onLockCommand = null
+        lock.removeListener(lockListener)
         activity = null
-        controlBar = null
         panel = null
         pairing.close()
         pc.close()
         worker.shutdownNow()
+        phone2.shutdownNow()
     }
 
     override fun onResume(owner: LifecycleOwner) = onResume()
@@ -122,11 +183,15 @@ internal class LiveIntegration(
     private fun onAction(action: String) {
         when (action) {
             LiveActions.OPEN_OVERLAY -> host.writeSetting(LIVE_OVERLAY_KEY, "true")
-            LiveActions.CLEAN_OUTPUT -> {
-                controlBar?.visibility = View.GONE
-                panel?.setHiddenForPlayback(true)
-                cleanOutput = true
-                LiveOverlayController.hideOverlay(appContext)
+            // Phase 1.3: Clean screen share is the Broadcast Lock now (V2 section 7.3, "absorbs CLEAN_OUTPUT").
+            LiveActions.CLEAN_OUTPUT -> lock.lock(LockSource.MANUAL)
+            LiveActions.LOCK_ARM -> if (lock.state.armed) {
+                when (lock.unlock()) {
+                    UnlockResult.REFUSED_SHARE_VISIBLE -> tellPhone2Status("A screen share is live. The lock stays on.")
+                    else -> tellPhone2Status("The lock is disarmed.")
+                }
+            } else {
+                lock.arm()
             }
             LiveActions.OPEN_PAIRING -> launch(PairingActivity::class.java)
             LiveActions.OPEN_PREVIEW -> launch(RemotePreviewActivity::class.java)
@@ -154,10 +219,11 @@ internal class LiveIntegration(
         showStatus("AR clip ready.")
     }
 
+    /** The overlay's expand control, kept for the old Clean screen share path: it asks to unlock. */
     private fun restoreCleanOutput() {
-        cleanOutput = false
-        controlBar?.visibility = View.VISIBLE
-        panel?.setHiddenForPlayback(false)
+        if (lock.unlock() == UnlockResult.REFUSED_SHARE_VISIBLE) {
+            tellPhone2Status("Unlock refused. A screen share is live.")
+        }
     }
 
     private fun launch(destination: Class<out Activity>) {
@@ -229,6 +295,7 @@ internal class LiveIntegration(
                                     onFailure = ::showStatus,
                                 )
                                 remoteEncoder = encoder
+                                remoteSession = session
                                 encoder.start(host) { started ->
                                     if (started) showStatus("Camera phone is ready on local Wi-Fi.")
                                 }
@@ -237,6 +304,8 @@ internal class LiveIntegration(
                                         val value = host.readSetting(key) ?: default
                                         session.sendControl(RemoteMessage(key, "setting", value))
                                     }
+                                    // Phase 1.3: Phone 2 shows the lock word from the first moment.
+                                    session.sendControl(RemoteMessage(RemoteMessage.LOCK_STATE_KEY, "setting", lock.state.word))
                                     while (!Thread.currentThread().isInterrupted) {
                                         when (val packet = session.receive()) {
                                             is RemotePacket.Control -> {
@@ -251,6 +320,7 @@ internal class LiveIntegration(
                                         }
                                     }
                                 } finally {
+                                    remoteSession = null
                                     encoder.close()
                                     remoteEncoder = null
                                 }
@@ -288,14 +358,20 @@ internal class LiveIntegration(
         }
     }
 
+    /**
+     * Link status. The panel types it and Phone 2 shows it. A toast only while unlocked: a toast
+     * is system chrome, and under the Broadcast Lock nothing but the stage may be on screen.
+     */
     private fun showStatus(message: String) {
         main.post {
-            activity?.let { Toast.makeText(it, message, Toast.LENGTH_LONG).show() }
+            tellPhone2Status(message)
+            if (!lock.locked) activity?.let { Toast.makeText(it, message, Toast.LENGTH_LONG).show() }
         }
     }
 
     companion object {
         private const val LIVE_OVERLAY_KEY = "fx.live.overlay"
+        private const val MAX_PHONE2_TEXT = 200
         private val CAMERA_SETTINGS = mapOf(
             "fx.cam.on" to "true",
             "fx.mic.on" to "false",
@@ -306,10 +382,8 @@ internal class LiveIntegration(
             activity: Activity,
             effects: EffectsController,
             processor: () -> CompositorProcessor?,
-            controlBar: View,
+            lock: BroadcastLockStore,
             panel: TerminalPanel,
-        ) {
-            LiveIntegration(activity, effects, processor, controlBar, panel)
-        }
+        ): LiveIntegration = LiveIntegration(activity, effects, processor, lock, panel)
     }
 }

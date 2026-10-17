@@ -109,6 +109,17 @@ internal class BroadcastLockStore(private val persistence: LockPersistence) {
     /** Called on every change with the new state, on the thread that made the change. */
     var onChanged: ((LockState) -> Unit)? = null
 
+    /** More listeners: the activity's chrome, the overlay, and Phone 2 each follow the lock. */
+    private val listeners = ArrayList<(LockState) -> Unit>()
+
+    fun addListener(listener: (LockState) -> Unit) {
+        listeners += listener
+    }
+
+    fun removeListener(listener: (LockState) -> Unit) {
+        listeners -= listener
+    }
+
     val locked: Boolean get() = state.locked
 
     /** Locks from [source]. AUTO goes through [setRecordingVisible]; the others are sticky. */
@@ -159,7 +170,7 @@ internal class BroadcastLockStore(private val persistence: LockPersistence) {
             recordingVisible = initialVisible ?: false,
             resumeHold = state.resumeHold || wasLocked,
         )
-        if (next != state) change(next) else onChanged?.invoke(state)
+        if (next != state) change(next) else notify(state)
     }
 
     /** The resume window passed without a VISIBLE report, so the hold alone no longer locks. */
@@ -174,7 +185,12 @@ internal class BroadcastLockStore(private val persistence: LockPersistence) {
         persistence.write(KEY_MANUAL, next.manualLocked)
         persistence.write(KEY_REMOTE, next.remoteLocked)
         persistence.write(KEY_ARMED, next.armed)
-        onChanged?.invoke(next)
+        notify(next)
+    }
+
+    private fun notify(now: LockState) {
+        onChanged?.invoke(now)
+        for (listener in listeners.toList()) listener(now)
     }
 
     companion object {

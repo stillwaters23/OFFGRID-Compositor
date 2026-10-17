@@ -11,11 +11,15 @@ import android.util.Log
 import android.util.Range
 import android.util.Rational
 import android.util.Size
+import android.view.MotionEvent
 import android.view.Surface
 import android.view.TextureView
 import android.view.View
+import android.widget.FrameLayout
+import android.view.ViewConfiguration
 import android.widget.Button
 import android.widget.TextView
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.OptIn
 import androidx.appcompat.app.AppCompatActivity
@@ -49,7 +53,9 @@ import com.offgrid.compositor.effects.EffectEngine
 import com.offgrid.compositor.effects.EffectLayers
 import com.offgrid.compositor.effects.StageGeometry
 import com.offgrid.compositor.audio.voice.VoiceAudioOutput
+import com.offgrid.compositor.terminal.PanelAction
 import com.offgrid.compositor.terminal.TerminalPanel
+import com.offgrid.compositor.terminal.showMinimized
 
 /**
  * Step 1. Shows the painted camera picture, records, and plays it back.
@@ -62,6 +68,11 @@ import com.offgrid.compositor.terminal.TerminalPanel
  * Lane B. The camera and mic toggles in the panel start and release the camera and the mic.
  * Videos are recorded by [AvSession], with the mic and its effects. While the camera is off,
  * [DarkStage] shows black with the effects drawn over it.
+ * Phase 1.2. The stage is clean: no record bar, no HUD words, no floating pill. Every message
+ * goes to the panel's status line and to Phone 2. Record and Play live in the Record folder.
+ * Phase 1.3. The Broadcast Lock ([BroadcastLockChrome], [LockTouch]) hides the panel and the
+ * overlay whenever Android 15 reports a screen share, or Royalty locks by hand, by Phone 2, or
+ * by arming. Nothing unlocks while a share is live.
  */
 class MainActivity : AppCompatActivity() {
 
@@ -111,6 +122,15 @@ class MainActivity : AppCompatActivity() {
     internal var diamondInVideo: Boolean? = null
     internal lateinit var effects: EffectsController
 
+    /** Phase 1.3: the Broadcast Lock, its chrome gate, and the stage touch sink and holds. */
+    internal lateinit var lockStore: BroadcastLockStore
+    internal lateinit var lockChrome: BroadcastLockChrome
+    private lateinit var lockTouch: LockTouch
+    internal lateinit var coachMark: CoachMark
+
+    /** Lane C, Phase 1.2: the link to Phone 2, which now also shows the status line and the lock word. */
+    internal lateinit var live: LiveIntegration
+
     internal fun effectsReady(): Boolean = ::effects.isInitialized
 
     /** Processed voice for another lane. The recording itself still comes from the same mic engine. */
@@ -141,6 +161,12 @@ class MainActivity : AppCompatActivity() {
         ActivityResultContracts.RequestPermission(),
     ) { granted -> onMicPermission(granted) }
 
+    internal val playbackBackCallback = object : OnBackPressedCallback(false) {
+        override fun handleOnBackPressed() {
+            hidePlayback()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -161,40 +187,122 @@ class MainActivity : AppCompatActivity() {
         terminalPanel = findViewById(R.id.terminal_panel)
 
         onBackPressedDispatcher.addCallback(this, terminalPanel.backCallback)
+        // Phase 1.2: with no Back to camera button on the stage, the phone's Back key ends playback.
+        onBackPressedDispatcher.addCallback(this, playbackBackCallback)
         terminalPanel.matchLook(
             bars = listOf(controlBar, playbackBar),
             texts = listOf(statusText, playbackHint),
             buttons = listOf(recordButton, playButton, actionButton, backButton),
         )
         terminalPanel.onTestDiamond = { on -> onTestDiamondChanged(on) }
-        terminalPanel.renderProbeMayOpen = { !recording }
+        // Phase 1.3: the Broadcast Lock exists before anything that can show chrome.
+        lockStore = BroadcastLockStore(PrefsLockPersistence(this))
+        lockChrome = BroadcastLockChrome(this, lockStore)
+        lockChrome.onCreate()
+        terminalPanel.renderProbeMayOpen = { !recording && !lockStore.locked }
+        terminalPanel.onLockTapped = { lockChrome.lock(LockSource.MANUAL) }
+        terminalPanel.onLockHeld = { lockChrome.toggleArmed() }
         val engine = EffectEngine()
         mic = MicPipeline()
         engine.beatCount = { mic.beats.beats }
         faces = FaceTracker(this, engine)
         segmenter = PersonSegmenter(this, engine, masks)
         effects = EffectsController(this, terminalPanel, engine)
-        LiveIntegration.install(this, effects, { processor }, controlBar, terminalPanel) // Lane C hook
+        live = LiveIntegration.install(this, effects, { processor }, lockStore, terminalPanel) // Lane C hook
         effects.lastVideo = { recordingFile() }
         effects.onSettings = { onEffectSettings() }
+        effects.onScreenAction = { action -> onScreenAction(action) }
         effects.start()
         effects.attachInk(previewView)
         terminalPanel.useGuides(findViewById(R.id.snap_guides))
         describeCamera(terminalPanel.testDiamondOn)
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.root)) { _, insets ->
+        val root = findViewById<FrameLayout>(R.id.root)
+        ViewCompat.setOnApplyWindowInsetsListener(root) { _, insets ->
             terminalPanel.onKeyboardInset(insets.getInsets(WindowInsetsCompat.Type.ime()).bottom)
             terminalPanel.onScreenEdges(screenEdges(insets))
             insets
         }
-        darkStage = DarkStage(this, findViewById(R.id.root), previewView) { processor }
+        darkStage = DarkStage(this, root, previewView) { processor }
         previewView.addOnLayoutChangeListener { _, left, top, right, bottom, _, _, _, _ ->
             onPreviewLayout(right - left, bottom - top)
         }
-        recordButton.setOnClickListener { toggleRecording() }
-        playButton.setOnClickListener { showPlayback() }
-        backButton.setOnClickListener { hidePlayback() }
+        val panelOpenInset = (PANEL_OPEN_EDGE_INSET_DP * resources.displayMetrics.density).toInt()
+        root.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            lockChrome.applyGestureExclusion(root, panelOpenInset)
+        }
+        lockTouch = LockTouch(
+            chrome = lockChrome,
+            slopPx = LockTouch.slopFor(ViewConfiguration.get(this)),
+            panelOpenInsetPx = panelOpenInset,
+            panelHidden = { terminalPanel.hiddenFromStage },
+            playbackShowing = { playRequested },
+            cancelViews = { cancelViewTouches() },
+            openPanel = {
+                coachMark.hide()
+                terminalPanel.showMinimized(false, animate = true)
+            },
+            closePlayback = { hidePlayback() },
+            tick = { terminalPanel.look.tick },
+            haptic = { kind -> window.decorView.performHapticFeedback(kind) },
+        )
+        coachMark = CoachMark(root, CoachMark.prefs(this))
+        terminalPanel.onShrunkByTap = {
+            val state = lockStore.state
+            coachMark.showOnce(
+                LockGestureMap.panelOpenZone(root.width, root.height, panelOpenInset),
+                allowed = !recording && !state.locked && !state.armed,
+            )
+        }
         playbackView.surfaceTextureListener = playbackSurfaceListener()
         showMessage(R.string.camera_starting, ButtonMode.NONE)
+    }
+
+    override fun onStart() {
+        super.onStart()
+        lockChrome.onStart()
+    }
+
+    override fun onStop() {
+        lockChrome.onStop()
+        super.onStop()
+    }
+
+    /** Phase 1.3: the touch sink and the stage holds see every touch before any view does. */
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        if (::lockTouch.isInitialized) {
+            val root = findViewById<View>(R.id.root)
+            if (lockTouch.dispatch(event, root.width, root.height)) return true
+        }
+        return super.dispatchTouchEvent(event)
+    }
+
+    /** A hold fired: the views under the fingers get a cancel so a pinch or a stroke ends cleanly. */
+    private fun cancelViewTouches() {
+        val now = android.os.SystemClock.uptimeMillis()
+        val cancel = MotionEvent.obtain(now, now, MotionEvent.ACTION_CANCEL, 0f, 0f, 0)
+        window.superDispatchTouchEvent(cancel)
+        cancel.recycle()
+    }
+
+    /** Phase 1.2: Record / Stop and Play last video are rows in the Record folder now. */
+    private fun onScreenAction(action: PanelAction) {
+        when (action) {
+            PanelAction.RECORD_TOGGLE -> toggleRecording()
+            PanelAction.PLAY_LAST -> showPlayback()
+            else -> Unit
+        }
+    }
+
+    /** The lock changed. Locked stops a playing video: a looping saved clip is not the stage. */
+    internal fun onLockApplied(state: LockState) {
+        if (state.locked && playRequested) hidePlayback()
+        if ((state.locked || state.armed) && ::coachMark.isInitialized) coachMark.hide()
+    }
+
+    /** One line for the panel's status line and for Phone 2. Nothing is drawn on the stage. */
+    internal fun sayStatus(message: String) {
+        terminalPanel.announce(message)
+        if (::live.isInitialized) live.tellPhone2(com.offgrid.live.RemoteMessage.STATUS_LINE_KEY, message)
     }
 
     override fun onResume() {
@@ -226,6 +334,9 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         mainHandler.removeCallbacks(rebindTask)
+        if (::lockTouch.isInitialized) lockTouch.release()
+        if (::lockChrome.isInitialized) lockChrome.onDestroy()
+        if (::coachMark.isInitialized) coachMark.hide()
         mic.stop()
         darkStage.hide()
         effects.release()
@@ -258,6 +369,7 @@ class MainActivity : AppCompatActivity() {
             created.inputSize?.let { size ->
                 faces.streamAspect = maxOf(size.width, size.height).toFloat() / minOf(size.width, size.height)
             }
+            lockChrome.onFirstStageFrame()
             showLivePicture()
         }
         created.onEffectsFailed = {
@@ -442,5 +554,8 @@ class MainActivity : AppCompatActivity() {
 
     private companion object {
         const val TAG = "OffgridCompositor"
+
+        /** The panel-open hold zone starts this far in from the screen edges: no edge gestures (V2 7.3). */
+        const val PANEL_OPEN_EDGE_INSET_DP = 48f
     }
 }
