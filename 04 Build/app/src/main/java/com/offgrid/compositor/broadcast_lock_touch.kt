@@ -107,13 +107,14 @@ internal class LockTouch(
     private fun fireLock() {
         lockHold.fired()
         main.removeCallbacks(panelTimer)
-        when (LockGestureMap.holdOutcome(lockedAtHoldStart, chrome.store.locked)) {
+        val outcome = LockGestureMap.holdOutcome(lockedAtHoldStart, chrome.store.locked)
+        if (LockGestureMap.swallowsRest(outcome)) {
+            cancelViews()
+            swallowRest = true
+        }
+        when (outcome) {
             HoldOutcome.UNLOCK -> chrome.unlock()
-            HoldOutcome.LOCK -> {
-                cancelViews()
-                swallowRest = true
-                chrome.lock(LockSource.MANUAL)
-            }
+            HoldOutcome.LOCK -> chrome.lock(LockSource.MANUAL)
             HoldOutcome.NONE -> Unit
         }
     }
