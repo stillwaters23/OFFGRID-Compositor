@@ -264,6 +264,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStop() {
         lockChrome.onStop()
+        // A coach mark still up when the app leaves would be the first thing drawn on resume.
+        coachMark.hide()
         super.onStop()
     }
 
