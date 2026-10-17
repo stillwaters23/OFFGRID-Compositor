@@ -13,6 +13,9 @@ class LiveService : Service() {
     private lateinit var notification: LiveNotification
     private lateinit var overlay: OverlayWindowController
     private var overlayVisible = false
+
+    /** Phase 1.3: true while the Broadcast Lock keeps the overlay window off the screen. */
+    private var overlayLocked = false
     private var streaming = false
     private var streamCamera = false
     private var streamMicrophone = false
@@ -31,8 +34,34 @@ class LiveService : Service() {
             ACTION_STREAM_STOP -> stopStream()
             ACTION_OPEN -> LiveHostRegistry.host?.openApp() ?: openApp()
             ACTION_STOP -> onNotificationStop()
+            ACTION_LOCK -> lockOverlay()
+            ACTION_UNLOCK -> unlockOverlay()
         }
         return START_NOT_STICKY
+    }
+
+    /**
+     * Phase 1.3: the Broadcast Lock takes the overlay window off the screen. Its FLAG_SECURE
+     * would otherwise paint a black box over the broadcast. The setting stays on, and SHOW is
+     * ignored until UNLOCK, so nothing of it comes back while the stage is on air.
+     */
+    private fun lockOverlay() {
+        overlayLocked = true
+        overlay.close()
+        overlayVisible = false
+        if (!streaming) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+        }
+    }
+
+    /** The lock is off. The camera screen sends SHOW again itself when the overlay setting is on. */
+    private fun unlockOverlay() {
+        overlayLocked = false
+        if (!streaming && !overlayVisible) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+        }
     }
 
     private fun startOverlayService(hide: Boolean) {
@@ -44,6 +73,15 @@ class LiveService : Service() {
             )
         } else {
             startForeground(NOTIFICATION_ID, notification.build())
+        }
+        if (overlayLocked) {
+            // A SHOW that arrives while locked is dropped: the window stays off the air. The
+            // foreground call above satisfies startForegroundService before the service stops.
+            if (!streaming) {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopSelf()
+            }
+            return
         }
         overlayVisible = Settings.canDrawOverlays(this)
         overlay.show()
@@ -125,6 +163,8 @@ class LiveService : Service() {
         const val ACTION_STOP = "com.offgrid.live.STOP"
         const val ACTION_STREAM_START = "com.offgrid.live.STREAM_START"
         const val ACTION_STREAM_STOP = "com.offgrid.live.STREAM_STOP"
+        const val ACTION_LOCK = "com.offgrid.live.LOCK"
+        const val ACTION_UNLOCK = "com.offgrid.live.UNLOCK"
         const val EXTRA_CAMERA = "camera"
         const val EXTRA_MICROPHONE = "microphone"
         private const val NOTIFICATION_ID = 4201

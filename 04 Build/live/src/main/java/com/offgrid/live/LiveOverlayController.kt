@@ -44,4 +44,24 @@ object LiveOverlayController {
             Intent(context, LiveService::class.java).setAction(LiveService.ACTION_HIDE),
         )
     }
+
+    /**
+     * Phase 1.3: the Broadcast Lock removes the overlay window entirely. [hideOverlay] only
+     * shrinks it to a bubble, and a bubble with FLAG_SECURE is still a black box on a broadcast.
+     * A plain start is enough: the service either removes its window or was not running.
+     */
+    fun lockOverlay(context: Context) {
+        if (!Settings.canDrawOverlays(context)) return
+        runCatching {
+            context.startService(Intent(context, LiveService::class.java).setAction(LiveService.ACTION_LOCK))
+        }
+    }
+
+    /** The lock is off. The caller follows with [openOverlay] when the overlay setting is on. */
+    fun unlockOverlay(context: Context) {
+        if (!Settings.canDrawOverlays(context)) return
+        runCatching {
+            context.startService(Intent(context, LiveService::class.java).setAction(LiveService.ACTION_UNLOCK))
+        }
+    }
 }

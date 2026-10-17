@@ -14,13 +14,19 @@ class RemoteSession private constructor(
     private val sendChannel: EncryptedChannel,
     private val receiveChannel: EncryptedChannel,
 ) : AutoCloseable {
-    @Synchronized
-    fun sendControl(message: RemoteMessage) {
+    /**
+     * Sends and receives take separate locks. A reader blocked in [receive] must not hold up a
+     * send: the camera phone pushes video and, since Phase 1.3, the lock state and status line
+     * while its reader waits for Phone 2's next command.
+     */
+    private val sendLock = Any()
+    private val receiveLock = Any()
+
+    fun sendControl(message: RemoteMessage) = synchronized(sendLock) {
         writeEncrypted(byteArrayOf(CONTROL.toByte()) + message.encode())
     }
 
-    @Synchronized
-    fun sendVideo(sample: ByteArray, presentationTimeUs: Long, flags: Int) {
+    fun sendVideo(sample: ByteArray, presentationTimeUs: Long, flags: Int) = synchronized(sendLock) {
         require(sample.size <= MAX_VIDEO_SIZE)
         val output = ByteArrayOutputStream()
         DataOutputStream(output).use { packet ->
@@ -33,14 +39,13 @@ class RemoteSession private constructor(
         writeEncrypted(output.toByteArray())
     }
 
-    @Synchronized
-    fun receive(): RemotePacket {
+    fun receive(): RemotePacket = synchronized(receiveLock) {
         val frameSize = input.readInt()
         require(frameSize in MIN_ENCRYPTED_SIZE..MAX_ENCRYPTED_SIZE)
         val encrypted = ByteArray(frameSize)
         input.readFully(encrypted)
         val payload = DataInputStream(receiveChannel.decrypt(encrypted).inputStream())
-        return when (payload.readUnsignedByte()) {
+        when (payload.readUnsignedByte()) {
             CONTROL -> {
                 val messageBytes = ByteArray(payload.available()).also(payload::readFully)
                 RemotePacket.Control(RemoteMessage.decode(messageBytes))

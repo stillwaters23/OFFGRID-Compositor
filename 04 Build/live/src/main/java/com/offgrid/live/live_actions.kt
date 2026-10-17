@@ -7,7 +7,10 @@ object LiveActions {
     const val OPEN_PREVIEW = "REMOTE_OPEN_PREVIEW"
     const val SEND_TO_PC = "LIVE_SEND_TO_PC"
 
-    val HANDLED = setOf(OPEN_OVERLAY, CLEAN_OUTPUT, OPEN_PAIRING, OPEN_PREVIEW, SEND_TO_PC)
+    /** Phase 1.3: arms or disarms the Broadcast Lock. CLEAN_OUTPUT is "Lock now". */
+    const val LOCK_ARM = "LOCK_ARM"
+
+    val HANDLED = setOf(OPEN_OVERLAY, CLEAN_OUTPUT, OPEN_PAIRING, OPEN_PREVIEW, SEND_TO_PC, LOCK_ARM)
 
     fun handles(name: String): Boolean = name in HANDLED
 }

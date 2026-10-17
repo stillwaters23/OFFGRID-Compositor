@@ -19,6 +19,8 @@ class RemotePreviewActivity : Activity(), SurfaceHolder.Callback {
     private lateinit var pairing: PairingWorkflow
     private lateinit var discovery: RemoteServiceDiscovery
     private lateinit var status: TextView
+    private lateinit var lockState: TextView
+    private lateinit var cameraStatus: TextView
     private lateinit var surfaceView: SurfaceView
     private lateinit var typedAddress: EditText
     private var pairingKey: String? = null
@@ -61,6 +63,7 @@ class RemotePreviewActivity : Activity(), SurfaceHolder.Callback {
         }
         root.addView(typedAddress, marginTop(8))
         root.addView(button("Connect to typed address") { connectTyped() }, marginTop(8))
+        addBroadcastLockStrip(root)
         root.addView(button("Auto Blackout Gate on / off") { toggle("fx.live.curtain.on", true) }, marginTop(8))
         root.addView(button("Idle Color: Black") { sendSetting("fx.live.curtain.mode", "black") }, marginTop(8))
         root.addView(button("Idle Color: White") { sendSetting("fx.live.curtain.mode", "white") }, marginTop(8))
@@ -74,7 +77,7 @@ class RemotePreviewActivity : Activity(), SurfaceHolder.Callback {
                 sendSetting("fx.camera.mode", mode)
             }, marginTop(8))
         }
-        for (action in RemoteMessage.FIRE_ACTIONS) {
+        for (action in RemoteMessage.FIRE_ACTIONS - RemoteMessage.LOCK_ACTIONS) {
             root.addView(button("Fire $action") {
                 link?.sendControl(RemoteMessage("", "fire", action))
             }, marginTop(8))
@@ -133,6 +136,10 @@ class RemotePreviewActivity : Activity(), SurfaceHolder.Callback {
                     is RemotePacket.Video -> decoder?.queue(packet)
                     is RemotePacket.Control -> if (packet.message.type == "setting") {
                         cameraSettings[packet.message.key] = packet.message.value
+                        when (packet.message.key) {
+                            RemoteMessage.LOCK_STATE_KEY -> runOnUiThread { showLockState(packet.message.value) }
+                            RemoteMessage.STATUS_LINE_KEY -> runOnUiThread { cameraStatus.text = "S25: ${packet.message.value}" }
+                        }
                     }
                 }
             },
@@ -216,6 +223,77 @@ class RemotePreviewActivity : Activity(), SurfaceHolder.Callback {
         setOnClickListener { action() }
     }
 
+    /**
+     * Phase 1.3: the Broadcast Lock from Phone 2. Lock and Arm are one tap. Unlock is a one
+     * second hold, so a brush of the thumb cannot put the S25's panel on air. The camera phone
+     * refuses lock_off while a share is live (A4) and says so on this screen.
+     */
+    private fun addBroadcastLockStrip(root: LinearLayout) {
+        root.addView(label("Broadcast Lock", 16, true), marginTop(16))
+        lockState = label("S25 lock: not connected", 13)
+        root.addView(lockState, marginTop(4))
+        cameraStatus = label("S25: waiting", 12)
+        root.addView(cameraStatus, marginTop(4))
+        val strip = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        val lockNow = button("Lock now") { fireLock(RemoteMessage.LOCK_ON) }
+        val arm = button("Arm") { fireLock(RemoteMessage.LOCK_ARM) }
+        val unlock = holdButton("Hold to unlock", HOLD_TO_UNLOCK_MS) { fireLock(RemoteMessage.LOCK_OFF) }
+        for (view in listOf(lockNow, arm, unlock)) {
+            strip.addView(view, LinearLayout.LayoutParams(0, dp(48), 1f).apply { marginEnd = dp(8) })
+        }
+        root.addView(strip, marginTop(8))
+    }
+
+    private fun fireLock(action: String) {
+        val remote = link
+        if (remote == null) {
+            status.text = "Connect to the camera phone first."
+            return
+        }
+        remote.sendControl(RemoteMessage("", "fire", action))
+        status.text = when (action) {
+            RemoteMessage.LOCK_OFF -> "Unlock sent. The S25 refuses it while a share is live."
+            RemoteMessage.LOCK_ARM -> "Arm sent."
+            else -> "Lock sent."
+        }
+    }
+
+    private fun showLockState(word: String) {
+        lockState.text = when (word) {
+            "live" -> "S25 lock: LIVE. A share is on. Unlock is refused."
+            "locked" -> "S25 lock: locked"
+            "armed" -> "S25 lock: armed"
+            else -> "S25 lock: unlocked"
+        }
+    }
+
+    /** A button that fires only after [holdMs] of steady pressure. Lifting early does nothing. */
+    private fun holdButton(text: String, holdMs: Long, action: () -> Unit) = button(text) {}.apply {
+        var fired = false
+        val fire = Runnable {
+            fired = true
+            action()
+        }
+        setOnClickListener(null)
+        setOnTouchListener { view, event ->
+            when (event.actionMasked) {
+                android.view.MotionEvent.ACTION_DOWN -> {
+                    fired = false
+                    view.isPressed = true
+                    view.postDelayed(fire, holdMs)
+                }
+                android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
+                    view.isPressed = false
+                    view.removeCallbacks(fire)
+                    if (!fired && event.actionMasked == android.view.MotionEvent.ACTION_UP) {
+                        status.text = "Hold Unlock for one second."
+                    }
+                }
+            }
+            true
+        }
+    }
+
     /** Minimal Phone 2 clip strip. The camera phone owns the files; these only send commands. */
     private fun addArDeckStrip(root: LinearLayout) {
         root.addView(label("AR Video Deck", 16, true), marginTop(16))
@@ -242,6 +320,7 @@ class RemotePreviewActivity : Activity(), SurfaceHolder.Callback {
         const val DIM = 0xff777777.toInt()
         const val GLASS = 0xff080808.toInt()
         const val UV = 0xff9b5cff.toInt()
+        const val HOLD_TO_UNLOCK_MS = 1_000L
         val EFFECT_TOGGLES = listOf(
             "fx.coaster.on" to "Roller Coaster",
             "fx.heroes.on" to "Flying Heroes",
