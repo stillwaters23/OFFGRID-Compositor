@@ -106,7 +106,10 @@ internal fun MainActivity.applyCapture() {
             micProblem = 0
         }
         mic.apply(settings)
-        if (resumed && micToggle && micProblem == 0 && !capture.micDenied && !hasMicPermission() && !micAsking) askForMic()
+        // The system permission dialog is chrome on air. Phone 2 can turn fx.mic.on on mid share.
+        if (resumed && !lockStore.locked && micToggle && micProblem == 0 && !capture.micDenied && !hasMicPermission() && !micAsking) {
+            askForMic()
+        }
         val micWanted = micToggle && micProblem == 0 && !capture.micDenied
         val actions = capture.update(cameraWanted, micWanted, hasMicPermission(), resumed)
         for (action in actions) {
