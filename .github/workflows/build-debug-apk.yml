@@ -265,12 +265,18 @@ jobs:
           fi
           echo "The person mask stays on the phone. Public addresses stay refused."
           # Phase 1.3: the permission is only useful with the callback, and the callback needs the permission.
-          if ! grep -q "addScreenRecordingCallback" "04 Build/app/src/main/java/com/offgrid/compositor/broadcast_lock_chrome.kt"; then
+          # Calls, not mentions: a comment or KDoc naming the callback must not satisfy this.
+          if ! grep -q -E "\.addScreenRecordingCallback\(" "04 Build/app/src/main/java/com/offgrid/compositor/broadcast_lock_chrome.kt"; then
             echo "The Broadcast Lock must register the Android 15 screen recording callback."
             exit 1
           fi
-          # Hard limit (V2 section 7.3): FLAG_SECURE on the activity or panel would black out the whole broadcast.
-          if grep -R -n "FLAG_SECURE" "04 Build/app/src/main"; then
+          if ! grep -q -E "\.removeScreenRecordingCallback\(" "04 Build/app/src/main/java/com/offgrid/compositor/broadcast_lock_chrome.kt"; then
+            echo "The Broadcast Lock must remove the screen recording callback in onStop."
+            exit 1
+          fi
+          # Hard limit (V2 section 7.3): a secure window on the activity or panel would black out the whole broadcast.
+          # The name, the raw value (8192, 0x2000) in setFlags or addFlags, and SurfaceView.setSecure(true) are all refused.
+          if grep -R -n -E "FLAG_SECURE|setSecure\( *true|(set|add)Flags\([^)]*(8192|0x2000)" "04 Build/app/src/main"; then
             echo "FLAG_SECURE is not allowed on the camera screen or the panel. It turns the broadcast black."
             exit 1
           fi
