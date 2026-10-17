@@ -9,7 +9,17 @@ import android.app.AlertDialog
 import androidx.core.content.ContextCompat
 
 object LiveOverlayController {
+    /**
+     * Phase 1.3: true while the Broadcast Lock holds. It lives with the process, not with
+     * [LiveService], because the service stops itself after a lock and a fresh instance would
+     * forget it. Every SHOW, HIDE, and permission dialog checks it, whoever asks.
+     */
+    @Volatile
+    var broadcastLocked = false
+        private set
+
     fun askForPermission(activity: Activity) {
+        if (broadcastLocked) return
         if (Settings.canDrawOverlays(activity)) {
             openOverlay(activity)
             return
@@ -30,7 +40,7 @@ object LiveOverlayController {
     }
 
     fun openOverlay(context: Context) {
-        if (!Settings.canDrawOverlays(context)) return
+        if (broadcastLocked || !Settings.canDrawOverlays(context)) return
         ContextCompat.startForegroundService(
             context,
             Intent(context, LiveService::class.java).setAction(LiveService.ACTION_SHOW),
@@ -38,7 +48,7 @@ object LiveOverlayController {
     }
 
     fun hideOverlay(context: Context) {
-        if (!Settings.canDrawOverlays(context)) return
+        if (broadcastLocked || !Settings.canDrawOverlays(context)) return
         ContextCompat.startForegroundService(
             context,
             Intent(context, LiveService::class.java).setAction(LiveService.ACTION_HIDE),
@@ -51,17 +61,21 @@ object LiveOverlayController {
      * A plain start is enough: the service either removes its window or was not running.
      */
     fun lockOverlay(context: Context) {
+        broadcastLocked = true
         if (!Settings.canDrawOverlays(context)) return
         runCatching {
             context.startService(Intent(context, LiveService::class.java).setAction(LiveService.ACTION_LOCK))
         }
     }
 
-    /** The lock is off. The caller follows with [openOverlay] when the overlay setting is on. */
+    /**
+     * The lock is off. The caller follows with [openOverlay] when the overlay setting is on.
+     * No service start here: starting the service only to stop it again would bring it down
+     * under a pending SHOW from [openOverlay], and Android kills an app whose
+     * startForegroundService never reaches startForeground.
+     */
+    @Suppress("UNUSED_PARAMETER")
     fun unlockOverlay(context: Context) {
-        if (!Settings.canDrawOverlays(context)) return
-        runCatching {
-            context.startService(Intent(context, LiveService::class.java).setAction(LiveService.ACTION_UNLOCK))
-        }
+        broadcastLocked = false
     }
 }

@@ -14,8 +14,6 @@ class LiveService : Service() {
     private lateinit var overlay: OverlayWindowController
     private var overlayVisible = false
 
-    /** Phase 1.3: true while the Broadcast Lock keeps the overlay window off the screen. */
-    private var overlayLocked = false
     private var streaming = false
     private var streamCamera = false
     private var streamMicrophone = false
@@ -29,13 +27,13 @@ class LiveService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action ?: ACTION_SHOW) {
-            ACTION_SHOW, ACTION_HIDE -> startOverlayService(intent?.action == ACTION_HIDE)
+            ACTION_SHOW, ACTION_HIDE -> startOverlayService(intent?.action == ACTION_HIDE, startId)
             ACTION_STREAM_START -> if (intent != null) startStream(intent)
             ACTION_STREAM_STOP -> stopStream()
             ACTION_OPEN -> LiveHostRegistry.host?.openApp() ?: openApp()
             ACTION_STOP -> onNotificationStop()
-            ACTION_LOCK -> lockOverlay()
-            ACTION_UNLOCK -> unlockOverlay()
+            ACTION_LOCK -> lockOverlay(startId)
+            ACTION_UNLOCK -> if (!streaming && !overlayVisible) stopSelf(startId)
         }
         return START_NOT_STICKY
     }
@@ -43,28 +41,22 @@ class LiveService : Service() {
     /**
      * Phase 1.3: the Broadcast Lock takes the overlay window off the screen. Its FLAG_SECURE
      * would otherwise paint a black box over the broadcast. The setting stays on, and SHOW is
-     * ignored until UNLOCK, so nothing of it comes back while the stage is on air.
+     * ignored while [LiveOverlayController.broadcastLocked] holds, so nothing of it comes back
+     * while the stage is on air.
+     *
+     * stopSelf(startId), never stopSelf(): a SHOW queued after this start is still owed a
+     * startForeground, and Android kills the app if the service goes down before it runs.
      */
-    private fun lockOverlay() {
-        overlayLocked = true
+    private fun lockOverlay(startId: Int) {
         overlay.close()
         overlayVisible = false
         if (!streaming) {
             stopForeground(STOP_FOREGROUND_REMOVE)
-            stopSelf()
+            stopSelf(startId)
         }
     }
 
-    /** The lock is off. The camera screen sends SHOW again itself when the overlay setting is on. */
-    private fun unlockOverlay() {
-        overlayLocked = false
-        if (!streaming && !overlayVisible) {
-            stopForeground(STOP_FOREGROUND_REMOVE)
-            stopSelf()
-        }
-    }
-
-    private fun startOverlayService(hide: Boolean) {
+    private fun startOverlayService(hide: Boolean, startId: Int) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             startForeground(
                 NOTIFICATION_ID,
@@ -74,12 +66,12 @@ class LiveService : Service() {
         } else {
             startForeground(NOTIFICATION_ID, notification.build())
         }
-        if (overlayLocked) {
+        if (LiveOverlayController.broadcastLocked) {
             // A SHOW that arrives while locked is dropped: the window stays off the air. The
             // foreground call above satisfies startForegroundService before the service stops.
             if (!streaming) {
                 stopForeground(STOP_FOREGROUND_REMOVE)
-                stopSelf()
+                stopSelf(startId)
             }
             return
         }
