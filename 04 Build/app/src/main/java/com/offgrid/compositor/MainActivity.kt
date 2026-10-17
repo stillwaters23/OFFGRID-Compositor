@@ -307,6 +307,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        lockChrome.onResume()
         effects.resume()
         hideSystemBars()
         resumed = true
@@ -324,6 +325,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onPause() {
+        lockChrome.onPause()
         effects.pause()
         hidePlayback()
         stopRecording()

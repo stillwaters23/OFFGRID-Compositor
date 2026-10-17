@@ -22,6 +22,11 @@ import android.content.Context
  * Unlock (A4): refused while the callback reports VISIBLE. Otherwise it clears MANUAL, REMOTE,
  * ARMED, and the resume hold in one go. There is no "allow unlock during share" option.
  *
+ * Leaving the screen: Android reports NOT_VISIBLE as soon as OFFGRID stops being drawn, which is
+ * while Bigo is coming to the front with the share still running, before onStop. That report is
+ * not the share ending. [reportRecording] holds a NOT_VISIBLE that lands while the activity is
+ * not resumed and applies it on [onResume]; [onStart] replaces it with the fresh first value.
+ *
  * Resume hold: [onStop] remembers whether the stage was locked when the app went to the
  * background. [onStart] turns that into a hold that keeps the chrome away until the activity
  * has drawn and the callback has had its chance to flip to VISIBLE. The activity releases the
@@ -122,6 +127,12 @@ internal class BroadcastLockStore(private val persistence: LockPersistence) {
 
     val locked: Boolean get() = state.locked
 
+    /** Between [onResume] and [onPause]. */
+    private var foreground = false
+
+    /** A NOT_VISIBLE that came while the activity was not in front. Applied on [onResume]. */
+    private var clearPending = false
+
     /** Locks from [source]. AUTO goes through [setRecordingVisible]; the others are sticky. */
     fun lock(source: LockSource) {
         when (source) {
@@ -141,6 +152,36 @@ internal class BroadcastLockStore(private val persistence: LockPersistence) {
     }
 
     /**
+     * The live callback, after the activity's settle delay. VISIBLE locks at once. NOT_VISIBLE
+     * clears AUTO only while the activity is in front; otherwise it waits for [onResume].
+     */
+    fun reportRecording(visible: Boolean) {
+        if (visible) {
+            clearPending = false
+            setRecordingVisible(true)
+            return
+        }
+        if (!foreground) {
+            if (state.recordingVisible) clearPending = true
+            return
+        }
+        clearPending = false
+        setRecordingVisible(false)
+    }
+
+    fun onResume() {
+        foreground = true
+        if (clearPending) {
+            clearPending = false
+            setRecordingVisible(false)
+        }
+    }
+
+    fun onPause() {
+        foreground = false
+    }
+
+    /**
      * Clears every lock set by hand, by Phone 2, or by arming. Refused while the callback
      * reports VISIBLE (A4). AUTO is never cleared here.
      */
@@ -156,6 +197,7 @@ internal class BroadcastLockStore(private val persistence: LockPersistence) {
 
     /** The activity is going to the background: remember whether the stage was locked. */
     fun onStop() {
+        foreground = false
         persistence.write(KEY_WAS_LOCKED, state.locked)
     }
 
@@ -166,6 +208,7 @@ internal class BroadcastLockStore(private val persistence: LockPersistence) {
      */
     fun onStart(initialVisible: Boolean?) {
         val wasLocked = persistence.read(KEY_WAS_LOCKED, false)
+        clearPending = false
         val next = state.copy(
             recordingVisible = initialVisible ?: false,
             resumeHold = state.resumeHold || wasLocked,

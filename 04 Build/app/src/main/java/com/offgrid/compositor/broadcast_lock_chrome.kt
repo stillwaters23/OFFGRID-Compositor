@@ -39,6 +39,7 @@ internal class BroadcastLockChrome(
     private var chromeShown = false
     private val revealTask = Runnable { openGate() }
     private val fallbackTask = Runnable { openGate() }
+    private val notVisibleTask = Runnable { store.reportRecording(false) }
     private val listener: (LockState) -> Unit = { state -> apply(state) }
 
     /** True while a share or recording is reported VISIBLE. For the gestures' refusal buzz. */
@@ -64,9 +65,14 @@ internal class BroadcastLockChrome(
         main.postDelayed(fallbackTask, FALLBACK_MS)
     }
 
+    fun onResume() = store.onResume()
+
+    fun onPause() = store.onPause()
+
     fun onStop() {
         main.removeCallbacks(revealTask)
         main.removeCallbacks(fallbackTask)
+        main.removeCallbacks(notVisibleTask)
         unregister()
         store.onStop()
         gateOpen = false
@@ -170,9 +176,15 @@ internal class BroadcastLockChrome(
      */
     private fun register(): Boolean? {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) return null
+        unregister()
         val manager = activity.windowManager
-        val consumer = Consumer<Int> { state ->
-            store.setRecordingVisible(state == WindowManager.SCREEN_RECORDING_STATE_VISIBLE)
+        // The platform posts each report to the executor, so one queued before
+        // removeScreenRecordingCallback can still run after it. Only the live consumer counts.
+        val consumer = object : Consumer<Int> {
+            override fun accept(state: Int) {
+                if (callback !== this) return
+                onRecordingState(state == WindowManager.SCREEN_RECORDING_STATE_VISIBLE)
+            }
         }
         return try {
             val initial = manager.addScreenRecordingCallback(ContextCompat.getMainExecutor(activity), consumer)
@@ -182,6 +194,15 @@ internal class BroadcastLockChrome(
             Log.w(TAG, "The screen recording callback was refused. The auto lock is off.", error)
             null
         }
+    }
+
+    /**
+     * VISIBLE hides the chrome at once. NOT_VISIBLE waits [NOT_VISIBLE_SETTLE_MS]: it also fires
+     * when OFFGRID leaves the screen with the share still running, and onPause lands in that time.
+     */
+    private fun onRecordingState(visible: Boolean) {
+        main.removeCallbacks(notVisibleTask)
+        if (visible) store.reportRecording(true) else main.postDelayed(notVisibleTask, NOT_VISIBLE_SETTLE_MS)
     }
 
     private fun unregister() {
@@ -208,5 +229,8 @@ internal class BroadcastLockChrome(
 
         /** With no camera frame at all (denied, or Camera off), the chrome shows after this long. */
         const val FALLBACK_MS = 1_500L
+
+        /** How long a NOT_VISIBLE report waits before it may clear the auto lock. */
+        const val NOT_VISIBLE_SETTLE_MS = 500L
     }
 }

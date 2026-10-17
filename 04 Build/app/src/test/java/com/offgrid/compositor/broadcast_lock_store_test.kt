@@ -206,6 +206,76 @@ class BroadcastLockStoreTest {
         assertFalse(lock.locked)
     }
 
+    /**
+     * The order Android 15 really uses when the S25 goes from OFFGRID to Bigo mid share:
+     * NOT_VISIBLE comes as OFFGRID leaves the screen, around onPause and before onStop.
+     */
+    @Test
+    fun leavingTheScreenDuringAShareKeepsTheAutoLockThroughOnStop() {
+        val persistence = MemoryLockPersistence()
+        val lock = store(persistence)
+        lock.onStart(initialVisible = true)
+        lock.onResume()
+        lock.onPause()
+        lock.reportRecording(false)
+        assertTrue("leaving is not the share ending", lock.locked)
+        assertEquals("live", lock.state.word)
+        lock.onStop()
+        assertTrue(persistence.values[BroadcastLockStore.KEY_WAS_LOCKED] == true)
+
+        // Back in front with the share still running.
+        lock.onStart(initialVisible = true)
+        lock.onResume()
+        assertTrue(lock.locked)
+        assertEquals(UnlockResult.REFUSED_SHARE_VISIBLE, lock.unlock())
+    }
+
+    @Test
+    fun theShareEndingWhileOffgridIsInFrontClearsTheAutoLock() {
+        val lock = store()
+        lock.onStart(initialVisible = true)
+        lock.onResume()
+        lock.reportRecording(false)
+        assertFalse(lock.locked)
+    }
+
+    @Test
+    fun aNotVisibleHeldWhilePausedIsAppliedOnResume() {
+        val lock = store()
+        lock.onStart(initialVisible = true)
+        lock.onResume()
+        lock.onPause()
+        lock.reportRecording(false)
+        assertTrue(lock.locked)
+        lock.onResume()
+        assertFalse(lock.locked)
+    }
+
+    @Test
+    fun aVisibleReportDropsAHeldNotVisible() {
+        val lock = store()
+        lock.onStart(initialVisible = true)
+        lock.onPause()
+        lock.reportRecording(false)
+        lock.reportRecording(true)
+        lock.onResume()
+        assertTrue(lock.locked)
+        assertEquals("live", lock.state.word)
+    }
+
+    @Test
+    fun onStartReplacesAHeldNotVisibleWithTheFreshFirstValue() {
+        val lock = store()
+        lock.onStart(initialVisible = true)
+        lock.onResume()
+        lock.onPause()
+        lock.reportRecording(false)
+        lock.onStop()
+        lock.onStart(initialVisible = true)
+        lock.onResume()
+        assertTrue(lock.state.recordingVisible)
+    }
+
     @Test
     fun listenersHearEveryChangeAndNoRepeats() {
         val lock = store()
