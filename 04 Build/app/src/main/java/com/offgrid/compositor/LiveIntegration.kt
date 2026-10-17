@@ -226,13 +226,23 @@ internal class LiveIntegration(
         }
     }
 
+    /** No OFFGRID screen opens over the stage while it is locked, whoever asked (panel or Phone 2). */
     private fun launch(destination: Class<out Activity>) {
         val owner = activity ?: return
+        if (lock.locked) {
+            tellPhone2Status("Unlock the S25 first. Nothing opens over the stage while it is locked.")
+            return
+        }
         owner.startActivity(Intent(owner, destination))
     }
 
     private fun overlayChanged(enabled: Boolean) {
         if (enabled) {
+            if (lock.locked) {
+                // Phone 2 can write this setting at any time. The overlay comes back on unlock.
+                tellPhone2Status("The overlay comes back when the lock is off.")
+                return
+            }
             val owner = activity
             if (owner != null) LiveOverlayController.askForPermission(owner)
             else showStatus("Open OFFGRID to allow display over other apps.")
