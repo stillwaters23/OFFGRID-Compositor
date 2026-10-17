@@ -534,6 +534,7 @@ class TerminalPanel @JvmOverloads constructor(
         if (hidden) {
             hideKeyboard()
             menu.close(animate = false)
+            PanelPopups.dismissAll()
         }
         visibility = if (hidden) GONE else VISIBLE
         refreshBack()

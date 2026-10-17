@@ -91,6 +91,7 @@ internal class NeonColorRow(
         })
         PopupWindow(card, LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT, true).apply {
             elevation = Hud.dp(context, 8f)
+            PanelPopups.track(this)
             showAsDropDown(anchor, 0, Hud.dpi(context, 4f))
         }
     }

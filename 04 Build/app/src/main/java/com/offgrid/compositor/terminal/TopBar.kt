@@ -218,6 +218,7 @@ internal class TopBar(
             menu.add("List").setOnMenuItemClickListener { onViewModeChanged(1); true }
             menu.add("Grid 2").setOnMenuItemClickListener { onViewModeChanged(2); true }
             menu.add("Grid 3").setOnMenuItemClickListener { onViewModeChanged(3); true }
+            PanelPopups.track(this)
             show()
         }
     }
