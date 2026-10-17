@@ -1,6 +1,6 @@
 HR Verdict: PASS WITH BLOCKED ITEMS
 
-Independent HR release gate, replacing the earlier gate run that stopped mid-review. This note is docs only. Product code was not changed. Nothing was merged. `final-build` and `main` were not pushed. No release was published.
+Independent HR release gate, replacing the earlier gate run that stopped mid-review. This note is draft PR #51, into `cursor/issue45-broadcast-lock-d6d6`. Docs only. Product code was not changed. Nothing was merged. `final-build` and `main` were not pushed. No release was published.
 
 Reviewed together: draft PR #44 (`copilot/hr-release-gate-broadcast-lock` at `29a4e23`, into `final-build`) and draft PR #49 (`cursor/issue45-broadcast-lock-d6d6` at `c677b87`, stacked on #44, issue #45). Combined diff `origin/final-build...HEAD`: 14 files, +646 / −21. PR #46 is an empty commit, failed QA in PR #48, and is out of scope. Independent QA on #49 is PR #50. This gate re-read the code and re-ran the build. It does not treat that QA note as the result.
 
