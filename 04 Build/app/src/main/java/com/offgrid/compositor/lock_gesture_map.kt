@@ -39,6 +39,13 @@ internal object LockGestureMap {
         else -> HoldOutcome.LOCK
     }
 
+    /**
+     * A hold that locks, and a hold that unlocks, both swallow the rest of that gesture.
+     * A hold whose meaning changed under the fingers ([HoldOutcome.NONE]) does not.
+     */
+    fun swallowsRest(outcome: HoldOutcome): Boolean =
+        outcome == HoldOutcome.LOCK || outcome == HoldOutcome.UNLOCK
+
     /** Left, top, right, bottom of the center zone, in pixels. */
     fun centerZone(width: Int, height: Int): IntArray {
         val insetX = ((1f - CENTER_SHARE) / 2f * width).roundToInt()

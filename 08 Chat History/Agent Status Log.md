@@ -428,3 +428,11 @@ States: passed, waiting for review, blocked, or waiting for Royalty's phone test
 - **State:** HOLD until the CI run is green and the phone tests pass
 - **Next:** Royalty runs the Bigo share tests on the S25 Ultra (Android 15).
 
+## 2026-10-17 — Issue #45 Broadcast Lock finish (stacked on PR #44)
+
+- **Bootloader step:** HR release gate, issue #45, on `copilot/hr-release-gate-broadcast-lock` (`29a4e23`)
+- **What was done:** PairingActivity now closes on an Android 15 screen share, the camera permission is asked once after the lock lifts, an unlock hold swallows the rest of the gesture, and the TerminalPanel comment no longer claims Phone 2 can reopen the panel. Local `./gradlew testDebugUnitTest assembleDebug` with JDK 17.0.20.1 and SDK platform 36: 310 tests, 0 failures. CI has not run. Details in `docs/chat_history/2026_10_17_issue45_broadcast_lock_build.md`.
+- **PR / commit:** Draft PR #49 into `copilot/hr-release-gate-broadcast-lock`. Not merged. `main` and `final-build` were not pushed.
+- **State:** HOLD. Phone checks on the Samsung Galaxy S25 Ultra are blocked.
+- **Next:** Royalty runs the numbered phone steps in that note. Do not merge from this branch.
+

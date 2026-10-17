@@ -24,6 +24,13 @@ class RemoteLockMessageTest {
     }
 
     @Test
+    fun phone2HasNoCommandThatReopensThePanel() {
+        assertTrue(RemoteMessage.FIRE_ACTIONS.none { it.contains("panel") })
+        assertTrue("open" !in RemoteMessage.FIRE_ACTIONS)
+        assertTrue("reopen" !in RemoteMessage.FIRE_ACTIONS)
+    }
+
+    @Test
     fun lockCommandsStayOutOfTheGenericEffectButtons() {
         val effectButtons = RemoteMessage.FIRE_ACTIONS - RemoteMessage.LOCK_ACTIONS
         assertTrue("shatter" in effectButtons)

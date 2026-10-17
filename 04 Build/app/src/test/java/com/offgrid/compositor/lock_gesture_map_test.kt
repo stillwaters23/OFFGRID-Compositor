@@ -168,6 +168,13 @@ class LockGestureMapTest {
     }
 
     @Test
+    fun anUnlockHoldSwallowsTheRestOfTheGestureTheSameWayALockDoes() {
+        assertTrue(LockGestureMap.swallowsRest(HoldOutcome.LOCK))
+        assertTrue(LockGestureMap.swallowsRest(HoldOutcome.UNLOCK))
+        assertFalse(LockGestureMap.swallowsRest(HoldOutcome.NONE))
+    }
+
+    @Test
     fun anUnlockHoldStartsLikeALockHoldAndKeepsHoldingStill() {
         // Locked or not, the recognizer sees the same two-finger hold. The store decides lock versus unlock.
         val hold = twoFingers()
