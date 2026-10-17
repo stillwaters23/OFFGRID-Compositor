@@ -48,6 +48,7 @@ internal class LiveIntegration(
     private var panel: TerminalPanel? = panel
     @Volatile private var remoteSession: RemoteSession? = null
     private var resumed = false
+    private var toast: Toast? = null
     private val lockListener: (LockState) -> Unit = { state -> onLockChanged(state) }
     private val host = LiveHost(appContext).also {
         it.attach(effects, processor)
@@ -94,6 +95,7 @@ internal class LiveIntegration(
 
     private fun onPause() {
         resumed = false
+        cancelToast()
         pc.stop()
         if (host.readSetting(LIVE_OVERLAY_KEY) == "true") {
             showOverlayIfWanted()
@@ -114,6 +116,7 @@ internal class LiveIntegration(
      */
     private fun onLockChanged(state: LockState) {
         if (state.locked) {
+            cancelToast()
             LiveOverlayController.lockOverlay(appContext)
         } else {
             LiveOverlayController.unlockOverlay(appContext)
@@ -145,8 +148,12 @@ internal class LiveIntegration(
     fun tellPhone2(key: String, value: String) {
         val session = remoteSession ?: return
         val safe = value.take(MAX_PHONE2_TEXT)
-        phone2.execute {
-            runCatching { session.sendControl(RemoteMessage(key, "setting", safe)) }
+        try {
+            phone2.execute {
+                runCatching { session.sendControl(RemoteMessage(key, "setting", safe)) }
+            }
+        } catch (_: java.util.concurrent.RejectedExecutionException) {
+            // close() shut the sender down; a late status line has nowhere to go.
         }
     }
 
@@ -369,14 +376,24 @@ internal class LiveIntegration(
     }
 
     /**
-     * Link status. The panel types it and Phone 2 shows it. A toast only while unlocked: a toast
-     * is system chrome, and under the Broadcast Lock nothing but the stage may be on screen.
+     * Link status. The panel types it and Phone 2 shows it. A toast only while OFFGRID is in
+     * front and unlocked: a toast is system chrome drawn over whatever app is on screen, Bigo
+     * included, and it can carry the LAN address. A lock or a pause takes it down.
      */
     private fun showStatus(message: String) {
         main.post {
             tellPhone2Status(message)
-            if (!lock.locked) activity?.let { Toast.makeText(it, message, Toast.LENGTH_LONG).show() }
+            val owner = activity
+            if (owner != null && resumed && !lock.locked) {
+                cancelToast()
+                toast = Toast.makeText(owner, message, Toast.LENGTH_LONG).also { it.show() }
+            }
         }
+    }
+
+    private fun cancelToast() {
+        toast?.cancel()
+        toast = null
     }
 
     companion object {
