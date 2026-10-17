@@ -18,6 +18,10 @@
          Lane C keeps INTERNET for local Send to PC and the direct phone link.
          Public hosts are refused in code. The person mask still has no server call. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Phase 1.3 Broadcast Lock (Royalty approved 2026-10-15). Normal protection level, no prompt.
+         Android 15 tells OFFGRID when its screen is inside a recording or a share, so every bit of
+         chrome hides at once and only the stage is on air. It never reads the recording. -->
+    <uses-permission android:name="android.permission.DETECT_SCREEN_RECORDING" />
 
     <uses-feature
         android:name="android.hardware.camera"

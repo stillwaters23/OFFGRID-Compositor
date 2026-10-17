@@ -232,6 +232,11 @@ jobs:
               print("Send to PC and the direct phone link need INTERNET.")
               sys.exit(1)
           print("INTERNET is only for local Send to PC and the direct phone link.")
+          # Phase 1.3 guards both ways (V2 section 10): the Broadcast Lock auto trigger must stay declared.
+          if "android.permission.DETECT_SCREEN_RECORDING" not in found:
+              print("DETECT_SCREEN_RECORDING is approved and the Broadcast Lock needs it. It must stay in the app.")
+              sys.exit(1)
+          print("DETECT_SCREEN_RECORDING is declared for the Broadcast Lock.")
           exact = {
               # AndroidX generates this package permission. It is not a device permission.
               "com.offgrid.compositor.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",
@@ -259,6 +264,17 @@ jobs:
             exit 1
           fi
           echo "The person mask stays on the phone. Public addresses stay refused."
+          # Phase 1.3: the permission is only useful with the callback, and the callback needs the permission.
+          if ! grep -q "addScreenRecordingCallback" "04 Build/app/src/main/java/com/offgrid/compositor/broadcast_lock_chrome.kt"; then
+            echo "The Broadcast Lock must register the Android 15 screen recording callback."
+            exit 1
+          fi
+          # Hard limit (V2 section 7.3): FLAG_SECURE on the activity or panel would black out the whole broadcast.
+          if grep -R -n "FLAG_SECURE" "04 Build/app/src/main"; then
+            echo "FLAG_SECURE is not allowed on the camera screen or the panel. It turns the broadcast black."
+            exit 1
+          fi
+          echo "The Broadcast Lock callback is registered and the camera screen has no FLAG_SECURE."
 
       - name: Name the app file
         run: |
