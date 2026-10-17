@@ -1,5 +1,6 @@
 package com.offgrid.live
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.os.Build
 import android.os.Bundle
@@ -104,10 +105,12 @@ class PairingActivity : Activity() {
     /**
      * Android 15 reports whether this window is inside a screen recording or a share.
      * The permission is the one the app module already declares (`DETECT_SCREEN_RECORDING`);
-     * it is normal level, so there is no prompt. Older phones have no callback: the guard
-     * does nothing. A [SecurityException] is logged and Pairing stays up, the same way the
-     * camera screen treats a refused callback.
+     * it is normal level, so there is no prompt. The live manifest must not declare it again.
+     * Lint only inspects this module, so it cannot see that declaration. Older phones have no
+     * callback: the guard does nothing. A [SecurityException] is logged and Pairing stays up,
+     * the same way the camera screen treats a refused callback.
      */
+    @SuppressLint("MissingPermission")
     private fun registerShareGuard() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) return
         unregisterShareGuard()
@@ -127,6 +130,7 @@ class PairingActivity : Activity() {
         }
     }
 
+    @SuppressLint("MissingPermission")
     private fun unregisterShareGuard() {
         val consumer = shareGuard ?: return
         shareGuard = null
