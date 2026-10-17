@@ -47,8 +47,10 @@ internal fun MainActivity.toggleRecording() {
 
 internal fun MainActivity.beginRecording() {
         recording = true
+        // The coach mark never stays up while recording (Phase 1.2).
+        coachMark.hide()
+        // RECORDING mode types the timed words itself when a length is set (Phase 1.2).
         showMessage(R.string.recording_now, MainActivity.ButtonMode.RECORDING)
-        recordSeconds().takeIf { it > 0 }?.let { statusText.text = getString(R.string.recording_timed, it) }
     }
 
     /** Records with the camera's own recorder when [AvSession] would not start. It has no sound. */
@@ -59,7 +61,7 @@ internal fun MainActivity.startFallbackRecording(temp: File) {
             return
         }
         beginRecording()
-        statusText.setText(R.string.record_no_sound)
+        sayStatus(getString(R.string.record_no_sound))
         val options = FileOutputOptions.Builder(temp).build()
         val pending = capture.output.prepareRecording(this, options)
         val started = pending.start(ContextCompat.getMainExecutor(this)) { event ->

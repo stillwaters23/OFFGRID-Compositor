@@ -26,6 +26,9 @@ internal class OverlayWindowController(
     private var params: LayoutParams? = null
     private var closeTarget: TextView? = null
 
+    /** The one dialog the overlay may have open. [close] takes it down with the window. */
+    private var dialog: AlertDialog? = null
+
     fun show() {
         if (!Settings.canDrawOverlays(service)) {
             onClose()
@@ -73,6 +76,8 @@ internal class OverlayWindowController(
     fun hide() = animateBubble(true)
 
     fun close() {
+        dialog?.dismiss()
+        dialog = null
         removeCloseTarget()
         panel?.let {
             try {
@@ -191,8 +196,6 @@ internal class OverlayWindowController(
                 }
             }
             .create()
-        dialog.window?.setType(LayoutParams.TYPE_APPLICATION_OVERLAY)
-        dialog.window?.addFlags(LayoutParams.FLAG_SECURE)
         makeFocusableForInput()
         dialog.setOnDismissListener {
             val view = panel
@@ -206,9 +209,7 @@ internal class OverlayWindowController(
             }
             inputWindowService().hideSoftInputFromWindow(input.windowToken, 0)
         }
-        dialog.show()
-        dialog.window?.setType(LayoutParams.TYPE_APPLICATION_OVERLAY)
-        dialog.window?.addFlags(LayoutParams.FLAG_SECURE)
+        showDialog(dialog)
         input.requestFocus()
         inputWindowService().showSoftInput(input, InputMethodManager.SHOW_IMPLICIT)
     }
@@ -313,11 +314,7 @@ internal class OverlayWindowController(
                 updateOverlay()
             }
             .create()
-        dialog.window?.setType(LayoutParams.TYPE_APPLICATION_OVERLAY)
-        dialog.window?.addFlags(LayoutParams.FLAG_SECURE)
-        dialog.show()
-        dialog.window?.setType(LayoutParams.TYPE_APPLICATION_OVERLAY)
-        dialog.window?.addFlags(LayoutParams.FLAG_SECURE)
+        showDialog(dialog)
     }
 
     private fun chooseMode() {
@@ -329,11 +326,17 @@ internal class OverlayWindowController(
             }
             .setNegativeButton("Cancel", null)
             .create()
-        dialog.window?.setType(LayoutParams.TYPE_APPLICATION_OVERLAY)
-        dialog.window?.addFlags(LayoutParams.FLAG_SECURE)
-        dialog.show()
-        dialog.window?.setType(LayoutParams.TYPE_APPLICATION_OVERLAY)
-        dialog.window?.addFlags(LayoutParams.FLAG_SECURE)
+        showDialog(dialog)
+    }
+
+    private fun showDialog(next: AlertDialog) {
+        dialog?.dismiss()
+        dialog = next
+        next.window?.setType(LayoutParams.TYPE_APPLICATION_OVERLAY)
+        next.window?.addFlags(LayoutParams.FLAG_SECURE)
+        next.show()
+        next.window?.setType(LayoutParams.TYPE_APPLICATION_OVERLAY)
+        next.window?.addFlags(LayoutParams.FLAG_SECURE)
     }
 
     private fun toggleSetting(key: String, default: Boolean) {

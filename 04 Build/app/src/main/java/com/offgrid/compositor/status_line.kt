@@ -6,7 +6,6 @@ import android.content.pm.PackageManager
 import android.provider.Settings
 import android.net.Uri
 import android.view.RoundedCorner
-import android.view.View
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -107,7 +106,10 @@ internal fun MainActivity.applyCapture() {
             micProblem = 0
         }
         mic.apply(settings)
-        if (resumed && micToggle && micProblem == 0 && !capture.micDenied && !hasMicPermission() && !micAsking) askForMic()
+        // The system permission dialog is chrome on air. Phone 2 can turn fx.mic.on on mid share.
+        if (resumed && !lockStore.locked && micToggle && micProblem == 0 && !capture.micDenied && !hasMicPermission() && !micAsking) {
+            askForMic()
+        }
         val micWanted = micToggle && micProblem == 0 && !capture.micDenied
         val actions = capture.update(cameraWanted, micWanted, hasMicPermission(), resumed)
         for (action in actions) {
@@ -177,40 +179,31 @@ internal fun MainActivity.showPermissionHelp() {
         }
     }
 
+/**
+ * Phase 1.2 (V2 section 7.2): the stage carries no words. Every message is typed on the panel's
+ * status line and sent to Phone 2 as `fx.status.line`. The one button Royalty may need to tap,
+ * Try again or Open Settings, sits under the status line. The record bar stays GONE for good.
+ */
 internal fun MainActivity.showMessage(textRes: Int, buttonMode: MainActivity.ButtonMode) {
         if (playRequested && buttonMode != MainActivity.ButtonMode.LIVE && buttonMode != MainActivity.ButtonMode.RECORDING) {
             hidePlayback()
         }
-        controlBar.visibility = View.VISIBLE
         shownMessage = textRes
-        statusText.setText(textRes)
-        val showRecord = buttonMode == MainActivity.ButtonMode.LIVE || buttonMode == MainActivity.ButtonMode.RECORDING
-        recordButton.visibility = if (showRecord) View.VISIBLE else View.GONE
-        playButton.visibility = if (showRecord) View.VISIBLE else View.GONE
-        recordButton.isEnabled = buttonMode == MainActivity.ButtonMode.LIVE || buttonMode == MainActivity.ButtonMode.RECORDING
-        if (buttonMode == MainActivity.ButtonMode.RECORDING) {
-            recordButton.setText(R.string.record_stop)
+        val words = if (buttonMode == MainActivity.ButtonMode.RECORDING) {
+            recordSeconds().takeIf { it > 0 }?.let { getString(R.string.recording_timed, it) } ?: getString(textRes)
         } else {
-            setRecordLabel()
+            getString(textRes)
         }
-        refreshPlayButton()
-        // A button to tap must never hide behind the panel (final build, Rex's review).
-        terminalPanel.setBarNeedsTap(buttonMode == MainActivity.ButtonMode.TRY_AGAIN || buttonMode == MainActivity.ButtonMode.SETTINGS)
+        sayStatus(words)
         when (buttonMode) {
             MainActivity.ButtonMode.NONE, MainActivity.ButtonMode.LIVE, MainActivity.ButtonMode.RECORDING -> {
-                actionButton.visibility = View.GONE
+                terminalPanel.showNotice(null)
             }
-            MainActivity.ButtonMode.TRY_AGAIN -> {
-                actionButton.visibility = View.VISIBLE
-                actionButton.setText(R.string.try_again)
-                actionButton.setOnClickListener {
-                    permissionLauncher.launch(Manifest.permission.CAMERA)
-                }
+            MainActivity.ButtonMode.TRY_AGAIN -> terminalPanel.showNotice(getString(R.string.try_again)) {
+                permissionLauncher.launch(Manifest.permission.CAMERA)
             }
-            MainActivity.ButtonMode.SETTINGS -> {
-                actionButton.visibility = View.VISIBLE
-                actionButton.setText(R.string.open_settings)
-                actionButton.setOnClickListener { openAppSettings() }
+            MainActivity.ButtonMode.SETTINGS -> terminalPanel.showNotice(getString(R.string.open_settings)) {
+                openAppSettings()
             }
         }
     }

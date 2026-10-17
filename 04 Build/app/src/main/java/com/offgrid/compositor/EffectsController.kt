@@ -63,6 +63,9 @@ internal class EffectsController(
     // Lane C hook
     var onLiveSettings: (() -> Unit)? = null
 
+    /** Phase 1.2: Record / Stop and Play last video live in the panel now. The camera screen runs them. */
+    var onScreenAction: ((PanelAction) -> Unit)? = null
+
     private var chained: Runnable? = null
     private val radarPing = object : Runnable {
         override fun run() {
@@ -234,6 +237,7 @@ internal class EffectsController(
             PanelAction.HANDSHAKE_ADD -> withCopiedCode { code -> inBackground({ handshake.trust(code) }) { say(handshakeLine(it)) } }
             PanelAction.HANDSHAKE_BLOCK -> withCopiedCode { code -> inBackground({ handshake.block(code) }) { say(handshakeLine(it)) } }
             PanelAction.HANDSHAKE_CHECK -> withCopiedCode { code -> inBackground({ handshake.check(code) }) { say(handshakeLine(it)) } }
+            PanelAction.RECORD_TOGGLE, PanelAction.PLAY_LAST -> onScreenAction?.invoke(action)
             // Lane C hook
             else -> onLiveAction?.invoke(action.name)
         }

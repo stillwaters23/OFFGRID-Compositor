@@ -10,6 +10,7 @@ import com.offgrid.compositor.effects.FxKeys
 import com.offgrid.compositor.terminal.PanelPrefs
 import com.offgrid.live.FrameSink
 import com.offgrid.live.OffgridHost
+import com.offgrid.live.RemoteMessage
 
 internal class LiveHost(
     private val context: Context,
@@ -23,6 +24,9 @@ internal class LiveHost(
     var onRoleChanged: ((String) -> Unit)? = null
     var onPcOutputChanged: ((Boolean) -> Unit)? = null
     var onRestoreControls: (() -> Unit)? = null
+
+    /** Phase 1.3: Phone 2 sent lock_on, lock_off, or arm. Runs on the main thread. */
+    var onLockCommand: ((String) -> Unit)? = null
 
     fun attach(effects: EffectsController, processor: () -> CompositorProcessor?) {
         this.effects = effects
@@ -64,6 +68,10 @@ internal class LiveHost(
     override fun fire(action: String) {
         if (action == ArDeckCatalog.PLAY || action == ArDeckCatalog.PAUSE || action == ArDeckCatalog.NEXT) {
             main.post { effects?.arRemote(action) }
+            return
+        }
+        if (action in RemoteMessage.LOCK_ACTIONS) {
+            main.post { onLockCommand?.invoke(action) }
             return
         }
         val kind = FIRES[action] ?: return

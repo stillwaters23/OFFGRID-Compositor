@@ -28,6 +28,8 @@ internal class TopBar(
     onToggle: (String, Boolean, String) -> Unit,
     private val onDimensionChanged: (String, Int) -> Unit,
     onViewModeChanged: (Int) -> Unit,
+    onLockTapped: () -> Unit = {},
+    onLockHeld: () -> Unit = {},
     private val onNotch: (Int) -> Unit = {},
     private val laserSource: () -> Pair<Int, Int> = { NeonPalette.CYAN_GLOW to 72 },
 ) : LinearLayout(context), Styled {
@@ -42,6 +44,7 @@ internal class TopBar(
     private val microphone = QuickToggleView(context, true, prefs.toggle(FxKeys.MIC_ON, false))
     private val moreButton: View
     private val shrinkButton: View
+    private val lockButton: LockGlyphButton
     private val widthCaption: TextView
     private val heightCaption: TextView
     private val widthPlate: GradientDrawable
@@ -97,6 +100,12 @@ internal class TopBar(
         heightControl = dimensionControl(context, heightCaption, heightPlate, heightReel, heightInput)
         addControl(heightControl, sizeBoxWidth)
 
+        // Phase 1.3: the Broadcast Lock glyph. Tap locks now. Hold arms or disarms.
+        lockButton = LockGlyphButton(context).apply {
+            onTap = onLockTapped
+            onHold = onLockHeld
+        }
+        addControl(lockButton, controlWidth)
         moreButton = MoreButton(context).apply {
             contentDescription = context.getString(R.string.terminal_menu_button)
             setOnClickListener { showViewMenu(this, onViewModeChanged) }
@@ -119,10 +128,18 @@ internal class TopBar(
         val available = MeasureSpec.getSize(widthMeasureSpec)
         // Prefer a slightly wider W/H box, but keep the title on a narrow phone.
         val paddingH = paddingLeft + paddingRight
-        val gaps = sideGap * 7
-        val fixedControls = controlWidth * 5
-        val roomForTitleAndBoxes = available - paddingH - gaps - fixedControls
-        val box = minOf(sizeBoxWidth, maxOf(controlWidth, (roomForTitleAndBoxes - 1) / 2))
+        val gaps = sideGap * 8
+        val room = available - paddingH - gaps
+        // Phase 1.3 added the Lock glyph. When the six fixed controls, two boxes, and a readable
+        // title no longer fit, the fixed controls and boxes narrow together, never the gaps.
+        val minTitle = Hud.dpi(context, MIN_TITLE_DP)
+        var control = controlWidth
+        if (room - FIXED_CONTROLS * control - 2 * control < minTitle) {
+            control = ((room - minTitle) / (FIXED_CONTROLS + 2)).coerceIn(Hud.dpi(context, MIN_CONTROL_DP), controlWidth)
+        }
+        for (view in fixedControls) resizeBox(view, control)
+        val roomForTitleAndBoxes = room - FIXED_CONTROLS * control
+        val box = minOf(sizeBoxWidth, maxOf(control, (roomForTitleAndBoxes - 1) / 2))
         resizeBox(widthControl, box)
         resizeBox(heightControl, box)
         widthControl.visibility = VISIBLE
@@ -130,6 +147,9 @@ internal class TopBar(
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
         laidOutWidth = available
     }
+
+    private val fixedControls: List<View>
+        get() = listOf(backOrb, camera, microphone, lockButton, moreButton, shrinkButton)
 
     private fun resizeBox(view: View, width: Int) {
         val params = view.layoutParams ?: return
@@ -164,6 +184,10 @@ internal class TopBar(
         microphone.setBlocked(blocked)
     }
 
+    fun setLockWord(word: String) {
+        lockButton.word = word
+    }
+
     override fun applyLook(look: PanelLook) {
         titleView.setTextColor(look.text)
         widthInput.setTextColor(look.text)
@@ -194,6 +218,7 @@ internal class TopBar(
             menu.add("List").setOnMenuItemClickListener { onViewModeChanged(1); true }
             menu.add("Grid 2").setOnMenuItemClickListener { onViewModeChanged(2); true }
             menu.add("Grid 3").setOnMenuItemClickListener { onViewModeChanged(3); true }
+            PanelPopups.track(this)
             show()
         }
     }
@@ -312,5 +337,8 @@ internal class TopBar(
 
     private companion object {
         const val CONTROL_HEIGHT_DP = 40f
+        const val FIXED_CONTROLS = 6
+        const val MIN_TITLE_DP = 36f
+        const val MIN_CONTROL_DP = 28f
     }
 }

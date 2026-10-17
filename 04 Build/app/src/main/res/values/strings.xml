@@ -22,6 +22,8 @@
     <string name="back_to_camera">Back to camera</string>
     <string name="try_again">Try again</string>
     <string name="open_settings">Open Settings</string>
+    <!-- Phase 1.2: shown once on the stage after the first shrink. The pill is gone. -->
+    <string name="coach_panel_open">Panel hidden. Hold one finger here for one second to bring it back.</string>
     <string name="mic_toggle_on">Microphone on. Tap to turn it off.</string>
     <string name="mic_toggle_off">Microphone off. Tap to turn it on.</string>
     <string name="mic_toggle_blocked">Microphone blocked. Open Microphone Effects to unblock it.</string>

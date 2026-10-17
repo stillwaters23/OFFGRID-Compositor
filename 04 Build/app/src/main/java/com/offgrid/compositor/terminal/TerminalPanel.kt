@@ -79,7 +79,21 @@ class TerminalPanel @JvmOverloads constructor(
     internal val pill = LinearLayout(context)
     internal val pillRing = HoloRingView(context, special = true)
     internal val backOrb = BackOrbView(context)
+    internal val noticeButton = ActionButton(context, "")
     internal lateinit var topBar: TopBar
+
+    /** Phase 1.3: the Broadcast Lock hides the whole panel. Nothing of it may be on air. */
+    internal var hiddenForLock = false
+
+    /** The saved video plays over the whole stage, so the panel steps off it. */
+    internal var hiddenForPlayback = false
+
+    /** Called when the top bar's Lock glyph is tapped (lock now) or held (arm or disarm). */
+    var onLockTapped: (() -> Unit)? = null
+    var onLockHeld: (() -> Unit)? = null
+
+    /** Royalty tapped the shrink button. The stage may show the one-time coach mark. */
+    var onShrunkByTap: (() -> Unit)? = null
 
     /** The folder and its order from before the last drag, for Undo last move. */
     internal var lastMove: Pair<PanelFolder, List<PanelFolder>>? = null
@@ -122,7 +136,11 @@ class TerminalPanel @JvmOverloads constructor(
     internal var detailAnim: Animator? = null
     internal var panelAnim: Animator? = null
     internal var centerAnim: ValueAnimator? = null
-    internal var minimized = prefs.minimized
+    /**
+     * Phase 1.2: with no pill on the stage, a shrunk panel leaves nothing to tap, so every
+     * cold start opens the panel. The Broadcast Lock still hides it when the stage is on air.
+     */
+    internal var minimized = false
     internal var fullBleed = false
     internal var seeThroughAtFullSize = false
     internal var visibleWindowEdges: ScreenEdges? = null
@@ -342,6 +360,17 @@ class TerminalPanel @JvmOverloads constructor(
         statusLine.minLines = 2
         statusLine.setPadding(dpi(14f), dpi(4f), dpi(12f), dpi(6f))
         expanded.addView(statusLine, LinearLayout.LayoutParams(MATCH, WRAP))
+        // Phase 1.2: the one button the camera screen may need tapped (Try again, Open Settings)
+        // lives under the status line now that the record bar is gone from the stage.
+        noticeButton.visibility = GONE
+        expanded.addView(
+            noticeButton,
+            LinearLayout.LayoutParams(MATCH, WRAP).apply {
+                marginStart = dpi(14f)
+                marginEnd = dpi(14f)
+                bottomMargin = dpi(6f)
+            },
+        )
         expanded.addView(
             GlowRule(context, vertical = false, decor = true),
             LinearLayout.LayoutParams(MATCH, dpi(1f)).apply {
@@ -359,8 +388,10 @@ class TerminalPanel @JvmOverloads constructor(
             rightMargin = dpi(18f)
         })
 
+        // Phase 1.2 (V2 section 7.2): the floating OFFGRID pill is built but never attached. A
+        // shrunk panel is simply off the stage. A one-finger hold near the top-left corner, or
+        // Phone 2, opens it again.
         buildPill()
-        addView(pill, LayoutParams(WRAP, WRAP))
 
         ViewCompat.addAccessibilityAction(this, context.getString(R.string.terminal_bigger)) { _, _ ->
             resizeBy(dp(STEP_DP))
@@ -482,15 +513,54 @@ class TerminalPanel @JvmOverloads constructor(
 
     /** Hides the panel while the saved video plays, so the whole video can be checked. */
     fun setHiddenForPlayback(hidden: Boolean) {
+        hiddenForPlayback = hidden
+        applyHidden()
+    }
+
+    /**
+     * Phase 1.3: the Broadcast Lock. While locked, the panel is GONE, the keyboard is shut, and
+     * the menu is closed, so nothing of Royalty's controls can reach the broadcast.
+     */
+    fun setHiddenForLock(hidden: Boolean) {
+        hiddenForLock = hidden
+        applyHidden()
+    }
+
+    /** True while the lock, playback, or the shrink keeps the panel off the stage. */
+    val hiddenFromStage: Boolean get() = hiddenForLock || hiddenForPlayback || minimized
+
+    internal fun applyHidden() {
+        val hidden = hiddenFromStage
         if (hidden) {
             hideKeyboard()
-        }
-        if (hidden) {
             menu.close(animate = false)
+            PanelPopups.dismissAll()
         }
         visibility = if (hidden) GONE else VISIBLE
         refreshBack()
         refreshCoveredBars()
+    }
+
+    /**
+     * Phase 1.2: shows one button under the status line, like Try again or Open Settings, or
+     * hides it when [label] is null. The camera screen's bar used to carry these.
+     */
+    fun showNotice(label: String?, onTap: (() -> Unit)? = null) {
+        if (label == null || onTap == null) {
+            noticeButton.visibility = GONE
+            noticeButton.setOnClickListener(null)
+            return
+        }
+        noticeButton.text = label
+        noticeButton.contentDescription = label
+        noticeButton.setOnClickListener { onTap() }
+        noticeButton.visibility = VISIBLE
+        if (minimized && !hiddenForLock && !hiddenForPlayback) showMinimized(false, animate = false, save = false)
+    }
+
+    /** The top bar's Lock glyph follows the lock word: "unlocked", "armed", "locked", or "live". */
+    fun setLockWord(word: String) {
+        if (::topBar.isInitialized) topBar.setLockWord(word)
     }
 
     /** Back is on only while there is something to close. */
@@ -726,7 +796,10 @@ class TerminalPanel @JvmOverloads constructor(
             width = store.number(LookKeys.WIDTH),
             height = store.number(LookKeys.HEIGHT),
             backOrb = backOrb,
-            onShrink = { showMinimized(true, animate = true) },
+            onShrink = {
+                showMinimized(true, animate = true)
+                onShrunkByTap?.invoke()
+            },
             onToggle = { key, on, label ->
                 if (key == FxKeys.MIC_ON && store.toggle(FxKeys.MIC_BLOCKED)) {
                     topBar.setMicBlocked(true)
@@ -737,6 +810,8 @@ class TerminalPanel @JvmOverloads constructor(
                 }
             },
             onDimensionChanged = { key, value -> setSizePercent(key, value, announce = false) },
+            onLockTapped = { onLockTapped?.invoke() },
+            onLockHeld = { onLockHeld?.invoke() },
             onNotch = ::playWheelClick,
             laserSource = { auricLaserColor() to store.number(PanelTree.AURIC_LASER_DIMMER) },
             onViewModeChanged = { mode ->

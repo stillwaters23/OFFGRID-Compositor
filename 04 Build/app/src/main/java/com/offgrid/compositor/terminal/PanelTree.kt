@@ -107,6 +107,16 @@ internal enum class PanelAction {
 
     /** Opens the system file picker for one local AR clip. No library permission. */
     AR_PICK_CLIP,
+
+    /** Phase 1.2: Record and Stop, and Play last video, moved off the stage into the Record folder. */
+    RECORD_TOGGLE,
+    PLAY_LAST,
+
+    /**
+     * Phase 1.3: arms the Broadcast Lock for the next share, or disarms it. LIVE_CLEAN_OUTPUT is
+     * "Lock now": the old Clean screen share button, absorbed by the lock.
+     */
+    LOCK_ARM,
 }
 
 /** Final build: the saved looks (theme, colors, glow, cursor, toggle style, size), with save, load, rename, delete. */

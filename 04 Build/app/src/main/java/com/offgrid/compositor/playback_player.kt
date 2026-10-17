@@ -22,13 +22,13 @@ internal fun MainActivity.showPlayback() {
             return
         }
         playRequested = true
-        controlBar.visibility = View.GONE
+        playbackBackCallback.isEnabled = true
         terminalPanel.setHiddenForPlayback(true)
         playbackBackdrop.visibility = View.VISIBLE
         playbackView.visibility = View.VISIBLE
-        playbackBar.visibility = View.VISIBLE
+        // Phase 1.2: no playback bar on the stage. The hint goes to Phone 2; a tap or Back returns.
         val diamond = diamondInVideo ?: terminalPanel.testDiamondOn
-        playbackHint.setText(if (diamond) R.string.playback_hint else R.string.playback_hint_plain)
+        sayStatus(getString(if (diamond) R.string.playback_hint else R.string.playback_hint_plain))
         playbackRotation = readVideoRotation(file)
         if (playbackSurface != null) {
             startPlayer(file)
@@ -37,6 +37,7 @@ internal fun MainActivity.showPlayback() {
 
 internal fun MainActivity.hidePlayback() {
         playRequested = false
+        playbackBackCallback.isEnabled = false
         releasePlayer()
         playbackRotation = 0
         playbackView.rotation = 0f
@@ -49,12 +50,9 @@ internal fun MainActivity.hidePlayback() {
         playbackView.layoutParams = params
         playbackBackdrop.visibility = View.GONE
         playbackView.visibility = View.GONE
-        playbackBar.visibility = View.GONE
+        val wasPlaying = terminalPanel.hiddenForPlayback
         terminalPanel.setHiddenForPlayback(false)
-        if (controlBar.visibility != View.VISIBLE && hasCameraPermission()) {
-            controlBar.visibility = View.VISIBLE
-            refreshPlayButton()
-        }
+        if (wasPlaying && hasCameraPermission() && !recording) showLivePicture()
     }
 
 internal fun MainActivity.startPlayer(file: File) {

@@ -183,6 +183,18 @@ class EffectPanelTest {
     }
 
     @Test
+    fun broadcastLockRowsLiveInThePanelNowThatTheStageHasNoBars() {
+        val tree = PanelTree.build()
+        val liveRemote = tree.folders.single { it.id == "live_remote" }.items.filterIsInstance<ActionItem>()
+        assertTrue(liveRemote.any { it.action == PanelAction.LOCK_ARM })
+        assertEquals("Lock now", liveRemote.single { it.action == PanelAction.LIVE_CLEAN_OUTPUT }.label)
+        assertEquals(LiveActions.LOCK_ARM, PanelAction.LOCK_ARM.name)
+
+        val record = tree.folders.single { it.id == "record" }.items.filterIsInstance<ActionItem>().map { it.action }
+        assertEquals(listOf(PanelAction.RECORD_TOGGLE, PanelAction.PLAY_LAST), record.take(2))
+    }
+
+    @Test
     fun microphoneSettingsStartOffAndExposeTheRexTuningControls() {
         val defaults = PanelTree.defaults
         val mic = PanelTree.build().folders.first { it.id == "microphone" }
