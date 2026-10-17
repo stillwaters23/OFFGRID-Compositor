@@ -51,7 +51,7 @@ internal class MoreButton(context: Context) : View(context), Styled {
 
 /** A small picture of each choice in the ⋮ menu, drawn with lines. */
 internal class ChoiceGlyph(context: Context, private val kind: Kind) : View(context), Styled {
-    enum class Kind { LIST, BIG_LIST, GRID_2, GRID_3, IMPORTANT, A_TO_Z, CUSTOM, SIDE_SHOW, SIDE_SWIPE, SIDE_HIDDEN }
+    enum class Kind { LIST, BIG_LIST, GRID_2, GRID_3, IMPORTANT, A_TO_Z, CUSTOM }
 
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val box = RectF()
@@ -113,17 +113,6 @@ internal class ChoiceGlyph(context: Context, private val kind: Kind) : View(cont
                 bar(0.1f, 0.2f + row * 0.26f, 0.9f, 0.28f + row * 0.26f)
                 canvas.drawCircle(x0 + s * 0.9f, y0 + s * (0.24f + row * 0.26f), line * 1.4f, paint)
             }
-            Kind.SIDE_SHOW -> {
-                frame(0.08f, 0.14f, 0.92f, 0.86f)
-                bar(0.08f, 0.14f, 0.34f, 0.86f)
-            }
-            Kind.SIDE_SWIPE -> {
-                frame(0.08f, 0.14f, 0.92f, 0.86f)
-                bar(0.08f, 0.14f, 0.16f, 0.86f)
-                bar(0.3f, 0.47f, 0.62f, 0.53f)
-                bar(0.52f, 0.38f, 0.58f, 0.62f)
-            }
-            Kind.SIDE_HIDDEN -> frame(0.08f, 0.14f, 0.92f, 0.86f)
         }
     }
 }
@@ -161,10 +150,9 @@ private class ChoiceMark(context: Context) : View(context) {
     }
 }
 
-/** One choice in the ⋮ menu: a small picture, a name, a short note, and a round mark. */
-internal class ChoiceRow(context: Context, label: String, help: String, kind: ChoiceGlyph.Kind) :
+/** One choice: an optional small picture, a name, a short note, and a round mark. */
+internal class ChoiceRow(context: Context, label: String, help: String, private val glyph: View?) :
     LinearLayout(context), Styled {
-    private val glyph = ChoiceGlyph(context, kind)
     private val title = FitTextView(context)
     private val note = FitTextView(context)
     private val mark = ChoiceMark(context)
@@ -183,7 +171,10 @@ internal class ChoiceRow(context: Context, label: String, help: String, kind: Ch
         val pad = Hud.dpi(context, 6f)
         setPadding(pad, Hud.dpi(context, 5f), pad, Hud.dpi(context, 5f))
         minimumHeight = Hud.dpi(context, 48f)
-        addView(glyph, LayoutParams(Hud.dpi(context, 26f), Hud.dpi(context, 26f)))
+        if (glyph != null) {
+            val size = if (glyph is PowerToggleView) Hud.dpi(context, 44f) else Hud.dpi(context, 26f)
+            addView(glyph, LayoutParams(size, size))
+        }
         val column = LinearLayout(context).apply { orientation = VERTICAL }
         title.text = label
         title.typeface = Hud.condensedBold
@@ -192,7 +183,7 @@ internal class ChoiceRow(context: Context, label: String, help: String, kind: Ch
         column.addView(title)
         column.addView(note)
         addView(column, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f).apply {
-            marginStart = Hud.dpi(context, 10f)
+            marginStart = Hud.dpi(context, if (glyph == null) 4f else 10f)
             marginEnd = Hud.dpi(context, 6f)
         })
         addView(mark, LayoutParams(Hud.dpi(context, 22f), Hud.dpi(context, 22f)))
@@ -203,11 +194,11 @@ internal class ChoiceRow(context: Context, label: String, help: String, kind: Ch
 
     override fun applyLook(look: PanelLook) {
         this.look = look
-        glyph.applyLook(look)
+        (glyph as? Styled)?.applyLook(look)
         title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f * look.fontScale)
-        title.setTextColor(if (chosen) look.decor else look.sideText)
+        title.setTextColor(if (chosen) look.decor else look.secondaryText)
         note.setTextSize(TypedValue.COMPLEX_UNIT_SP, 9.5f * look.fontScale)
-        note.setTextColor(Hud.withAlpha(look.sideText, 0.62f))
+        note.setTextColor(Hud.withAlpha(look.secondaryText, 0.62f))
         mark.color = look.decor
         foreground = pressGlow(context, look.edge)
         setBackgroundColor(if (chosen) Hud.withAlpha(look.edge, 0.09f) else 0)
@@ -226,8 +217,7 @@ internal class ChoiceRow(context: Context, label: String, help: String, kind: Ch
  * The ⋮ menu (Step 2.4), like the three dots in Samsung My Files.
  *
  * View: List, Big list, Grid 2, or Grid 3. Sort: Important first, A to Z, or Custom, with
- * Move folders to unlock dragging. Folder size from 0 to 100. Side list: Show, Swipe to
- * open, or Hidden. Each choice works at once and is saved. A tap outside the card, Done,
+ * Move folders to unlock dragging. Folder size from 0 to 100. Each choice works at once and is saved. A tap outside the card, Done,
  * or the phone's Back key closes it.
  */
 internal class PanelMenu(
@@ -241,9 +231,14 @@ internal class PanelMenu(
         fun onSortChosen(sort: FolderSort)
         fun onUnlockChanged(unlocked: Boolean)
         fun onFolderSize(value: Int, announce: Boolean)
-        fun onSideChosen(mode: SideMode)
         fun onMenuClosed()
         fun onProblem(message: String)
+
+        /** Final build: put the last folder move back. */
+        fun onUndoMove()
+
+        /** Final build: the answer to "replace your saved order?". True uses the order on screen. */
+        fun onReplaceOrder(replace: Boolean)
     }
 
     private val density = resources.displayMetrics.density
@@ -253,9 +248,10 @@ internal class PanelMenu(
     private val glass = PanelGlassDrawable(density, 0f, pane = true)
     private val viewRows = LinkedHashMap<FolderView, ChoiceRow>()
     private val sortRows = LinkedHashMap<FolderSort, ChoiceRow>()
-    private val sideRows = LinkedHashMap<SideMode, ChoiceRow>()
     private val unlockRow: ToggleRow
     private val sizeRow: NumberRow
+    private val undoButton: ActionButton
+    private val askBox = LinearLayout(context)
 
     var isOpen = false
         private set
@@ -280,7 +276,7 @@ internal class PanelMenu(
             FolderView.GRID_3 to ChoiceGlyph.Kind.GRID_3,
         )
         for (view in FolderView.entries) {
-            val row = ChoiceRow(context, view.title, view.help, viewKinds.getValue(view))
+            val row = ChoiceRow(context, view.title, view.help, ChoiceGlyph(context, viewKinds.getValue(view)))
             row.setOnClickListener { listener.onViewChosen(view) }
             viewRows[view] = row
             content.addView(row, LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
@@ -293,7 +289,7 @@ internal class PanelMenu(
             FolderSort.CUSTOM to ChoiceGlyph.Kind.CUSTOM,
         )
         for (sort in FolderSort.entries) {
-            val row = ChoiceRow(context, sort.title, sort.help, sortKinds.getValue(sort))
+            val row = ChoiceRow(context, sort.title, sort.help, ChoiceGlyph(context, sortKinds.getValue(sort)))
             row.setOnClickListener { listener.onSortChosen(sort) }
             sortRows[sort] = row
             content.addView(row, LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
@@ -309,6 +305,38 @@ internal class PanelMenu(
         unlockRow.setPadding(Hud.dpi(context, 6f), unlockRow.paddingTop, Hud.dpi(context, 2f), unlockRow.paddingBottom)
         content.addView(unlockRow, LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
 
+        // Asked before your own saved order is replaced by the order on screen.
+        askBox.orientation = LinearLayout.VERTICAL
+        askBox.visibility = GONE
+        askBox.addView(FitTextView(context).apply {
+            text = context.getString(R.string.terminal_menu_replace_question)
+            typeface = Hud.mono(context)
+            setPadding(Hud.dpi(context, 6f), Hud.dpi(context, 4f), Hud.dpi(context, 6f), Hud.dpi(context, 6f))
+            styled(TextRole.MESSAGE, 10.5f)
+        })
+        val replace = ActionButton(context, context.getString(R.string.terminal_menu_replace_yes))
+        val keep = ActionButton(context, context.getString(R.string.terminal_menu_replace_no))
+        replace.setOnClickListener {
+            askBox.visibility = GONE
+            listener.onReplaceOrder(true)
+        }
+        keep.setOnClickListener {
+            askBox.visibility = GONE
+            listener.onReplaceOrder(false)
+        }
+        askBox.addView(replace, LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+        askBox.addView(keep, LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply {
+            topMargin = Hud.dpi(context, 6f)
+        })
+        content.addView(askBox, LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+
+        undoButton = ActionButton(context, context.getString(R.string.terminal_menu_undo))
+        undoButton.visibility = GONE
+        undoButton.setOnClickListener { listener.onUndoMove() }
+        content.addView(undoButton, LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply {
+            topMargin = Hud.dpi(context, 4f)
+        })
+
         content.addView(section(R.string.terminal_menu_size))
         val sizeItem = NumberItem(
             key = "folder_size",
@@ -323,19 +351,6 @@ internal class PanelMenu(
             onProblem = { listener.onProblem(it) },
         )
         content.addView(sizeRow, LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
-
-        content.addView(section(R.string.terminal_menu_side))
-        val sideKinds = mapOf(
-            SideMode.SHOW to ChoiceGlyph.Kind.SIDE_SHOW,
-            SideMode.SWIPE to ChoiceGlyph.Kind.SIDE_SWIPE,
-            SideMode.HIDDEN to ChoiceGlyph.Kind.SIDE_HIDDEN,
-        )
-        for (mode in SideMode.entries) {
-            val row = ChoiceRow(context, mode.title, mode.help, sideKinds.getValue(mode))
-            row.setOnClickListener { listener.onSideChosen(mode) }
-            sideRows[mode] = row
-            content.addView(row, LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
-        }
 
         val done = ActionButton(context, context.getString(R.string.terminal_menu_done))
         done.setOnClickListener { close(animate = true) }
@@ -367,14 +382,23 @@ internal class PanelMenu(
         if (content.paddingBottom != pad + room) content.setPadding(pad, content.paddingTop, pad, pad + room)
     }
 
+    /** Shows Undo last move while there is a move to put back. */
+    fun setUndoAvailable(available: Boolean) {
+        undoButton.visibility = if (available) VISIBLE else GONE
+    }
+
+    /** Asks before your own saved order is replaced. Move folders stays off until you answer. */
+    fun askReplaceOrder() {
+        if (unlockRow.toggle.isOn) unlockRow.toggle.setOn(false)
+        askBox.visibility = VISIBLE
+    }
+
     /** Shows the saved choices. Called after any change, and after Reset all. */
     fun refresh() {
         val view = settings.view
         val sort = settings.sort
-        val side = settings.side
         viewRows.forEach { (key, row) -> row.chosen = key == view }
         sortRows.forEach { (key, row) -> row.chosen = key == sort }
-        sideRows.forEach { (key, row) -> row.chosen = key == side }
         if (unlockRow.toggle.isOn != settings.unlocked) unlockRow.toggle.setOn(settings.unlocked)
         if (!sizeRow.box.hasFocus() && sizeRow.box.value != settings.size) sizeRow.box.show(settings.size)
     }

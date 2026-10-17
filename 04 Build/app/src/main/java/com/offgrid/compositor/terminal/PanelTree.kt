@@ -7,6 +7,8 @@ import android.text.TextPaint
 import android.text.style.CharacterStyle
 import android.text.style.StyleSpan
 import android.text.style.UpdateAppearance
+import android.content.Context
+import com.offgrid.compositor.RenderProbe
 
 /** What kind of folder it is. Settings and premium folders use the special folder color. */
 internal enum class FolderKind { SETTINGS, OFFICE, COLOR, PREMIUM, PLATFORM, EFFECTS, TESTS }
@@ -17,10 +19,14 @@ internal sealed class PanelItem {
     open val count: Int get() = 1
 }
 
-/** A typed whole number from 0 to 100. Never a slider. */
-internal class NumberItem(val key: String, val label: String, val help: String) : PanelItem()
+/**
+ * A typed whole number from 0 to 100. Never a slider.
+ * [default] is the start value for settings no theme sets, like effects. Theme settings
+ * take their start value from the theme.
+ */
+internal class NumberItem(val key: String, val label: String, val help: String, val default: Int? = null) : PanelItem()
 
-/** An on and off toggle. Every toggle uses the same art from 03 Design/References. */
+/** An on and off toggle. Every toggle is the same coded power toggle (PowerToggleView). */
 internal class ToggleItem(
     val key: String,
     val label: String,
@@ -29,10 +35,92 @@ internal class ToggleItem(
     val isTest: Boolean,
 ) : PanelItem()
 
-/** A button that does one thing, like Reset all. */
-internal class ActionItem(val action: PanelAction, val label: String, val help: String) : PanelItem()
+/** One choice in a pick-one list. */
+internal class Choice(val value: String, val label: String, val help: String)
 
-internal enum class PanelAction { RESET_ALL, CENTER_PANEL }
+/** What shows at the front of each choice: nothing, or a live toggle in that style. */
+internal enum class ChoicePreview { NONE, TOGGLE }
+
+/** Pick one of a few choices, like the toggle style or the camera mode. The choice is saved. */
+internal class ChoiceItem(
+    val key: String,
+    val label: String,
+    val choices: List<Choice>,
+    val default: String,
+    val preview: ChoicePreview = ChoicePreview.NONE,
+) : PanelItem()
+
+/** A short typed text, like a status word or a message. Letters, numbers, and emoji. Never a slider. */
+internal class TextItem(
+    val key: String,
+    val label: String,
+    val help: String,
+    val default: String,
+    val maxLength: Int,
+) : PanelItem()
+
+/** A button that does one thing, like Reset all. [arg] says what for, like a platform or an effect. */
+internal class ActionItem(
+    val action: PanelAction,
+    val label: String,
+    val help: String,
+    val arg: String? = null,
+) : PanelItem()
+
+/** Debug-only viewer row under SYSTEM › Diagnostics › Render probe. */
+internal class RenderProbeViewerItem : PanelItem()
+
+internal enum class PanelAction {
+    RESET_ALL,
+    CENTER_PANEL,
+
+    /** Final build: puts one folder's settings back to the start. Its argument is the folder id. */
+    RESET_FOLDER,
+
+    /** Fires a one-shot effect. Its argument is the effect's name, like SHATTER. */
+    FIRE,
+    CLEAR_INK,
+    TRY_SOUND,
+    SAVE_TO_GALLERY,
+    SAVE_REPLAY,
+
+    /** Platform tools. Their argument is the platform id. */
+    KICKED,
+    OPEN_PLATFORM,
+    SAFE_START,
+    TEST_CODE,
+
+    /** OFFGRID to OFFGRID handshake codes (feature 14). */
+    HANDSHAKE_SHOW,
+    HANDSHAKE_NEW,
+    HANDSHAKE_ADD,
+    HANDSHAKE_BLOCK,
+    HANDSHAKE_CHECK,
+
+    // Lane C hook
+    LIVE_OPEN_OVERLAY_SETTINGS,
+    LIVE_CLEAN_OUTPUT,
+    REMOTE_OPEN_PAIRING,
+    REMOTE_OPEN_PREVIEW,
+    LIVE_SEND_TO_PC,
+    OPEN_EFFECT_LINK,
+
+    /** Opens the system file picker for one local AR clip. No library permission. */
+    AR_PICK_CLIP,
+
+    /** Phase 1.2: Record and Stop, and Play last video, moved off the stage into the Record folder. */
+    RECORD_TOGGLE,
+    PLAY_LAST,
+
+    /**
+     * Phase 1.3: arms the Broadcast Lock for the next share, or disarms it. LIVE_CLEAN_OUTPUT is
+     * "Lock now": the old Clean screen share button, absorbed by the lock.
+     */
+    LOCK_ARM,
+}
+
+/** Final build: the saved looks (theme, colors, glow, cursor, toggle style, size), with save, load, rename, delete. */
+internal class PresetsItem : PanelItem()
 
 /** One ready-made theme. Tapping it applies it. */
 internal class ThemeItem(val theme: Theme) : PanelItem()
@@ -113,15 +201,63 @@ internal class PanelFolder(
     }
 }
 
+/** Start values for settings no theme sets, read from the items that declare them. */
+internal class SettingDefaults(
+    val numbers: Map<String, Int>,
+    val toggles: Map<String, Boolean>,
+    val choices: Map<String, String>,
+    val texts: Map<String, String>,
+)
+
 /**
  * Every folder in the terminal panel.
  * The 18 platform folders follow 01 Brainstorm/Feature Scope.md, feature 13.
- * Platform folders hold no effects yet. Effects come in later steps.
  */
 internal object PanelTree {
-    fun build(): PanelFolder {
-        val top = listOf(settingsFolder(), offgridFolder()) +
-            PLATFORMS.mapIndexed { index, platform -> platformFolder(index + 1, platform) }
+    const val AURIC_LASER_COLOR = "auric_laser_color"
+    const val AURIC_LASER_DIMMER = "auric_laser_dimmer"
+    const val CLICKER_ENABLED = "clicker_enabled"
+    const val CLICKER_STYLE = "clicker_style"
+    const val CLICKER_VARIANT = "clicker_variant"
+    const val CLICKER_VOLUME = "clicker_volume"
+
+    /** The start value of every setting in the tree, by key. Themes still win for their own settings. */
+    val defaults: SettingDefaults by lazy {
+        val numbers = HashMap<String, Int>()
+        val toggles = HashMap<String, Boolean>()
+        val choices = HashMap<String, String>()
+        val texts = HashMap<String, String>()
+        fun walk(folder: PanelFolder) {
+            for (item in folder.items) {
+                when (item) {
+                    is NumberItem -> item.default?.let { numbers[item.key] = it }
+                    is ToggleItem -> if (!item.isTest) toggles[item.key] = item.default
+                    is ChoiceItem -> choices[item.key] = item.default
+                    is TextItem -> texts[item.key] = item.default
+                    else -> Unit
+                }
+            }
+            folder.folders.forEach { walk(it) }
+        }
+        walk(build())
+        SettingDefaults(numbers, toggles, choices, texts)
+    }
+
+    private fun debugSystemFolder(app: Context?): List<PanelFolder> =
+        if (RenderProbe.isDebugBuild(app)) listOf(EffectFolders.system()) else emptyList()
+
+    fun build(app: Context? = null): PanelFolder {
+        val top = listOf(
+            settingsFolder(),
+            EffectFolders.camera(),
+            EffectFolders.arVideoDeck(),
+            EffectFolders.microphone(),
+            EffectFolders.effects(),
+            EffectFolders.record(),
+            // Lane C hook
+            EffectFolders.liveRemote(),
+            offgridFolder(),
+        ) + debugSystemFolder(app) + PLATFORMS.mapIndexed { index, platform -> platformFolder(index + 1, platform) }
         return PanelFolder(id = "home", title = "HOME", tag = null, kind = FolderKind.SETTINGS, folders = top)
     }
 
@@ -139,13 +275,16 @@ internal object PanelTree {
             displayFolder(),
             glowFolder(),
             colorsFolder(),
+            auricWheelFolder(),
+            clickerSoundsFolder(),
             themesFolder(),
+            effectLinksFolder(),
             resetFolder(),
         ),
         notes = listOf(
             "Every setting is in a folder. Tap a folder to open it.",
             "Type a number from 0 to 100. Then tap Done.",
-            "Green toggle means on. Red toggle means off.",
+            "A lit toggle means on. A dim toggle means off.",
             "No sliders here. Only typed numbers and toggles.",
         ),
     )
@@ -158,6 +297,20 @@ internal object PanelTree {
         items = listOf(
             NumberItem(LookKeys.WIDTH, "Width", "0 is the narrowest panel. 100 fills the screen from side to side."),
             NumberItem(LookKeys.HEIGHT, "Height", "0 is the shortest panel. 100 fills the screen from top to bottom."),
+            ToggleItem(
+                LookKeys.FULL_SCREEN,
+                "Full screen",
+                "Fills the whole screen edge to edge.",
+                false,
+                isTest = false,
+            ),
+            ToggleItem(
+                LookKeys.SEE_THROUGH_FULL_SIZE,
+                "See-through at full size",
+                "Show the camera through the full-screen panel.",
+                false,
+                isTest = false,
+            ),
             ActionItem(PanelAction.CENTER_PANEL, "Center panel", "Moves the panel to the middle of the screen."),
             NumberItem(LookKeys.OPACITY, "Opacity", "How solid the panel looks. 0 is clear. 50 is half see-through. 100 is solid."),
             NumberItem(LookKeys.FONT_SIZE, "Font size", "How big the words are. 50 is normal."),
@@ -172,8 +325,9 @@ internal object PanelTree {
             ),
         ),
         notes = listOf(
-            "Width and Height are also at the top of the panel.",
-            "Pinch with two fingers, or drag the corner lines, to resize.",
+            "Width and Height are also on the drum wheels at the top of the panel.",
+            "Turn a drum wheel to pick a whole number. Pinch, or drag the bottom edge, to resize.",
+            "Type the number under a wheel if you cannot turn it. The laser is one line across both wheels.",
         ),
     )
 
@@ -200,7 +354,13 @@ internal object PanelTree {
                 true,
                 isTest = false,
             ),
-            ToggleItem(LookKeys.TICK, "Tick when saved", "Your phone ticks softly when a setting is saved.", true, isTest = false),
+            ToggleItem(
+                LookKeys.TICK,
+                "Touch feedback",
+                "Use the phone's touch vibration on saves and every Auric wheel notch.",
+                true,
+                isTest = false,
+            ),
             ToggleItem(
                 LookKeys.TITANIUM_FRAME,
                 "Titanium frame",
@@ -215,10 +375,83 @@ internal object PanelTree {
                 false,
                 isTest = false,
             ),
+            NumberItem(LookKeys.BORDER_THICKNESS, "Border thickness", "0 is 2 dp. 50 is 3 dp. 100 is 6 dp.", 50),
         ),
         notes = listOf(
             "These change what the panel shows.",
             "The tick follows your phone's own touch feel setting.",
+        ),
+    )
+
+    private fun auricWheelFolder() = PanelFolder(
+        id = "auric_wheel",
+        title = "📁 Auric wheel",
+        tag = null,
+        kind = FolderKind.OFFICE,
+        items = listOf(
+            ChoiceItem(
+                AURIC_LASER_COLOR,
+                "Laser color",
+                listOf(
+                    Choice("2BF5E6", "Auric cyan", "Bright teal light."),
+                    Choice("E7FF78", "Lime", "Warm green light."),
+                    Choice("FFD36E", "Amber", "Soft gold light."),
+                    Choice("FFFFFF", "Ice", "White light."),
+                    Choice("C5A3FF", "Violet", "Purple light."),
+                    Choice("FF7B8B", "Rose", "Pink-red light."),
+                ),
+                "2BF5E6",
+            ),
+            NumberItem(AURIC_LASER_DIMMER, "Laser dimmer", "0 turns the laser off. 100 is full brightness.", 72),
+        ),
+        notes = listOf(
+            "Width and Height use the five-row Auric drum wheel.",
+            "The center laser stays in one unbroken line across the selected row.",
+            "Notches follow Touch feedback and your phone's system touch setting.",
+        ),
+    )
+
+    private fun clickerSoundsFolder() = PanelFolder(
+        id = "clicker_sounds",
+        title = "📁 Clicker Sounds",
+        tag = null,
+        kind = FolderKind.OFFICE,
+        items = listOf(
+            ToggleItem(CLICKER_ENABLED, "Clicker sounds", "Play a short generated click on each wheel notch.", true, isTest = false),
+            ChoiceItem(
+                CLICKER_STYLE,
+                "Sound style",
+                listOf(
+                    Choice("soft", "Soft", "A rounded sine click."),
+                    Choice("wood", "Wood", "A dry wooden tap."),
+                    Choice("digital", "Digital", "A compact square-wave tick."),
+                    Choice("rubber", "Rubber", "A descending, soft pop."),
+                    Choice("glass", "Glass", "A bright two-tone tap."),
+                    Choice("metal", "Metal", "A short inharmonic ring."),
+                    Choice("muted", "Muted", "A quiet low click."),
+                ),
+                "soft",
+            ),
+            NumberItem(CLICKER_VARIANT, "Tone variation", "77 generated tones. 0 is low. 100 is high.", 50),
+            NumberItem(CLICKER_VOLUME, "Volume", "0 is silent. 100 is loud.", 55),
+        ),
+        notes = listOf(
+            "Sounds are made by the app. No sound files or microphone are used.",
+            "Audio is prepared away from the screen thread.",
+        ),
+    )
+
+    /** Final build: save the look you have now and bring it back later. */
+    private fun presetsFolder() = PanelFolder(
+        id = "presets",
+        title = "📁 Profiles",
+        tag = null,
+        kind = FolderKind.OFFICE,
+        items = listOf(PresetsItem()),
+        notes = listOf(
+            "Profiles save the look, position, camera mode, and effect settings.",
+            "Type a name, then tap Save. Existing names ask before overwrite.",
+            "Archive profiles to keep them without showing them in the active list.",
         ),
     )
 
@@ -241,11 +474,92 @@ internal object PanelTree {
         title = "📁 Themes",
         tag = null,
         kind = FolderKind.OFFICE,
-        items = Theme.entries.map { ThemeItem(it) },
+        folders = listOf(themeModeFolder(), toggleStyleFolder(), presetsFolder()),
+        items = listOf(ThemeItem(Theme.SYSTEM)),
         notes = listOf(
-            "Tap a theme to use it.",
-            "You can still change every setting after.",
-            "OLED means the screen's black parts turn fully off.",
+            "System is the only built-in theme.",
+            "Its black and white colors follow Auto, Day, or Night.",
+        ),
+    )
+
+    private fun effectLinksFolder() = PanelFolder(
+        id = "effects_library",
+        title = "📁 Effects Library",
+        tag = null,
+        kind = FolderKind.OFFICE,
+        folders = EffectLinks.categories.mapIndexed { categoryIndex, category ->
+            PanelFolder(
+                id = "effect_links_$categoryIndex",
+                title = "📁 ${category.title}",
+                tag = null,
+                kind = FolderKind.OFFICE,
+                items = category.links.mapIndexed { linkIndex, link ->
+                    ActionItem(
+                        PanelAction.OPEN_EFFECT_LINK,
+                        link.title,
+                        link.note,
+                        "$categoryIndex:$linkIndex",
+                    )
+                },
+            )
+        },
+        notes = listOf(EffectLinks.LICENSE_NOTE),
+    )
+
+    private fun themeModeFolder() = PanelFolder(
+        id = "theme_mode",
+        title = "📁 Theme mode",
+        tag = null,
+        kind = FolderKind.OFFICE,
+        items = listOf(
+            ChoiceItem(
+                LookKeys.THEME_MODE,
+                "Theme mode",
+                ThemeMode.entries.map { mode ->
+                    Choice(
+                        mode.key,
+                        when (mode) {
+                            ThemeMode.AUTO -> "Auto"
+                            ThemeMode.DAY -> "Day"
+                            ThemeMode.NIGHT -> "Night"
+                        },
+                        when (mode) {
+                            ThemeMode.AUTO -> "Follow the phone's light setting."
+                            ThemeMode.DAY -> "Use a white panel and black text."
+                            ThemeMode.NIGHT -> "Use a black panel and white text."
+                        },
+                    )
+                },
+                ThemeMode.AUTO.key,
+            ),
+        ),
+    )
+
+    /** Final build, milestone 1: the coded power toggles, in Pure White or Pure Black. */
+    private fun toggleStyleFolder() = PanelFolder(
+        id = "toggle_style",
+        title = "📁 Toggle style",
+        tag = null,
+        kind = FolderKind.OFFICE,
+        items = listOf(
+            ChoiceItem(
+                LookKeys.TOGGLE_STYLE,
+                "Toggle style",
+                ToggleStyle.entries.map { Choice(it.key, it.title, it.help) },
+                default = ToggleStyle.WHITE.key,
+                preview = ChoicePreview.TOGGLE,
+            ),
+            ToggleItem(
+                LookKeys.TOGGLE_GLOW,
+                "Toggle glow",
+                "A soft halo in your glow color around toggles that are on. It starts off.",
+                false,
+                isTest = false,
+            ),
+        ),
+        notes = listOf(
+            "Every toggle is a circle with a power symbol.",
+            "A lit toggle means on. A dim toggle means off.",
         ),
     )
 
@@ -284,12 +598,13 @@ internal object PanelTree {
 
     private val PART_HELP = mapOf(
         ColorPart.SKIN to "This colors the panel glass.",
+        ColorPart.NUMBER_DARK to "This colors numbers on dark panels. Keep at least 4.5 to 1 contrast.",
+        ColorPart.NUMBER_LIGHT to "This colors numbers on light panels. Keep at least 4.5 to 1 contrast.",
         ColorPart.EDGE to "This colors the thin line around the panel.",
         ColorPart.OUTER_GLOW to "This colors the soft glow outside the panel.",
         ColorPart.TEXT to "This colors the typed guidance text.",
         ColorPart.CURSOR to "This colors the laser cursor. It is one solid color.",
         ColorPart.FOLDER to "This colors the folder icons.",
-        ColorPart.SIDE_TEXT to "This colors the folder names.",
         ColorPart.STATUS to "This colors the status line at the top.",
     )
 
@@ -319,16 +634,37 @@ internal object PanelTree {
         title = "OFFGRID to OFFGRID",
         tag = null,
         kind = FolderKind.PREMIUM,
+        folders = listOf(handshakeFolder()),
         guide = Guide(
-            canDo = "The premium lane. Both sides see every effect. Calls come in Step 12.",
-            cantDo = "No calls yet. Nothing in this folder is built.",
+            canDo = "The premium lane. Both sides see every effect. Your handshake code is ready.",
+            cantDo = "No calls yet. Calls need a server, which is not built.",
             where = "The OFFGRID app on both phones.",
             browser = "None needed.",
             vpn = "UNCONFIRMED for this lane. VPN means virtual private network. It hides where you are.",
             order = "UNCONFIRMED for this lane.",
             phone = "Dummy phone 1 and dummy phone 2.",
         ),
-        notes = listOf("Empty for now."),
+        notes = listOf("Calls are not built yet. The handshake codes are."),
+    )
+
+    /** Feature 14: the secret codes two OFFGRID phones swap before a call. Kept in the phone's locked storage. */
+    private fun handshakeFolder() = PanelFolder(
+        id = "offgrid_to_offgrid.handshake",
+        title = "📁 Handshake",
+        tag = null,
+        kind = FolderKind.PREMIUM,
+        items = listOf(
+            ActionItem(PanelAction.HANDSHAKE_SHOW, "Copy my code", "Copies your 300 character code, to send to a trusted person."),
+            ActionItem(PanelAction.HANDSHAKE_NEW, "Make a new code", "Your old code stops working. Do this after every call."),
+            ActionItem(PanelAction.HANDSHAKE_ADD, "Trust a copied code", "Copy a person's code first, then tap here to trust it."),
+            ActionItem(PanelAction.HANDSHAKE_BLOCK, "Block a copied code", "Copy a person's code first, then tap here. It never works again."),
+            ActionItem(PanelAction.HANDSHAKE_CHECK, "Check a copied code", "Says if a copied code is trusted, blocked, or new."),
+        ),
+        notes = listOf(
+            "Codes are kept locked on this phone. They are never saved in the app's files as plain text.",
+            "Only a fingerprint of other people's codes is kept, never the code itself.",
+            "Never paste a code in a chat or a public place.",
+        ),
     )
 
     private fun platformFolder(number: Int, platform: Platform): PanelFolder {
@@ -339,36 +675,16 @@ internal object PanelTree {
             kind = FolderKind.PLATFORM,
             guide = platform.guide,
             folders = listOf(
-                PanelFolder(
-                    id = "${platform.id}.effects",
-                    title = "Effects",
-                    tag = null,
-                    kind = FolderKind.EFFECTS,
-                    notes = listOf(
-                        "Empty for now. Effects come in later steps.",
-                        "Every effect will show in the video viewers see.",
-                    ),
-                ),
-                PanelFolder(
-                    id = "${platform.id}.tests",
-                    title = "Tests",
-                    tag = null,
-                    kind = FolderKind.TESTS,
-                    items = TEST_TOGGLES,
-                    notes = listOf(
-                        "Private test toggles. Viewers never see them.",
-                        "Green means on. Red means off.",
-                        TEST_MARKERS_LINE,
-                    ),
-                ),
+                EffectFolders.platformEffects(platform.id, platform.title),
+                EffectFolders.platformTests(platform.id, TEST_TOGGLES),
             ),
         )
     }
 
-    /** Tells Royalty the test toggles don't change anything inside live-stream apps yet. */
-    const val TEST_MARKERS_LINE = "These are test markers for now. Real checks come in a later step."
+    /** Tells Royalty the test toggles are her own markers. The success code is the real check. */
+    const val TEST_MARKERS_LINE = "These toggles are your own markers. 📁 Success code is the real check."
 
-    /** The example tests from feature 15. They hold no checks yet. */
+    /** The example tests from feature 15. Mark each one in 📁 Results. */
     private val TEST_TOGGLES = listOf(
         ToggleItem("burned_in", "Effects show in the video viewers see", "", false, isTest = true),
         ToggleItem("outside_video", "The app takes video from OFFGRID", "", false, isTest = true),
@@ -386,7 +702,7 @@ internal object PanelTree {
     )
 
     private val KEY_NOT_CHECKED = Guide(
-        canDo = "No effects yet. A phone stream key is UNCONFIRMED.",
+        canDo = "Your effects are baked into your video. A phone stream key is UNCONFIRMED.",
         cantDo = "UNCONFIRMED.",
         where = "UNCONFIRMED.",
         browser = "UNCONFIRMED.",
@@ -397,7 +713,7 @@ internal object PanelTree {
             "bigo_live",
             "Bigo Live",
             Guide(
-                canDo = "No effects yet. They come in later steps. A phone stream key is UNCONFIRMED.",
+                canDo = "Your effects are baked into your video. A phone stream key is UNCONFIRMED.",
                 cantDo = "You can't stop a host from kicking you. Never auto rejoin. It can get you banned.",
                 where = "The app on your phone. Website: bigo.tv",
                 browser = "UNCONFIRMED.",
@@ -407,7 +723,7 @@ internal object PanelTree {
             "tagged",
             "Tagged",
             Guide(
-                canDo = "No effects yet. Tagged Live works in the app and on the website.",
+                canDo = "Tagged Live works in the app and on the website.",
                 cantDo = "Hosts and their helpers can kick you. Modified apps break the rules.",
                 where = "App or website. Effects use the website route. Web address: UNCONFIRMED.",
                 browser = "UNCONFIRMED. A safe phone browser is checked in Step 10.",
@@ -417,7 +733,7 @@ internal object PanelTree {
             "meetme",
             "MeetMe",
             Guide(
-                canDo = "No effects yet. Tap plus, then Guest, to ask to join. The streamer must accept.",
+                canDo = "Tap plus, then Guest, to ask to join. The streamer must accept.",
                 cantDo = "If you get kicked, you can't rejoin that stream. Modified apps break the rules.",
                 where = "The app on your phone. meetme.com is the app's company site. " +
                     "meetme.video is a separate browser site. Effects use the website route.",
@@ -429,7 +745,7 @@ internal object PanelTree {
             "tiktok",
             "TikTok",
             Guide(
-                canDo = "No effects yet. You can ask to join a host's live. The host decides.",
+                canDo = "You can ask to join a host's live. The host decides.",
                 cantDo = "TikTok's rules ban apps that tap or join for you.",
                 where = "The app on your phone. Website: tiktok.com",
                 browser = "UNCONFIRMED.",
@@ -440,7 +756,7 @@ internal object PanelTree {
             "kick",
             "Kick",
             Guide(
-                canDo = "No effects yet. Kick's help says phone apps can go live with a stream key.",
+                canDo = "Kick's help says phone apps can go live with a stream key.",
                 cantDo = "Never paste your stream key in chat. Other limits: UNCONFIRMED.",
                 where = "Copy the stream key from the Kick dashboard in a browser. Exact address: UNCONFIRMED.",
                 browser = "UNCONFIRMED.",
@@ -450,7 +766,7 @@ internal object PanelTree {
             "youtube_live",
             "YouTube Live",
             Guide(
-                canDo = "No effects yet. YouTube takes live video from phone streaming apps. " +
+                canDo = "YouTube takes live video from phone streaming apps. " +
                     "A phone stream key is UNCONFIRMED.",
                 cantDo = "The Go Live camera in the YouTube app can't show OFFGRID effects. " +
                     "Going live there needs 50 subscribers and a verified channel.",
@@ -464,7 +780,7 @@ internal object PanelTree {
             "tango",
             "Tango",
             Guide(
-                canDo = "No effects yet. Battles are by invite, up to 4 people.",
+                canDo = "Battles are by invite, up to 4 people.",
                 cantDo = "Bots are not allowed. Host helpers can kick viewers.",
                 where = "The app on your phone. Hosts can also use Tango Web. Website: tango.me",
                 browser = "UNCONFIRMED.",

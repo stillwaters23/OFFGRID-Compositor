@@ -1,32 +1,31 @@
 package com.offgrid.compositor
 
 import android.Manifest
-import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.Matrix
-import android.graphics.SurfaceTexture
-import android.media.MediaMetadataRetriever
 import android.media.MediaPlayer
-import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.ParcelFileDescriptor
-import android.provider.Settings
 import android.util.Log
 import android.util.Range
 import android.util.Rational
 import android.util.Size
-import android.view.Gravity
+import android.view.MotionEvent
 import android.view.Surface
 import android.view.TextureView
 import android.view.View
-import android.widget.Button
 import android.widget.FrameLayout
+import android.view.ViewConfiguration
+import android.widget.Button
 import android.widget.TextView
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.OptIn
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ExperimentalMirrorMode
+import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.MirrorMode
 import androidx.camera.core.Preview
 import androidx.camera.core.UseCaseGroup
@@ -36,72 +35,135 @@ import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.video.FallbackStrategy
-import androidx.camera.video.FileOutputOptions
 import androidx.camera.video.Quality
 import androidx.camera.video.QualitySelector
 import androidx.camera.video.Recorder
 import androidx.camera.video.Recording
 import androidx.camera.video.VideoCapture
-import androidx.camera.video.VideoRecordEvent
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import androidx.core.util.Consumer
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
+import com.offgrid.compositor.audio.CaptureSwitch
+import com.offgrid.compositor.audio.MicKeys
+import com.offgrid.compositor.audio.MicPipeline
+import com.offgrid.compositor.effects.EffectEngine
+import com.offgrid.compositor.effects.EffectLayers
+import com.offgrid.compositor.effects.StageGeometry
+import com.offgrid.compositor.audio.voice.VoiceAudioOutput
+import com.offgrid.compositor.terminal.PanelAction
 import com.offgrid.compositor.terminal.TerminalPanel
-import java.io.File
+import com.offgrid.compositor.terminal.showMinimized
 
 /**
- * Step 1. Shows the painted camera picture, records a few seconds, and plays it back.
- * The mic stays off.
+ * Step 1. Shows the painted camera picture, records, and plays it back.
+ * The mic stays off until Microphone Effects turns it on. A hard block keeps it closed.
  * Step 2. The floating terminal panel sits on top. It is not painted into the video.
  * Step 2.1. The yellow test diamond is off unless Panel settings turns it on.
+ * Final build. The effects, the no-face camera modes, and the face finder are baked into the
+ * video. The screen shows the same picture viewers get, not a mirror. Videos can be any
+ * length and also go to the gallery.
+ * Lane B. The camera and mic toggles in the panel start and release the camera and the mic.
+ * Videos are recorded by [AvSession], with the mic and its effects. While the camera is off,
+ * [DarkStage] shows black with the effects drawn over it.
+ * Phase 1.2. The stage is clean: no record bar, no HUD words, no floating pill. Every message
+ * goes to the panel's status line and to Phone 2. Record and Play live in the Record folder.
+ * Phase 1.3. The Broadcast Lock ([BroadcastLockChrome], [LockTouch]) hides the panel and the
+ * overlay whenever Android 15 reports a screen share, or Royalty locks by hand, by Phone 2, or
+ * by arming. Nothing unlocks while a share is live.
  */
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var previewView: PreviewView
-    private lateinit var playbackView: TextureView
-    private lateinit var playbackBackdrop: View
-    private lateinit var controlBar: View
-    private lateinit var statusText: TextView
-    private lateinit var recordButton: Button
-    private lateinit var playButton: Button
-    private lateinit var actionButton: Button
-    private lateinit var playbackBar: View
-    private lateinit var playbackHint: TextView
+    internal lateinit var previewView: PreviewView
+    internal lateinit var playbackView: TextureView
+    internal lateinit var playbackBackdrop: View
+    internal lateinit var controlBar: View
+    internal lateinit var statusText: TextView
+    internal lateinit var recordButton: Button
+    internal lateinit var playButton: Button
+    internal lateinit var actionButton: Button
+    internal lateinit var playbackBar: View
+    internal lateinit var playbackHint: TextView
     private lateinit var backButton: Button
-    private lateinit var terminalPanel: TerminalPanel
+    internal lateinit var terminalPanel: TerminalPanel
 
-    private var cameraProvider: ProcessCameraProvider? = null
-    private var processor: CompositorProcessor? = null
-    private var videoCapture: VideoCapture<Recorder>? = null
-    private var activeRecording: Recording? = null
-    private var bindGeneration = 0
+    internal var cameraProvider: ProcessCameraProvider? = null
+    internal var processor: CompositorProcessor? = null
+    internal var videoCapture: VideoCapture<Recorder>? = null
+    internal var activeRecording: Recording? = null
+    internal var bindGeneration = 0
+
+    /** Phase 1.1: the view size the camera was bound at, and the one-rebind rule for a changed shape. */
+    internal val rebindGate = StageGeometry.RebindGate()
+    internal val rebindTask = Runnable { rebindForNewShape() }
     private var permissionAsked = false
-    private var recording = false
-    private var stopRequested = false
-    private var playRequested = false
-    private var playbackSurface: Surface? = null
-    private var mediaPlayer: MediaPlayer? = null
-    private var playbackFd: ParcelFileDescriptor? = null
-    private var videoWidth = 0
-    private var videoHeight = 0
-    private var playbackRotation = 0
-    private var shownMessage = 0
-    private var diamondInVideo: Boolean? = null
+    internal val capture = CaptureSwitch()
+    internal lateinit var mic: MicPipeline
+    internal lateinit var darkStage: DarkStage
+    internal var avSession: AvSession? = null
+    internal var resumed = false
+    internal var cameraDark = false
+    internal var micAsking = false
 
-    private val mainHandler = Handler(Looper.getMainLooper())
-    private var stopRecordingTask: Runnable? = null
+    /** The words for why the mic is off even though its toggle is on, or 0. */
+    internal var micProblem = 0
+    internal var recording = false
+    internal var stopRequested = false
+    internal var playRequested = false
+    internal var playbackSurface: Surface? = null
+    internal var mediaPlayer: MediaPlayer? = null
+    internal var playbackFd: ParcelFileDescriptor? = null
+    internal var videoWidth = 0
+    internal var videoHeight = 0
+    internal var playbackRotation = 0
+    internal var shownMessage = 0
+    internal var diamondInVideo: Boolean? = null
+    internal lateinit var effects: EffectsController
 
-    private val permissionLauncher = registerForActivityResult(
+    /** Phase 1.3: the Broadcast Lock, its chrome gate, and the stage touch sink and holds. */
+    internal lateinit var lockStore: BroadcastLockStore
+    internal lateinit var lockChrome: BroadcastLockChrome
+    private lateinit var lockTouch: LockTouch
+    internal lateinit var coachMark: CoachMark
+
+    /** Lane C, Phase 1.2: the link to Phone 2, which now also shows the status line and the lock word. */
+    internal lateinit var live: LiveIntegration
+
+    internal fun effectsReady(): Boolean = ::effects.isInitialized
+
+    /** Processed voice for another lane. The recording itself still comes from the same mic engine. */
+    fun addVoiceAudioOutput(output: VoiceAudioOutput): AutoCloseable = mic.addVoiceAudioOutput(output)
+
+    /** True when the effects could not start on this phone. The camera screen says why it is black. */
+    internal var effectsBroken = false
+    private lateinit var faces: FaceTracker
+
+    /** The person mask, shared by the segmenter thread and the drawing thread. */
+    private val masks = MaskBus()
+    private lateinit var segmenter: PersonSegmenter
+
+    internal val mainHandler = Handler(Looper.getMainLooper())
+    internal var stopRecordingTask: Runnable? = null
+
+    internal val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
         if (granted) {
-            startCamera()
+            if (effects.engine.settings.on(MicKeys.CAM_ON, true)) startCamera()
         } else {
             showPermissionHelp()
+        }
+    }
+
+    internal val micPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted -> onMicPermission(granted) }
+
+    internal val playbackBackCallback = object : OnBackPressedCallback(false) {
+        override fun handleOnBackPressed() {
+            hidePlayback()
         }
     }
 
@@ -125,34 +187,137 @@ class MainActivity : AppCompatActivity() {
         terminalPanel = findViewById(R.id.terminal_panel)
 
         onBackPressedDispatcher.addCallback(this, terminalPanel.backCallback)
+        // Phase 1.2: with no Back to camera button on the stage, the phone's Back key ends playback.
+        onBackPressedDispatcher.addCallback(this, playbackBackCallback)
         terminalPanel.matchLook(
             bars = listOf(controlBar, playbackBar),
             texts = listOf(statusText, playbackHint),
             buttons = listOf(recordButton, playButton, actionButton, backButton),
         )
         terminalPanel.onTestDiamond = { on -> onTestDiamondChanged(on) }
+        // Phase 1.3: the Broadcast Lock exists before anything that can show chrome.
+        lockStore = BroadcastLockStore(PrefsLockPersistence(this))
+        lockChrome = BroadcastLockChrome(this, lockStore)
+        lockChrome.onCreate()
+        terminalPanel.renderProbeMayOpen = { !recording && !lockStore.locked }
+        terminalPanel.onLockTapped = { lockChrome.lock(LockSource.MANUAL) }
+        terminalPanel.onLockHeld = { lockChrome.toggleArmed() }
+        val engine = EffectEngine()
+        mic = MicPipeline()
+        engine.beatCount = { mic.beats.beats }
+        faces = FaceTracker(this, engine)
+        segmenter = PersonSegmenter(this, engine, masks)
+        effects = EffectsController(this, terminalPanel, engine)
+        live = LiveIntegration.install(this, effects, { processor }, lockStore, terminalPanel) // Lane C hook
+        effects.lastVideo = { recordingFile() }
+        effects.onSettings = { onEffectSettings() }
+        effects.onScreenAction = { action -> onScreenAction(action) }
+        effects.start()
+        effects.attachInk(previewView)
         terminalPanel.useGuides(findViewById(R.id.snap_guides))
         describeCamera(terminalPanel.testDiamondOn)
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.root)) { _, insets ->
+        val root = findViewById<FrameLayout>(R.id.root)
+        ViewCompat.setOnApplyWindowInsetsListener(root) { _, insets ->
             terminalPanel.onKeyboardInset(insets.getInsets(WindowInsetsCompat.Type.ime()).bottom)
-            // Full screen for the panel stays clear of the bars and the camera hole.
-            val safe = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
-            terminalPanel.onSystemInsets(safe.left, safe.top, safe.right, safe.bottom)
+            terminalPanel.onScreenEdges(screenEdges(insets))
             insets
         }
-        recordButton.setOnClickListener { startFiveSecondRecording() }
-        playButton.setOnClickListener { showPlayback() }
-        backButton.setOnClickListener { hidePlayback() }
-        playbackView.surfaceTextureListener = playbackListener
+        darkStage = DarkStage(this, root, previewView) { processor }
+        previewView.addOnLayoutChangeListener { _, left, top, right, bottom, _, _, _, _ ->
+            onPreviewLayout(right - left, bottom - top)
+        }
+        val panelOpenInset = (PANEL_OPEN_EDGE_INSET_DP * resources.displayMetrics.density).toInt()
+        root.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            lockChrome.applyGestureExclusion(root, panelOpenInset)
+        }
+        lockTouch = LockTouch(
+            chrome = lockChrome,
+            slopPx = LockTouch.slopFor(ViewConfiguration.get(this)),
+            panelOpenInsetPx = panelOpenInset,
+            panelHidden = { terminalPanel.hiddenFromStage },
+            playbackShowing = { playRequested },
+            cancelViews = { cancelViewTouches() },
+            openPanel = {
+                coachMark.hide()
+                terminalPanel.showMinimized(false, animate = true)
+            },
+            closePlayback = { hidePlayback() },
+            tick = { terminalPanel.look.tick },
+            haptic = { kind -> window.decorView.performHapticFeedback(kind) },
+        )
+        coachMark = CoachMark(root, CoachMark.prefs(this))
+        terminalPanel.onShrunkByTap = {
+            val state = lockStore.state
+            coachMark.showOnce(
+                LockGestureMap.panelOpenZone(root.width, root.height, panelOpenInset),
+                allowed = !recording && !state.locked && !state.armed,
+            )
+        }
+        playbackView.surfaceTextureListener = playbackSurfaceListener()
         showMessage(R.string.camera_starting, ButtonMode.NONE)
+    }
+
+    override fun onStart() {
+        super.onStart()
+        lockChrome.onStart()
+    }
+
+    override fun onStop() {
+        lockChrome.onStop()
+        // A coach mark still up when the app leaves would be the first thing drawn on resume.
+        coachMark.hide()
+        super.onStop()
+    }
+
+    /** Phase 1.3: the touch sink and the stage holds see every touch before any view does. */
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        if (::lockTouch.isInitialized) {
+            val root = findViewById<View>(R.id.root)
+            if (lockTouch.dispatch(event, root.width, root.height)) return true
+        }
+        return super.dispatchTouchEvent(event)
+    }
+
+    /** A hold fired: the views under the fingers get a cancel so a pinch or a stroke ends cleanly. */
+    private fun cancelViewTouches() {
+        val now = android.os.SystemClock.uptimeMillis()
+        val cancel = MotionEvent.obtain(now, now, MotionEvent.ACTION_CANCEL, 0f, 0f, 0)
+        window.superDispatchTouchEvent(cancel)
+        cancel.recycle()
+    }
+
+    /** Phase 1.2: Record / Stop and Play last video are rows in the Record folder now. */
+    private fun onScreenAction(action: PanelAction) {
+        when (action) {
+            PanelAction.RECORD_TOGGLE -> toggleRecording()
+            PanelAction.PLAY_LAST -> showPlayback()
+            else -> Unit
+        }
+    }
+
+    /** The lock changed. Locked stops a playing video: a looping saved clip is not the stage. */
+    internal fun onLockApplied(state: LockState) {
+        if (state.locked && playRequested) hidePlayback()
+        if ((state.locked || state.armed) && ::coachMark.isInitialized) coachMark.hide()
+    }
+
+    /** One line for the panel's status line and for Phone 2. Nothing is drawn on the stage. */
+    internal fun sayStatus(message: String) {
+        terminalPanel.announce(message)
+        if (::live.isInitialized) live.tellPhone2(com.offgrid.live.RemoteMessage.STATUS_LINE_KEY, message)
     }
 
     override fun onResume() {
         super.onResume()
+        lockChrome.onResume()
+        effects.resume()
         hideSystemBars()
+        resumed = true
+        applyCapture()
         if (hasCameraPermission()) {
-            startCamera()
-        } else if (!permissionAsked) {
+            return
+        }
+        if (!permissionAsked) {
             permissionAsked = true
             showMessage(R.string.camera_needs_ok, ButtonMode.NONE)
             permissionLauncher.launch(Manifest.permission.CAMERA)
@@ -162,67 +327,80 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onPause() {
+        lockChrome.onPause()
+        effects.pause()
         hidePlayback()
         stopRecording()
-        unbindCamera()
+        resumed = false
+        applyCapture()
         super.onPause()
     }
 
     override fun onDestroy() {
+        mainHandler.removeCallbacks(rebindTask)
+        if (::lockTouch.isInitialized) lockTouch.release()
+        if (::lockChrome.isInitialized) lockChrome.onDestroy()
+        if (::coachMark.isInitialized) coachMark.hide()
+        mic.stop()
+        darkStage.hide()
+        effects.release()
         processor?.onFirstFrame = null
         processor?.onFailed = null
+        processor?.onEffectsFailed = null
         processor?.release()
         processor = null
+        if (::segmenter.isInitialized) segmenter.release()
         super.onDestroy()
     }
 
-    private fun hasCameraPermission(): Boolean {
+    internal fun hasCameraPermission(): Boolean {
         return ContextCompat.checkSelfPermission(
             this,
             Manifest.permission.CAMERA,
         ) == PackageManager.PERMISSION_GRANTED
     }
 
-    private fun startCamera() {
-        if (previewView.width == 0 || previewView.height == 0) {
-            previewView.post { startCamera() }
-            return
-        }
-        val generation = ++bindGeneration
-        showMessage(R.string.camera_starting, ButtonMode.NONE)
-        val future = ProcessCameraProvider.getInstance(this)
-        future.addListener(
-            {
-                if (generation != bindGeneration || isFinishing) {
-                    return@addListener
-                }
-                try {
-                    val provider = future.get()
-                    cameraProvider = provider
-                    if (!provider.hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA)) {
-                        showMessage(R.string.camera_missing, ButtonMode.NONE)
-                        return@addListener
-                    }
-                    bindCamera(provider, withFrameRate = true)
-                } catch (error: Exception) {
-                    Log.e(TAG, "Camera did not start", error)
-                    showMessage(R.string.camera_failed, ButtonMode.NONE)
-                }
-            },
-            ContextCompat.getMainExecutor(this),
+    internal fun ensureProcessor(): CompositorProcessor {
+        processor?.let { return it }
+        val created = CompositorProcessor(
+            effects.engine,
+            EffectLayers.all(),
+            applicationContext,
+            effects.deckCatalog,
         )
+        created.useMasks(masks)
+        created.onFirstFrame = {
+            created.inputSize?.let { size ->
+                faces.streamAspect = maxOf(size.width, size.height).toFloat() / minOf(size.width, size.height)
+            }
+            lockChrome.onFirstStageFrame()
+            showLivePicture()
+        }
+        created.onEffectsFailed = {
+            effectsBroken = true
+            showLivePicture()
+        }
+        created.onFailed = {
+            stopRecording()
+            showMessage(R.string.camera_failed, ButtonMode.NONE)
+        }
+        created.testShapeOn = terminalPanel.testDiamondOn
+        created.reducedMotion = reducedMotion()
+        created.probe.previewSampler = { describePreviewView() }
+        effects.processor = created
+        processor = created
+        return created
     }
 
-    private fun bindCamera(provider: ProcessCameraProvider, withFrameRate: Boolean) {
-        val painter = processor ?: CompositorProcessor().also { created ->
-            created.onFirstFrame = { showLivePicture() }
-            created.onFailed = {
-                stopRecording()
-                showMessage(R.string.camera_failed, ButtonMode.NONE)
-            }
-            processor = created
-        }
-        painter.testShapeOn = terminalPanel.testDiamondOn
+    @OptIn(ExperimentalMirrorMode::class)
+    internal fun bindCamera(
+        provider: ProcessCameraProvider,
+        withFrameRate: Boolean,
+        withSegment: Boolean = true,
+    ) {
+        val painter = ensureProcessor()
+        faces.outputAspect = previewView.width.toFloat() / previewView.height
+        rebindGate.bound(previewView.width, previewView.height)
         val effect = CompositorEffect(
             painter.executor,
             painter,
@@ -235,7 +413,8 @@ class MainActivity : AppCompatActivity() {
         )
         val rotation = previewView.display?.rotation ?: Surface.ROTATION_0
         // Quality.HD is a 720p picture. The phone video chip saves it as H.264.
-        // Portrait rotation plays it as 720 by 1280. Audio stays off.
+        // Portrait rotation plays it as 720 by 1280. This recorder is only the fallback when AvSession
+        // cannot start, and it has no audio.
         val recorder = Recorder.Builder()
             .setQualitySelector(
                 QualitySelector.from(
@@ -244,9 +423,13 @@ class MainActivity : AppCompatActivity() {
                 ),
             )
             .build()
+        // The screen shows exactly what viewers get, not a mirror, so words read the right way
+        // and the face diamond and drawings land where they look (final build).
         val previewBuilder = Preview.Builder()
             .setResolutionSelector(previewResolution())
             .setTargetRotation(rotation)
+            .setMirrorMode(MirrorMode.MIRROR_MODE_OFF)
+        faces.attach(previewBuilder)
         val videoBuilder = VideoCapture.Builder(recorder)
             .setTargetRotation(rotation)
             .setMirrorMode(MirrorMode.MIRROR_MODE_OFF)
@@ -261,286 +444,96 @@ class MainActivity : AppCompatActivity() {
         val viewPort = ViewPort.Builder(Rational(previewView.width, previewView.height), rotation)
             .setScaleType(ViewPort.FILL_CENTER)
             .build()
-        val group = UseCaseGroup.Builder()
+        painter.probe.onBind(
+            bindGeneration,
+            previewView.width,
+            previewView.height,
+            "${viewPort.aspectRatio.numerator}:${viewPort.aspectRatio.denominator}",
+            rotation,
+        )
+        val groupBuilder = UseCaseGroup.Builder()
             .setViewPort(viewPort)
             .addUseCase(preview)
             .addUseCase(capture)
             .addEffect(effect)
-            .build()
+        if (withSegment) {
+            val analysis = ImageAnalysis.Builder()
+                .setResolutionSelector(segmentResolution())
+                .setTargetRotation(rotation)
+                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_YUV_420_888)
+                .build()
+            segmenter.attach(analysis)
+            groupBuilder.addUseCase(analysis)
+        }
+        val group = groupBuilder.build()
         try {
             provider.unbindAll()
             provider.bindToLifecycle(this, CameraSelector.DEFAULT_FRONT_CAMERA, group)
             videoCapture = capture
         } catch (error: Exception) {
-            if (withFrameRate) {
-                Log.w(TAG, "Steady frame rate was not available. Trying again.")
-                bindCamera(provider, withFrameRate = false)
-            } else {
-                Log.e(TAG, "Camera did not start", error)
-                showMessage(R.string.camera_failed, ButtonMode.NONE)
+            when {
+                withFrameRate -> {
+                    Log.w(TAG, "Steady frame rate was not available. Trying again.")
+                    bindCamera(provider, withFrameRate = false, withSegment = withSegment)
+                }
+                withSegment -> {
+                    Log.w(TAG, "Person segmentation stream was not available. Body modes stay black.")
+                    bindCamera(provider, withFrameRate = false, withSegment = false)
+                }
+                else -> {
+                    Log.e(TAG, "Camera did not start", error)
+                    showMessage(R.string.camera_failed, ButtonMode.NONE)
+                }
             }
         }
     }
 
-    private fun unbindCamera() {
+    /** A small 16:9 frame for the person mask, the same crop as the preview. */
+    private fun segmentResolution(): ResolutionSelector {
+        return ResolutionSelector.Builder()
+            .setAspectRatioStrategy(AspectRatioStrategy.RATIO_16_9_FALLBACK_AUTO_STRATEGY)
+            .setResolutionStrategy(
+                ResolutionStrategy(
+                    Size(360, 640),
+                    ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER,
+                ),
+            )
+            .build()
+    }
+
+    internal fun unbindCamera() {
         bindGeneration++
         cameraProvider?.unbindAll()
         videoCapture = null
     }
 
-    private fun startFiveSecondRecording() {
-        val capture = videoCapture ?: return
-        if (recording) {
-            return
+    /**
+     * Phase 0.5 probe sample, main thread: the PreviewView's size, its stream state, and the
+     * TextureView child's size and transform. A non-uniform scale here is the stretch.
+     *
+     * PreviewView (COMPATIBLE mode) sizes the TextureView to the stream resolution and fits it
+     * with View scaleX/scaleY/translation; setTransform() only carries the rotation correction.
+     * Both are logged, and shown= is the on-screen box those View properties produce.
+     */
+    internal fun describePreviewView(): String {
+        val child = (0 until previewView.childCount).map { previewView.getChildAt(it) }
+            .firstOrNull { it is TextureView } as? TextureView
+        if (child == null) {
+            return "previewView=${previewView.width}x${previewView.height} laidOut=${previewView.isLaidOut} " +
+                "stream=${previewView.previewStreamState.value} textureView=none"
         }
-        val temp = File(filesDir, TEMP_NAME)
-        if (temp.exists() && !temp.delete()) {
-            showMessage(R.string.record_failed, ButtonMode.LIVE)
-            return
-        }
-        recording = true
-        stopRequested = false
-        diamondInVideo = terminalPanel.testDiamondOn
-        showMessage(R.string.recording_now, ButtonMode.RECORDING)
-        val options = FileOutputOptions.Builder(temp).build()
-        val pending = capture.output.prepareRecording(this, options)
-        val started = pending.start(ContextCompat.getMainExecutor(this)) { event ->
-            onRecordEvent(event, temp)
-        }
-        activeRecording = started
-        val stopTask = Runnable { requestStop() }
-        stopRecordingTask = stopTask
-        mainHandler.postDelayed(stopTask, FALLBACK_STOP_MS)
-    }
-
-    private fun requestStop() {
-        if (stopRequested) {
-            return
-        }
-        stopRequested = true
-        activeRecording?.stop()
-    }
-
-    private fun onRecordEvent(event: VideoRecordEvent, temp: File) {
-        when (event) {
-            is VideoRecordEvent.Start -> {
-                stopRecordingTask?.let { mainHandler.removeCallbacks(it) }
-                val stopTask = Runnable { requestStop() }
-                stopRecordingTask = stopTask
-                mainHandler.postDelayed(stopTask, RECORD_MS)
-            }
-            is VideoRecordEvent.Finalize -> {
-                stopRecordingTask?.let { mainHandler.removeCallbacks(it) }
-                stopRecordingTask = null
-                activeRecording = null
-                recording = false
-                if (event.hasError()) {
-                    Log.e(TAG, "Recording failed with code ${event.error}")
-                    if (temp.exists()) {
-                        temp.delete()
-                    }
-                    showMessage(R.string.record_failed, ButtonMode.LIVE)
-                } else {
-                    val saved = recordingFile()
-                    if (saved.exists()) {
-                        saved.delete()
-                    }
-                    val moved = temp.renameTo(saved)
-                    if (!moved) {
-                        temp.copyTo(saved, overwrite = true)
-                        temp.delete()
-                    }
-                    showMessage(R.string.record_saved, ButtonMode.LIVE)
-                }
-            }
-            else -> Unit
-        }
-    }
-
-    private fun stopRecording() {
-        stopRecordingTask?.let { mainHandler.removeCallbacks(it) }
-        stopRecordingTask = null
-        requestStop()
-    }
-
-    private fun showPlayback() {
-        val file = recordingFile()
-        if (!file.exists() || file.length() == 0L) {
-            showMessage(R.string.record_failed, ButtonMode.LIVE)
-            return
-        }
-        playRequested = true
-        controlBar.visibility = View.GONE
-        terminalPanel.setHiddenForPlayback(true)
-        playbackBackdrop.visibility = View.VISIBLE
-        playbackView.visibility = View.VISIBLE
-        playbackBar.visibility = View.VISIBLE
-        val diamond = diamondInVideo ?: terminalPanel.testDiamondOn
-        playbackHint.setText(if (diamond) R.string.playback_hint else R.string.playback_hint_plain)
-        playbackRotation = readVideoRotation(file)
-        if (playbackSurface != null) {
-            startPlayer(file)
-        }
-    }
-
-    private fun hidePlayback() {
-        playRequested = false
-        releasePlayer()
-        playbackRotation = 0
-        playbackView.rotation = 0f
-        playbackView.translationX = 0f
-        playbackView.translationY = 0f
-        playbackView.setTransform(Matrix())
-        val params = playbackView.layoutParams
-        params.width = FrameLayout.LayoutParams.MATCH_PARENT
-        params.height = FrameLayout.LayoutParams.MATCH_PARENT
-        playbackView.layoutParams = params
-        playbackBackdrop.visibility = View.GONE
-        playbackView.visibility = View.GONE
-        playbackBar.visibility = View.GONE
-        terminalPanel.setHiddenForPlayback(false)
-        if (controlBar.visibility != View.VISIBLE && hasCameraPermission()) {
-            controlBar.visibility = View.VISIBLE
-            refreshPlayButton()
-        }
-    }
-
-    private fun startPlayer(file: File) {
-        val surface = playbackSurface ?: return
-        releasePlayer()
-        val player = MediaPlayer()
-        mediaPlayer = player
-        try {
-            val fd = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
-            playbackFd = fd
-            player.setDataSource(fd.fileDescriptor, 0, file.length())
-            player.setSurface(surface)
-            player.isLooping = true
-            player.setVolume(0f, 0f)
-            player.setOnVideoSizeChangedListener { mp, width, height ->
-                if (mediaPlayer !== mp) {
-                    return@setOnVideoSizeChangedListener
-                }
-                videoWidth = width
-                videoHeight = height
-                fitPlayback()
-            }
-            player.setOnPreparedListener { mp ->
-                if (mediaPlayer !== mp) {
-                    return@setOnPreparedListener
-                }
-                videoWidth = mp.videoWidth
-                videoHeight = mp.videoHeight
-                fitPlayback()
-                mp.start()
-            }
-            player.setOnErrorListener { mp, what, extra ->
-                Log.e(TAG, "Playback failed $what $extra")
-                if (mediaPlayer === mp) {
-                    runOnUiThread {
-                        hidePlayback()
-                        showMessage(R.string.record_failed, ButtonMode.LIVE)
-                    }
-                }
-                true
-            }
-            player.prepareAsync()
-        } catch (error: Exception) {
-            Log.e(TAG, "Playback failed", error)
-            hidePlayback()
-            showMessage(R.string.record_failed, ButtonMode.LIVE)
-        }
-    }
-
-    private fun releasePlayer() {
-        mediaPlayer?.let { player ->
-            player.setOnPreparedListener(null)
-            player.setOnErrorListener(null)
-            player.setOnVideoSizeChangedListener(null)
-            try {
-                player.stop()
-            } catch (error: IllegalStateException) {
-                Log.w(TAG, "Playback was already stopped")
-            }
-            player.release()
-        }
-        mediaPlayer = null
-        playbackFd?.close()
-        playbackFd = null
-    }
-
-    private fun fitPlayback() {
-        val parent = playbackView.parent as? View ?: return
-        val parentW = parent.width
-        val parentH = parent.height
-        if (parentW == 0 || parentH == 0 || videoWidth == 0 || videoHeight == 0) {
-            return
-        }
-        val swap = playbackRotation == 90 || playbackRotation == 270
-        val layoutW = if (swap) parentH else parentW
-        val layoutH = if (swap) parentW else parentH
-        val params = playbackView.layoutParams as FrameLayout.LayoutParams
-        if (params.width != layoutW || params.height != layoutH) {
-            params.width = layoutW
-            params.height = layoutH
-            params.gravity = Gravity.START or Gravity.TOP
-            playbackView.layoutParams = params
-        }
-        playbackView.pivotX = layoutW / 2f
-        playbackView.pivotY = layoutH / 2f
-        playbackView.rotation = playbackRotation.toFloat()
-        playbackView.translationX = (parentW - layoutW) / 2f
-        playbackView.translationY = (parentH - layoutH) / 2f
-        val viewAspect = layoutW.toFloat() / layoutH.toFloat()
-        val videoAspect = videoWidth.toFloat() / videoHeight.toFloat()
-        val scaleX: Float
-        val scaleY: Float
-        if (videoAspect > viewAspect) {
-            scaleX = 1f
-            scaleY = viewAspect / videoAspect
-        } else {
-            scaleX = videoAspect / viewAspect
-            scaleY = 1f
-        }
-        val matrix = Matrix()
-        matrix.setScale(scaleX, scaleY, layoutW / 2f, layoutH / 2f)
-        playbackView.setTransform(matrix)
-    }
-
-    private fun readVideoRotation(file: File): Int {
-        val retriever = MediaMetadataRetriever()
-        return try {
-            retriever.setDataSource(file.absolutePath)
-            retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)
-                ?.toIntOrNull() ?: 0
-        } catch (error: RuntimeException) {
-            Log.w(TAG, "Could not read which way the video is turned", error)
-            0
-        } finally {
-            retriever.release()
-        }
-    }
-
-    private val playbackListener = object : TextureView.SurfaceTextureListener {
-        override fun onSurfaceTextureAvailable(st: SurfaceTexture, width: Int, height: Int) {
-            playbackSurface = Surface(st)
-            if (playRequested) {
-                startPlayer(recordingFile())
-            }
-        }
-
-        override fun onSurfaceTextureSizeChanged(st: SurfaceTexture, width: Int, height: Int) {
-            fitPlayback()
-        }
-
-        override fun onSurfaceTextureDestroyed(st: SurfaceTexture): Boolean {
-            releasePlayer()
-            playbackSurface?.release()
-            playbackSurface = null
-            return true
-        }
-
-        override fun onSurfaceTextureUpdated(st: SurfaceTexture) = Unit
+        val values = FloatArray(9)
+        child.getTransform(null).getValues(values)
+        val matrix = "matrix(scaleX=${values[0]} skewX=${values[1]} transX=${values[2]} " +
+            "skewY=${values[3]} scaleY=${values[4]} transY=${values[5]})"
+        val view = "view(scaleX=${child.scaleX} scaleY=${child.scaleY} " +
+            "translationX=${child.translationX} translationY=${child.translationY} " +
+            "pivot=${child.pivotX},${child.pivotY} rotation=${child.rotation})"
+        val shown = "shown=${child.width * child.scaleX}x${child.height * child.scaleY}"
+        return "previewView=${previewView.width}x${previewView.height} laidOut=${previewView.isLaidOut} " +
+            "stream=${previewView.previewStreamState.value} textureView=${child.width}x${child.height} " +
+            "$view $shown $matrix"
     }
 
     private fun previewResolution(): ResolutionSelector {
@@ -555,96 +548,7 @@ class MainActivity : AppCompatActivity() {
             .build()
     }
 
-    private fun showLivePicture() {
-        if (recording || playRequested) {
-            return
-        }
-        val message = if (terminalPanel.testDiamondOn) R.string.shape_ready else R.string.camera_ready
-        showMessage(message, ButtonMode.LIVE)
-    }
-
-    /** The Test diamond toggle in Panel settings. Off paints nothing extra into the video. */
-    private fun onTestDiamondChanged(on: Boolean) {
-        processor?.testShapeOn = on
-        describeCamera(on)
-        if (shownMessage == R.string.shape_ready || shownMessage == R.string.camera_ready) {
-            showLivePicture()
-        }
-    }
-
-    private fun describeCamera(diamondOn: Boolean) {
-        previewView.contentDescription = getString(
-            if (diamondOn) R.string.camera_picture else R.string.camera_picture_plain,
-        )
-    }
-
-    private fun showPermissionHelp() {
-        val canAskAgain = shouldShowRequestPermissionRationale(Manifest.permission.CAMERA)
-        if (canAskAgain) {
-            showMessage(R.string.camera_denied, ButtonMode.TRY_AGAIN)
-        } else {
-            showMessage(R.string.camera_blocked, ButtonMode.SETTINGS)
-        }
-    }
-
-    private fun showMessage(textRes: Int, buttonMode: ButtonMode) {
-        if (playRequested && buttonMode != ButtonMode.LIVE && buttonMode != ButtonMode.RECORDING) {
-            hidePlayback()
-        }
-        controlBar.visibility = View.VISIBLE
-        shownMessage = textRes
-        statusText.setText(textRes)
-        val showRecord = buttonMode == ButtonMode.LIVE || buttonMode == ButtonMode.RECORDING
-        recordButton.visibility = if (showRecord) View.VISIBLE else View.GONE
-        playButton.visibility = if (showRecord) View.VISIBLE else View.GONE
-        recordButton.isEnabled = buttonMode == ButtonMode.LIVE
-        if (buttonMode == ButtonMode.RECORDING) {
-            recordButton.setText(R.string.recording_now)
-        } else {
-            recordButton.setText(R.string.record_five)
-        }
-        refreshPlayButton()
-        when (buttonMode) {
-            ButtonMode.NONE, ButtonMode.LIVE, ButtonMode.RECORDING -> {
-                actionButton.visibility = View.GONE
-            }
-            ButtonMode.TRY_AGAIN -> {
-                actionButton.visibility = View.VISIBLE
-                actionButton.setText(R.string.try_again)
-                actionButton.setOnClickListener {
-                    permissionLauncher.launch(Manifest.permission.CAMERA)
-                }
-            }
-            ButtonMode.SETTINGS -> {
-                actionButton.visibility = View.VISIBLE
-                actionButton.setText(R.string.open_settings)
-                actionButton.setOnClickListener { openAppSettings() }
-            }
-        }
-    }
-
-    private fun refreshPlayButton() {
-        val file = recordingFile()
-        playButton.isEnabled = !recording && file.exists() && file.length() > 0L
-    }
-
-    private fun recordingFile(): File = File(filesDir, SAVED_NAME)
-
-    private fun openAppSettings() {
-        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-            data = Uri.fromParts("package", packageName, null)
-        }
-        startActivity(intent)
-    }
-
-    private fun hideSystemBars() {
-        val controller = WindowInsetsControllerCompat(window, window.decorView)
-        controller.hide(WindowInsetsCompat.Type.systemBars())
-        controller.systemBarsBehavior =
-            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-    }
-
-    private enum class ButtonMode {
+    internal enum class ButtonMode {
         NONE,
         TRY_AGAIN,
         SETTINGS,
@@ -654,9 +558,8 @@ class MainActivity : AppCompatActivity() {
 
     private companion object {
         const val TAG = "OffgridCompositor"
-        const val SAVED_NAME = "last-recording.mp4"
-        const val TEMP_NAME = "recording-now.mp4"
-        const val RECORD_MS = 5_000L
-        const val FALLBACK_STOP_MS = 8_000L
+
+        /** The panel-open hold zone starts this far in from the screen edges: no edge gestures (V2 7.3). */
+        const val PANEL_OPEN_EDGE_INSET_DP = 48f
     }
 }

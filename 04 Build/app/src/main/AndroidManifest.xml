@@ -3,10 +3,25 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.CAMERA" />
-    <!-- This step does not use the mic. Keep the permission out even if a library asks. -->
+    <!-- Royalty approved the mic. Lane B records with it. The hard block can still close it. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- A video library asks for network state. The app does not use it. -->
     <uses-permission
-        android:name="android.permission.RECORD_AUDIO"
+        android:name="android.permission.ACCESS_NETWORK_STATE"
         tools:node="remove" />
+    <!-- Media3 declares a wake lock. The AR clip plays only while this screen is open. -->
+    <uses-permission
+        android:name="android.permission.WAKE_LOCK"
+        tools:node="remove" />
+    <!-- Lane E took INTERNET out so MediaPipe's logging library cannot upload frames.
+         That removal is archived in 04 Build/archive/lane_e_internet_remove.xml.
+         Lane C keeps INTERNET for local Send to PC and the direct phone link.
+         Public hosts are refused in code. The person mask still has no server call. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Phase 1.3 Broadcast Lock (Royalty approved 2026-10-15). Normal protection level, no prompt.
+         Android 15 tells OFFGRID when its screen is inside a recording or a share, so every bit of
+         chrome hides at once and only the stage is on air. It never reads the recording. -->
+    <uses-permission android:name="android.permission.DETECT_SCREEN_RECORDING" />
 
     <uses-feature
         android:name="android.hardware.camera"
@@ -17,6 +32,30 @@
     <uses-feature
         android:glEsVersion="0x00020000"
         android:required="true" />
+
+    <!-- Final build: lets "Open <app>" in each platform folder find that app on the phone.
+         This is not a permission. Nothing is ever opened without a tap. -->
+    <queries>
+        <package android:name="sg.bigo.live" />
+        <package android:name="com.taggedapp" />
+        <package android:name="com.myyearbook.m" />
+        <package android:name="com.zhiliaoapp.musically" />
+        <package android:name="tv.twitch.android.app" />
+        <package android:name="com.google.android.youtube" />
+        <package android:name="org.telegram.messenger" />
+        <package android:name="com.sgiggle.production" />
+        <package android:name="com.instagram.android" />
+        <package android:name="com.facebook.orca" />
+        <package android:name="com.whatsapp" />
+        <package android:name="us.zoom.videomeetings" />
+        <package android:name="com.google.android.apps.tachyon" />
+        <package android:name="com.discord" />
+        <package android:name="com.microsoft.teams" />
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="market" />
+        </intent>
+    </queries>
 
     <application
         android:allowBackup="false"

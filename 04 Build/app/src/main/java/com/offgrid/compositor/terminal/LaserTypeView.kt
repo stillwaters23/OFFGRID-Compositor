@@ -2,6 +2,7 @@ package com.offgrid.compositor.terminal
 
 import android.animation.ValueAnimator
 import android.content.Context
+import android.content.res.ColorStateList
 import android.graphics.Bitmap
 import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
@@ -90,6 +91,9 @@ internal class LaserTypeView(context: Context) : AppCompatTextView(context) {
     private var cacheKey = 0
     private val lineLayouts = SparseArray<StaticLayout>()
 
+    /** False while the view constructor is still inside the text-view setup. */
+    private var glowReady = false
+
     /** The line being typed right now, kept until the next letter shows. */
     private var partial: StaticLayout? = null
     private var partialLine = -1
@@ -112,9 +116,25 @@ internal class LaserTypeView(context: Context) : AppCompatTextView(context) {
     }
 
     init {
+        glowReady = true
         typeface = Hud.mono(context)
         setLineSpacing(0f, 1.12f)
         setOnClickListener { finishNow() }
+    }
+
+    /** Theme color changes must redraw laser glow immediately, not wait for a retype. */
+    override fun setTextColor(color: Int) {
+        super.setTextColor(color)
+        if (!glowReady) return
+        dropGlowCache()
+        invalidate()
+    }
+
+    override fun setTextColor(colors: ColorStateList?) {
+        super.setTextColor(colors)
+        if (!glowReady) return
+        dropGlowCache()
+        invalidate()
     }
 
     /** Types [text] letter by letter. */

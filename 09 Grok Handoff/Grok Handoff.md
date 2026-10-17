@@ -131,3 +131,32 @@ The pull requests stack like this: #5 is on the first build branch, #6 is on #5,
 1. Read pull request #7's test steps and the Step 2.4 release notes. Tell Royalty, in plain words, anything that looks hard to follow.
 2. Hold the look to your Laser Typewriter memo. The start look is black glass, laser text, and a solid white cursor.
 3. When Royalty shares the new toggle design or the app icons, help her pick the cleanest one on both a black and a white background.
+
+## 8. Added after the final build (pull request #8)
+
+The final build (pull request #8, branch `final-build`, stacked on #7) builds everything except voice. This section is new. Nothing above was changed.
+
+- **How the picture is made:**
+  - The camera goes into `CompositorProcessor`.
+  - `StagePainter` changes the picture on the GPU, following `effects/StagePlan.kt`: modes, freeze, quiet, echo, takeover, depth shift, and shatter.
+  - The drawn effects in `effects/layers/` are painted with Canvas on their own thread by `OverlayRenderer`, then baked in.
+  - The same finished picture goes to the screen, the video, and the replay buffer.
+  - The panel is a normal view on top, so it is never in the video.
+- **Settings:**
+  - Every effect setting starts with `fx.` (`effects/FxKeys.kt`).
+  - Its folder and start value are in `terminal/EffectFolders.kt`.
+  - `EffectsController` reads them into the effect engine whenever a setting changes.
+- **Face safety:**
+  - The face diamond starts on and follows the face, using the phone's own face finder (`FaceTracker`).
+  - If the effects can't run, or the diamond isn't drawn yet, the picture stays black whenever a no-face mode or the diamond is on.
+  - No reset changes the camera mode.
+- **Tests:** unit tests are in `04 Build/app/src/test`. They cover:
+  - the stage math, including no more than 3 flickers a second
+  - every drawn effect
+  - presets, test marks, and folder resets
+  - face math, sounds, and handshake codes
+- **Still not built, and why:**
+  - Voice (paused).
+  - Anything that needs the mic: the audio-reactive panel, and audio or heartbeat sync.
+  - The IP leak check (needs the internet permission).
+  - OFFGRID-to-OFFGRID calls (need a server).

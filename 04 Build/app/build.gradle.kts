@@ -23,6 +23,18 @@ android {
         }
     }
 
+    testOptions {
+        unitTests {
+            // The settings tests run the real Android settings code on the computer that builds the app.
+            isIncludeAndroidResources = true
+        }
+    }
+
+    androidResources {
+        // MediaPipe maps the model in place. A compressed asset cannot be mapped.
+        noCompress += "tflite"
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -36,6 +48,7 @@ kotlin {
 }
 
 dependencies {
+    implementation(project(":live"))
     implementation("androidx.core:core-ktx:1.16.0")
     implementation("androidx.appcompat:appcompat:1.7.1")
     implementation("androidx.activity:activity-ktx:1.10.1")
@@ -45,5 +58,13 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:$cameraX")
     implementation("androidx.camera:camera-video:$cameraX")
     implementation("androidx.camera:camera-view:$cameraX")
+    // Headless AR Video Deck. No media3-ui, so there is no player chrome.
+    val media3 = "1.11.1"
+    implementation("androidx.media3:media3-exoplayer:$media3")
+    implementation("androidx.media3:media3-common:$media3")
+    implementation("androidx.media3:media3-datasource:$media3")
+    // The only on-device model: MediaPipe Tasks Image Segmenter (selfie / person).
+    implementation("com.google.mediapipe:tasks-vision:0.10.35")
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.17")
 }
