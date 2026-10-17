@@ -1,6 +1,7 @@
 # Issue #45: Broadcast Lock finish (stacked on PR #44)
 
 Branch: `cursor/issue45-broadcast-lock-d6d6`, cut from `copilot/hr-release-gate-broadcast-lock` at `29a4e23` (PR #44).
+Draft PR: https://github.com/stillwaters23/OFFGRID-Compositor/pull/49
 PR #46 (`8877a4b`) was an empty commit and is not this work. Nothing was merged. `main` and `final-build` were not pushed.
 
 ## Per item
