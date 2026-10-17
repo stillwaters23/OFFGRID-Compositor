@@ -167,6 +167,11 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /** Phase 1.3: while locked, Back does nothing. Leaving OFFGRID would put another screen on air. */
+    internal val lockBackCallback = object : OnBackPressedCallback(false) {
+        override fun handleOnBackPressed() = Unit
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -189,6 +194,7 @@ class MainActivity : AppCompatActivity() {
         onBackPressedDispatcher.addCallback(this, terminalPanel.backCallback)
         // Phase 1.2: with no Back to camera button on the stage, the phone's Back key ends playback.
         onBackPressedDispatcher.addCallback(this, playbackBackCallback)
+        onBackPressedDispatcher.addCallback(this, lockBackCallback)
         terminalPanel.matchLook(
             bars = listOf(controlBar, playbackBar),
             texts = listOf(statusText, playbackHint),
@@ -199,6 +205,7 @@ class MainActivity : AppCompatActivity() {
         lockStore = BroadcastLockStore(PrefsLockPersistence(this))
         lockChrome = BroadcastLockChrome(this, lockStore)
         lockChrome.onCreate()
+        lockBackCallback.isEnabled = LockGuards.swallowsBack(lockStore.state)
         terminalPanel.renderProbeMayOpen = { !recording && !lockStore.locked }
         terminalPanel.onLockTapped = { lockChrome.lock(LockSource.MANUAL) }
         terminalPanel.onLockHeld = { lockChrome.toggleArmed() }
@@ -297,8 +304,10 @@ class MainActivity : AppCompatActivity() {
 
     /** The lock changed. Locked stops a playing video: a looping saved clip is not the stage. */
     internal fun onLockApplied(state: LockState) {
+        lockBackCallback.isEnabled = LockGuards.swallowsBack(state)
         if (state.locked && playRequested) hidePlayback()
         if ((state.locked || state.armed) && ::coachMark.isInitialized) coachMark.hide()
+        if (resumed && !hasCameraPermission() && !permissionAsked) askCameraPermission()
     }
 
     /** One line for the panel's status line and for Phone 2. Nothing is drawn on the stage. */
@@ -317,13 +326,15 @@ class MainActivity : AppCompatActivity() {
         if (hasCameraPermission()) {
             return
         }
-        if (!permissionAsked) {
-            permissionAsked = true
-            showMessage(R.string.camera_needs_ok, ButtonMode.NONE)
-            permissionLauncher.launch(Manifest.permission.CAMERA)
-        } else {
-            showPermissionHelp()
-        }
+        if (permissionAsked) showPermissionHelp() else askCameraPermission()
+    }
+
+    /** The system permission dialog is on air if it opens while locked, so it waits for the unlock. */
+    private fun askCameraPermission() {
+        if (!LockGuards.mayShowPermissionDialog(lockStore.state)) return
+        permissionAsked = true
+        showMessage(R.string.camera_needs_ok, ButtonMode.NONE)
+        permissionLauncher.launch(Manifest.permission.CAMERA)
     }
 
     override fun onPause() {
