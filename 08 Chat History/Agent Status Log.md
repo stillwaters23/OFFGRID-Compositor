@@ -419,3 +419,12 @@ States: passed, waiting for review, blocked, or waiting for Royalty's phone test
 - **Tests:** `./gradlew testDebugUnitTest assembleDebug lintDebug` from `04 Build`. BUILD SUCCESSFUL. 286 unit tests (247 app, 39 live), 0 failures. Lint 0 errors. The CI guard scripts pass locally.
 - **PR:** "Phase 1.2 clean surface + 1.3 Broadcast Lock" into `final-build`. Not merged. `main` untouched. No file deleted.
 - **Next:** Royalty's phone test. The REC glyph with elapsed time and the `ViewStub` stage-first boot wait for 7.4 and the settings-store split.
+
+## 2026-10-17 — HR release gate auditor (Broadcast Lock)
+
+- **Bootloader step:** Phase 1.2 clean surface and Phase 1.3 Broadcast Lock, HR release gate
+- **What was done:** Audited PR #42 from `final-build`. Found and fixed three defects: Back left the app while locked, the camera permission dialog could open over a locked stage, and a two-finger hold could lock again after the lock changed under the fingers. Added 7 tests, 298 in all, all passing. Wrote `docs/chat_history/2026_10_17_hr_release_gate_broadcast_lock.md`.
+- **PR / commit:** PR into `final-build`, not merged.
+- **State:** HOLD until the CI run is green and the phone tests pass
+- **Next:** Royalty runs the Bigo share tests on the S25 Ultra (Android 15).
+
