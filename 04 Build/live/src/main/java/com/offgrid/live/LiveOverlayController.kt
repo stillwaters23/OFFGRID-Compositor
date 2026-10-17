@@ -41,18 +41,25 @@ object LiveOverlayController {
 
     fun openOverlay(context: Context) {
         if (broadcastLocked || !Settings.canDrawOverlays(context)) return
-        ContextCompat.startForegroundService(
-            context,
-            Intent(context, LiveService::class.java).setAction(LiveService.ACTION_SHOW),
-        )
+        startOverlayService(context, LiveService.ACTION_SHOW)
     }
 
     fun hideOverlay(context: Context) {
         if (broadcastLocked || !Settings.canDrawOverlays(context)) return
-        ContextCompat.startForegroundService(
-            context,
-            Intent(context, LiveService::class.java).setAction(LiveService.ACTION_HIDE),
-        )
+        startOverlayService(context, LiveService.ACTION_HIDE)
+    }
+
+    /**
+     * Android 15 lets an overlay app start a foreground service from the background only while
+     * one of its overlay windows is visible, and the lock has just removed it. A Phone 2 unlock
+     * with Bigo in front lands here; the overlay then waits for OFFGRID's next pause instead.
+     */
+    private fun startOverlayService(context: Context, action: String) {
+        try {
+            ContextCompat.startForegroundService(context, Intent(context, LiveService::class.java).setAction(action))
+        } catch (_: IllegalStateException) {
+            Unit
+        }
     }
 
     /**
