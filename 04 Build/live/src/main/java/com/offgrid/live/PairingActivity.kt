@@ -1,13 +1,19 @@
 package com.offgrid.live
 
+import android.annotation.SuppressLint
 import android.app.Activity
+import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.view.Gravity
+import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import androidx.core.content.ContextCompat
+import java.util.function.Consumer
 
 class PairingActivity : Activity() {
     private lateinit var workflow: PairingWorkflow
@@ -15,6 +21,14 @@ class PairingActivity : Activity() {
     private lateinit var status: TextView
     private lateinit var addressText: TextView
     private lateinit var pastedKey: EditText
+
+    /**
+     * The live consumer only. The platform can still deliver a state that was queued
+     * before removeScreenRecordingCallback, and that stale report must not close a
+     * later visit to this screen.
+     */
+    private var shareGuard: Consumer<Int>? = null
+    private var closedForShare = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -50,6 +64,7 @@ class PairingActivity : Activity() {
         content.addView(pastedKey, marginTop(16))
         content.addView(button("Make pairing key") { makeKey() }, marginTop(12))
         content.addView(button("Copy key") {
+            if (closedForShare) return@button
             try {
                 workflow.copyCurrentKey()
                 status.text = "Copied. Android clears this key after 60 seconds."
@@ -61,39 +76,111 @@ class PairingActivity : Activity() {
         content.addView(button("Forget pairing") {
             workflow.forget(
                 onForgotten = {
+                    if (closedForShare) return@forget
                     keyText.text = "No key is shown."
                     status.text = "Pairing key forgotten."
                 },
-                onFailure = { status.text = it },
+                onFailure = { if (!closedForShare) status.text = it },
             )
         }, marginTop(8))
         content.addView(button("New key") { makeKey() }, marginTop(8))
         workflow.loadKey(
-            onLoaded = { _, fingerprint -> status.text = "Saved key fingerprint: $fingerprint" },
-            onFailure = { status.text = it },
+            onLoaded = { _, fingerprint ->
+                if (!closedForShare) status.text = "Saved key fingerprint: $fingerprint"
+            },
+            onFailure = { if (!closedForShare) status.text = it },
         )
     }
 
+    override fun onStart() {
+        super.onStart()
+        registerShareGuard()
+    }
+
+    override fun onStop() {
+        unregisterShareGuard()
+        super.onStop()
+    }
+
+    /**
+     * Android 15 reports whether this window is inside a screen recording or a share.
+     * The permission is the one the app module already declares (`DETECT_SCREEN_RECORDING`);
+     * it is normal level, so there is no prompt. The live manifest must not declare it again.
+     * Lint only inspects this module, so it cannot see that declaration. Older phones have no
+     * callback: the guard does nothing. A [SecurityException] is logged and Pairing stays up,
+     * the same way the camera screen treats a refused callback.
+     */
+    @SuppressLint("MissingPermission")
+    private fun registerShareGuard() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) return
+        unregisterShareGuard()
+        val manager = windowManager
+        val consumer = object : Consumer<Int> {
+            override fun accept(state: Int) {
+                if (shareGuard !== this) return
+                if (PairingSharePolicy.shouldClose(Build.VERSION.SDK_INT, state)) closeForShare()
+            }
+        }
+        try {
+            val initial = manager.addScreenRecordingCallback(ContextCompat.getMainExecutor(this), consumer)
+            shareGuard = consumer
+            if (PairingSharePolicy.shouldClose(Build.VERSION.SDK_INT, initial)) closeForShare()
+        } catch (error: SecurityException) {
+            Log.w(TAG, "The screen recording callback was refused. The auto lock is off.", error)
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun unregisterShareGuard() {
+        val consumer = shareGuard ?: return
+        shareGuard = null
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+            runCatching { windowManager.removeScreenRecordingCallback(consumer) }
+        }
+    }
+
+    /** The key and the address must not be the last frame a share captures. Then this screen leaves. */
+    private fun closeForShare() {
+        if (closedForShare) return
+        closedForShare = true
+        if (::keyText.isInitialized) {
+            keyText.text = ""
+            keyText.setTextIsSelectable(false)
+        }
+        if (::addressText.isInitialized) {
+            addressText.text = ""
+            addressText.setTextIsSelectable(false)
+        }
+        if (::status.isInitialized) status.text = ""
+        if (::pastedKey.isInitialized) pastedKey.setText("")
+        window.decorView.visibility = View.INVISIBLE
+        if (!isFinishing) finish()
+    }
+
     private fun makeKey() {
+        if (closedForShare) return
         workflow.makeKey(
             onCreated = { key, fingerprint ->
+                if (closedForShare) return@makeKey
                 keyText.text = key
                 status.text = "Show this key once. Fingerprint: $fingerprint"
             },
-            onFailure = { status.text = it },
+            onFailure = { if (!closedForShare) status.text = it },
         )
     }
 
     private fun acceptKey() {
+        if (closedForShare) return
         val typed = pastedKey.text?.toString().orEmpty().trim()
         workflow.acceptPastedKey(
             typed,
             onAccepted = { fingerprint ->
+                if (closedForShare) return@acceptPastedKey
                 pastedKey.text?.clear()
                 keyText.text = "Key saved. It is not shown again."
                 status.text = "Pairing key fingerprint: $fingerprint"
             },
-            onFailure = { status.text = it },
+            onFailure = { if (!closedForShare) status.text = it },
         )
     }
 
@@ -106,7 +193,7 @@ class PairingActivity : Activity() {
             } catch (error: IllegalStateException) {
                 "No private Wi-Fi address yet. Join the same Wi-Fi as the remote phone, then reopen Pairing."
             }
-            runOnUiThread { if (!isDestroyed) addressText.text = line }
+            runOnUiThread { if (!isDestroyed && !closedForShare) addressText.text = line }
         }, "offgrid-pairing-address").start()
     }
 
@@ -150,6 +237,7 @@ class PairingActivity : Activity() {
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 
     private companion object {
+        const val TAG = "OffgridPairing"
         const val WHITE = 0xfff4f4f4.toInt()
         const val DIM = 0xff777777.toInt()
         const val GLASS = 0xff080808.toInt()

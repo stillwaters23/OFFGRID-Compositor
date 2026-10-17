@@ -389,8 +389,8 @@ class TerminalPanel @JvmOverloads constructor(
         })
 
         // Phase 1.2 (V2 section 7.2): the floating OFFGRID pill is built but never attached. A
-        // shrunk panel is simply off the stage. A one-finger hold near the top-left corner, or
-        // Phone 2, opens it again.
+        // shrunk panel is simply off the stage. A one-finger hold near the top-left corner
+        // opens it again.
         buildPill()
 
         ViewCompat.addAccessibilityAction(this, context.getString(R.string.terminal_bigger)) { _, _ ->

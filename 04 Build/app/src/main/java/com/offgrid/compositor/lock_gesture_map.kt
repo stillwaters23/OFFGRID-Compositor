@@ -27,6 +27,25 @@ internal object LockGestureMap {
     /** The top-left zone reaches this share of the width and of the height. */
     const val PANEL_OPEN_SHARE = 0.3f
 
+    /**
+     * What a two-finger hold does when its timer runs out. The hold means what it meant when the
+     * fingers landed: a hold that began locked asks to unlock, one that began unlocked locks. If
+     * the lock changed under the fingers (Phone 2, or the share ending), nothing more happens,
+     * so the hold never turns an unlock into a lock.
+     */
+    fun holdOutcome(lockedAtStart: Boolean, lockedNow: Boolean): HoldOutcome = when {
+        lockedAtStart != lockedNow -> HoldOutcome.NONE
+        lockedNow -> HoldOutcome.UNLOCK
+        else -> HoldOutcome.LOCK
+    }
+
+    /**
+     * A hold that locks, and a hold that unlocks, both swallow the rest of that gesture.
+     * A hold whose meaning changed under the fingers ([HoldOutcome.NONE]) does not.
+     */
+    fun swallowsRest(outcome: HoldOutcome): Boolean =
+        outcome == HoldOutcome.LOCK || outcome == HoldOutcome.UNLOCK
+
     /** Left, top, right, bottom of the center zone, in pixels. */
     fun centerZone(width: Int, height: Int): IntArray {
         val insetX = ((1f - CENTER_SHARE) / 2f * width).roundToInt()
@@ -56,6 +75,8 @@ internal object LockGestureMap {
 
 /** The touch phases the recognizers care about, free of android.view so tests stay on the JVM. */
 internal enum class TouchKind { DOWN, POINTER_DOWN, MOVE, POINTER_UP, UP, CANCEL }
+
+internal enum class HoldOutcome { LOCK, UNLOCK, NONE }
 
 internal enum class HoldEvent { NONE, HOLD_STARTED, HOLD_CANCELLED }
 

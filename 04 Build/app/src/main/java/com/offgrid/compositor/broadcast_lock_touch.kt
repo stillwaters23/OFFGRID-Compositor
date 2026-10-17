@@ -43,6 +43,7 @@ internal class LockTouch(
     private val xs = FloatArray(MAX_POINTERS)
     private val ys = FloatArray(MAX_POINTERS)
     private var swallowRest = false
+    private var lockedAtHoldStart = false
     private var tapDownX = 0f
     private var tapDownY = 0f
     private var tapDownAt = 0L
@@ -61,6 +62,7 @@ internal class LockTouch(
         if (kind == TouchKind.DOWN) swallowRest = false
         when (lockHold.feed(kind, count, xs, ys, width, height)) {
             HoldEvent.HOLD_STARTED -> {
+                lockedAtHoldStart = locked
                 main.removeCallbacks(lockTimer)
                 main.postDelayed(lockTimer, LockGestureMap.HOLD_MS)
                 if (tick()) haptic(HapticFeedbackConstants.CLOCK_TICK)
@@ -105,12 +107,15 @@ internal class LockTouch(
     private fun fireLock() {
         lockHold.fired()
         main.removeCallbacks(panelTimer)
-        if (chrome.store.locked) {
-            chrome.unlock()
-        } else {
+        val outcome = LockGestureMap.holdOutcome(lockedAtHoldStart, chrome.store.locked)
+        if (LockGestureMap.swallowsRest(outcome)) {
             cancelViews()
             swallowRest = true
-            chrome.lock(LockSource.MANUAL)
+        }
+        when (outcome) {
+            HoldOutcome.UNLOCK -> chrome.unlock()
+            HoldOutcome.LOCK -> chrome.lock(LockSource.MANUAL)
+            HoldOutcome.NONE -> Unit
         }
     }
 

@@ -419,3 +419,20 @@ States: passed, waiting for review, blocked, or waiting for Royalty's phone test
 - **Tests:** `./gradlew testDebugUnitTest assembleDebug lintDebug` from `04 Build`. BUILD SUCCESSFUL. 286 unit tests (247 app, 39 live), 0 failures. Lint 0 errors. The CI guard scripts pass locally.
 - **PR:** "Phase 1.2 clean surface + 1.3 Broadcast Lock" into `final-build`. Not merged. `main` untouched. No file deleted.
 - **Next:** Royalty's phone test. The REC glyph with elapsed time and the `ViewStub` stage-first boot wait for 7.4 and the settings-store split.
+
+## 2026-10-17 — HR release gate auditor (Broadcast Lock)
+
+- **Bootloader step:** Phase 1.2 clean surface and Phase 1.3 Broadcast Lock, HR release gate
+- **What was done:** Audited PR #42 from `final-build`. Found and fixed three defects: Back left the app while locked, the camera permission dialog could open over a locked stage, and a two-finger hold could lock again after the lock changed under the fingers. Added 7 tests, 298 in all, all passing. Wrote `docs/chat_history/2026_10_17_hr_release_gate_broadcast_lock.md`.
+- **PR / commit:** PR into `final-build`, not merged.
+- **State:** HOLD until the CI run is green and the phone tests pass
+- **Next:** Royalty runs the Bigo share tests on the S25 Ultra (Android 15).
+
+## 2026-10-17 — Issue #45 Broadcast Lock finish (stacked on PR #44)
+
+- **Bootloader step:** HR release gate, issue #45, on `copilot/hr-release-gate-broadcast-lock` (`29a4e23`)
+- **What was done:** PairingActivity now closes on an Android 15 screen share, the camera permission is asked once after the lock lifts, an unlock hold swallows the rest of the gesture, and the TerminalPanel comment no longer claims Phone 2 can reopen the panel. Local `./gradlew testDebugUnitTest assembleDebug` with JDK 17.0.20.1 and SDK platform 36: 310 tests, 0 failures. CI has not run. Details in `docs/chat_history/2026_10_17_issue45_broadcast_lock_build.md`.
+- **PR / commit:** Draft PR #49 into `copilot/hr-release-gate-broadcast-lock`. Not merged. `main` and `final-build` were not pushed.
+- **State:** HOLD. Phone checks on the Samsung Galaxy S25 Ultra are blocked.
+- **Next:** Royalty runs the numbered phone steps in that note. Do not merge from this branch.
+

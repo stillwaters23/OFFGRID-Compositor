@@ -136,4 +136,51 @@ class LockGestureMapTest {
         feed(open, TouchKind.UP, 300f to 500f)
         assertEquals(HoldEvent.NONE, feed(open, TouchKind.DOWN, 720f to 1560f))
     }
+
+    @Test
+    fun aHoldMeansWhatItMeantWhenTheFingersLanded() {
+        assertEquals(HoldOutcome.LOCK, LockGestureMap.holdOutcome(lockedAtStart = false, lockedNow = false))
+        assertEquals(HoldOutcome.UNLOCK, LockGestureMap.holdOutcome(lockedAtStart = true, lockedNow = true))
+        assertEquals(
+            "Phone 2 unlocked under the fingers: the hold must not lock again",
+            HoldOutcome.NONE,
+            LockGestureMap.holdOutcome(lockedAtStart = true, lockedNow = false),
+        )
+        assertEquals(
+            "the lock came on under the fingers: the hold must not unlock it",
+            HoldOutcome.NONE,
+            LockGestureMap.holdOutcome(lockedAtStart = false, lockedNow = true),
+        )
+    }
+
+    @Test
+    fun everyCornerAndEdgeOfTheStageRejectsALockStart() {
+        val corners = listOf(0f to 0f, width.toFloat() to 0f, 0f to height.toFloat(), width.toFloat() to height.toFloat())
+        for ((x, y) in corners) assertFalse("corner $x,$y", LockGestureMap.inCenterZone(x, y, width, height))
+        val hold = twoFingers()
+        feed(hold, TouchKind.DOWN, 700f to 1500f)
+        assertEquals(
+            "one finger in the middle, one on the right edge",
+            HoldEvent.NONE,
+            feed(hold, TouchKind.POINTER_DOWN, 700f to 1500f, (width - 1).toFloat() to 1500f),
+        )
+        assertFalse(hold.holding)
+    }
+
+    @Test
+    fun anUnlockHoldSwallowsTheRestOfTheGestureTheSameWayALockDoes() {
+        assertTrue(LockGestureMap.swallowsRest(HoldOutcome.LOCK))
+        assertTrue(LockGestureMap.swallowsRest(HoldOutcome.UNLOCK))
+        assertFalse(LockGestureMap.swallowsRest(HoldOutcome.NONE))
+    }
+
+    @Test
+    fun anUnlockHoldStartsLikeALockHoldAndKeepsHoldingStill() {
+        // Locked or not, the recognizer sees the same two-finger hold. The store decides lock versus unlock.
+        val hold = twoFingers()
+        feed(hold, TouchKind.DOWN, 700f to 1500f)
+        assertEquals(HoldEvent.HOLD_STARTED, feed(hold, TouchKind.POINTER_DOWN, 700f to 1500f, 800f to 1600f))
+        assertEquals(HoldEvent.NONE, feed(hold, TouchKind.MOVE, 710f to 1505f, 805f to 1596f))
+        assertEquals(HoldEvent.HOLD_CANCELLED, feed(hold, TouchKind.CANCEL, 710f to 1505f, 805f to 1596f))
+    }
 }
