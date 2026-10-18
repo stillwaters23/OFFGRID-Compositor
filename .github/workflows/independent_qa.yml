@@ -1,7 +1,7 @@
 name: Independent QA
 
-# Independent of the fixer. Checks out PR 56 head 2fea30e, builds that
-# debug APK, and walks the panel with this branch's own adb taps.
+# Independent of the fixer. Two jobs walk PR 56 head 2fea30e. A third job
+# runs the same walk on 6c7936e as a control for the drum-swipe device loss.
 # GitHub-hosted ubuntu-latest provides /dev/kvm. This file does not change app code.
 
 on:
@@ -19,9 +19,22 @@ concurrency:
 
 jobs:
   independent-qa:
-    name: API 35 KVM walk
+    name: API 35 ${{ matrix.name }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: candidate-1
+            sha: 2fea30ec71f29cfce4c20531d66f6ee15a759b70
+            fallback: cursor/royalty-v033-phone-fixes-1373
+          - name: candidate-2
+            sha: 2fea30ec71f29cfce4c20531d66f6ee15a759b70
+            fallback: cursor/royalty-v033-phone-fixes-1373
+          - name: control-6c7936e
+            sha: 6c7936e5da9935305904b712fed10e9af287bcfa
+            fallback: cursor/royalty-v033-phone-fixes-1373
     steps:
       - name: Enable KVM
         run: |
@@ -36,13 +49,13 @@ jobs:
       - name: Check out the QA branch
         uses: actions/checkout@v4
 
-      - name: Check out PR 56 head 2fea30e
+      - name: Check out app head ${{ matrix.sha }}
         run: |
           set -euo pipefail
-          git fetch --depth 1 origin 2fea30ec71f29cfce4c20531d66f6ee15a759b70 \
-            || git fetch --depth 1 origin cursor/royalty-v033-phone-fixes-1373
-          git worktree add --detach offgrid-head 2fea30ec71f29cfce4c20531d66f6ee15a759b70
-          test "$(git -C offgrid-head rev-parse HEAD)" = "2fea30ec71f29cfce4c20531d66f6ee15a759b70"
+          git fetch --depth 1 origin ${{ matrix.sha }} \
+            || git fetch --depth 1 origin ${{ matrix.fallback }}
+          git worktree add --detach offgrid-head ${{ matrix.sha }}
+          test "$(git -C offgrid-head rev-parse HEAD)" = "${{ matrix.sha }}"
           git -C offgrid-head log -1 --oneline
 
       - name: Set up Java
@@ -65,7 +78,7 @@ jobs:
           yes | "$HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$HOME/android-sdk" --licenses >/dev/null || true
           "$HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$HOME/android-sdk" --install "platforms;android-36" "build-tools;36.0.0" "platform-tools"
 
-      - name: Build debug and androidTest APKs from 2fea30e
+      - name: Build debug and androidTest APKs
         working-directory: offgrid-head/04 Build
         run: |
           set -euo pipefail
@@ -80,7 +93,8 @@ jobs:
           merged="$(find "offgrid-head/04 Build/app/build" -path "*merged_manifest*" -name AndroidManifest.xml | head -n 1)"
           test -n "$merged"
           cp "$merged" docs/qa/independent_qa/evidence/merged-manifest.xml
-          python3 - "$merged" << 'PY'
+          sha="$(git -C offgrid-head rev-parse HEAD)"
+          python3 - "$merged" "$sha" << 'PY'
           import pathlib, sys
           import xml.etree.ElementTree as ET
           name = "{http://schemas.android.com/apk/res/android}name"
@@ -92,7 +106,7 @@ jobs:
               if node.get(name)
           )
           out = pathlib.Path("docs/qa/independent_qa/evidence/static_checks.txt")
-          lines = ["HEAD=2fea30ec71f29cfce4c20531d66f6ee15a759b70", "permissions:"]
+          lines = [f"HEAD={sys.argv[2]}", "permissions:"]
           lines += [f"  {item}" for item in found]
           for banned in ("android.permission.RECORD_AUDIO", "android.permission.FOREGROUND_SERVICE_MICROPHONE"):
               lines.append(f"{banned}={'PRESENT' if banned in found else 'absent'}")
@@ -131,7 +145,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: independent-qa-api-35
+          name: independent-qa-${{ matrix.name }}
           if-no-files-found: warn
           path: |
             docs/qa/independent_qa/evidence

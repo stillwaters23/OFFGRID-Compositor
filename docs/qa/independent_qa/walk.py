@@ -705,6 +705,24 @@ def positive_play(lines: list[str]) -> str:
     return next((line for line in lines if re.search(r"streamId=([1-9]\d*)", line)), "")
 
 
+def poll_get_state(tag: str) -> str:
+    """Poll adb get-state. Each call has its own timeout. Returns the last state word."""
+    samples: list[str] = []
+    for _ in range(5):
+        ran = adb(["get-state"], timeout=10)
+        state = (ran.stdout or "").strip()
+        err = (ran.stderr or "").strip().replace("\n", " ")
+        samples.append(state or err or f"exit={ran.returncode}")
+        if state == "device":
+            break
+        time.sleep(1)
+    line = f"{tag} get-state: {' | '.join(samples)}"
+    progress(line)
+    with (EVID / "device-state.log").open("a", encoding="utf-8") as handle:
+        handle.write(line + "\n")
+    return samples[-1] if samples else ""
+
+
 def swipe_reel(label: str, direction: str, nodes: list[dict]) -> tuple[list[dict], str]:
     """One real input swipe on a drum, then logcat -s OffgridClicker."""
     node = find_reel(nodes, label)
@@ -723,25 +741,37 @@ def swipe_reel(label: str, direction: str, nodes: list[dict]) -> tuple[list[dict
     y_start, y_end = (bottom, top) if direction == "up" else (top, bottom)
     tag = f"reel_{label.lower()}_{direction}"
     shot(f"{tag}_before")
-    adb(["logcat", "-c"], timeout=20)
-    time.sleep(0.3)
+    # Leave the continuous logcat stream intact. Do not clear the device buffer.
+    stream = EVID / "logcat-stream.txt"
+    stream_at = stream.stat().st_size if stream.exists() else 0
     adb(
         ["shell", "input", "swipe", str(cx), str(y_start), str(cx), str(y_end), "350"],
         timeout=20,
     )
+    state = poll_get_state(f"{tag}_after_swipe")
+    if state != "device":
+        return nodes, f"{label} {direction}: DEVICE_LOST after swipe get-state={state} from {before}"
     time.sleep(0.8)
     after_nodes = dump(tag)
+    state_after = poll_get_state(f"{tag}_after_dump")
     shot(tag)
+    if state_after != "device":
+        return after_nodes, f"{label} {direction}: DEVICE_LOST after dump get-state={state_after} from {before}"
     after = reel_value(find_reel(after_nodes, label), label)
     click = logcat("OffgridClicker")
-    played = positive_play(play_lines(click))
+    fresh = ""
+    if stream.exists():
+        fresh = stream.read_bytes()[stream_at:].decode("utf-8", errors="replace")
+    played = positive_play(play_lines(click) or play_lines(fresh))
     with (EVID / "reel_clicker.log").open("a", encoding="utf-8") as handle:
         handle.write(f"\n===== {label} {direction} {before} -> {after} =====\n")
         handle.write(click)
         if click and not click.endswith("\n"):
             handle.write("\n")
+        handle.write("----- stream after swipe -----\n")
+        handle.write(fresh[-4000:])
     if before is None or after is None or before == after or not played:
-        return after_nodes, f"{label} {direction}: {before} -> {after}; log={play_lines(click)[:4]}"
+        return after_nodes, f"{label} {direction}: {before} -> {after}; log={play_lines(click)[:4] or play_lines(fresh)[:4]}"
     return after_nodes, f"{label} {direction}: {before} -> {after}; {played}"
 
 
@@ -773,9 +803,14 @@ def check_reel() -> None:
         nodes, note = swipe_reel(label, direction, nodes)
         notes.append(note)
         progress(note)
+        if "DEVICE_LOST" in note:
+            break
+    lost = [note for note in notes if "DEVICE_LOST" in note]
     missed = [note for note in notes if "SoundPool play streamId=" not in note]
     detail = " | ".join(notes)
-    if missed:
+    if lost:
+        mark("reel_click", "BLOCKED", detail)
+    elif missed:
         mark("reel_click", "FAIL", detail)
     else:
         mark("reel_click", "PASS", detail)

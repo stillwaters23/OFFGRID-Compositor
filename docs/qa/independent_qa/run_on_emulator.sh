@@ -31,6 +31,23 @@ adb_t() {
 
 progress "script start"
 echo "NOTE (non-blocking, traced on the unfit VM): startup main-thread work before first frame included AppCompatTextView class verification (art::verifier::MethodVerifier::VerifyMethod inside AppCompatTextView.<init>) and ResourcesCompat.loadFont / TypefaceCompat.createFromResourcesFamilyXml inside AppCompatActivity.setContentView."
+git -C "$root/offgrid-head" rev-parse HEAD >"$ev/head.txt" 2>/dev/null || true
+git -C "$root/offgrid-head" log -1 --oneline >"$ev/head-oneline.txt" 2>/dev/null || true
+
+dump_host_diag() {
+  {
+    echo "=== $(date -u +%Y-%m-%dT%H:%M:%SZ) host diagnostics ==="
+    echo "--- oom / kill ---"
+    sudo dmesg -T 2>/dev/null | grep -Ei 'oom|killed process|out of memory' || echo "no oom lines"
+    echo "--- emulator memory tail ---"
+    tail -n 40 "$ev/emulator-memory.log" 2>/dev/null || echo "no memory log"
+    echo "--- emulator stderr tail ---"
+    tail -n 60 "$ev/emulator-process.stderr" 2>/dev/null || echo "no emulator stderr"
+    echo "--- emulator stdout tail ---"
+    tail -n 40 "$ev/emulator-process.stdout" 2>/dev/null || echo "no emulator stdout"
+  } >"$ev/host-diagnostics.txt" 2>&1 || true
+}
+trap dump_host_diag EXIT
 
 progress "wait-for-device cap 120s"
 if ! adb_t 120 wait-for-device; then
@@ -55,6 +72,13 @@ if [ "$booted" -ne 1 ]; then
   exit 1
 fi
 progress "boot_completed=1"
+
+progress "stream logcat -v time from boot"
+: >"$ev/logcat-stream.txt"
+nohup adb logcat -v time >>"$ev/logcat-stream.txt" 2>>"$ev/logcat-stream.err" &
+logcat_pid=$!
+echo "$logcat_pid" >"$ev/logcat-stream.pid"
+progress "logcat stream pid ${logcat_pid}"
 
 adb_t 30 shell settings delete secure immersive_mode_confirmations || true
 adb_t 30 shell settings put global window_animation_scale 1 || true
@@ -97,6 +121,11 @@ progress "installs done"
 (
   i=1
   while [ ! -f "$ev/recording.stop" ] && [ "$i" -le 16 ]; do
+    state="$(timeout --signal=KILL 10 adb get-state 2>/dev/null | tr -d '\r' || true)"
+    if [ "$state" != "device" ]; then
+      progress "screenrecord stop adb state=${state:-offline}"
+      break
+    fi
     progress "screenrecord clip ${i} begin"
     timeout --signal=KILL 15 adb shell pkill -2 screenrecord >/dev/null 2>&1 || true
     timeout --signal=KILL 200 adb shell screenrecord --time-limit 170 --bit-rate 4000000 "/sdcard/qa_r${i}.mp4" || true
@@ -140,6 +169,9 @@ printf 'walk_exit=%s\ninstrument_exit=%s\n' "$walk_status" "$instrument_status" 
 
 progress "stop screenrecord"
 touch "$ev/recording.stop"
+if [ -n "${logcat_pid:-}" ]; then
+  kill "$logcat_pid" 2>/dev/null || true
+fi
 adb_t 20 shell 'kill -2 $(pidof screenrecord) 2>/dev/null || true' || true
 # wait is a shell builtin, so GNU timeout cannot run it. The recorder loop exits on the flag.
 kill "$rec_pid" 2>/dev/null || true
