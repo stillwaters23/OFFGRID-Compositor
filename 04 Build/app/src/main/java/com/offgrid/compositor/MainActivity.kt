@@ -135,12 +135,18 @@ class MainActivity : AppCompatActivity() {
     internal lateinit var live: LiveIntegration
 
     internal fun effectsReady(): Boolean = ::effects.isInitialized
+    internal fun micReady(): Boolean = ::mic.isInitialized
+    internal fun darkStageReady(): Boolean = ::darkStage.isInitialized
 
     /** Processed voice for another lane. The recording itself still comes from the same mic engine. */
     fun addVoiceAudioOutput(output: VoiceAudioOutput): AutoCloseable = mic.addVoiceAudioOutput(output)
 
     /** True when the effects could not start on this phone. The camera screen says why it is black. */
     internal var effectsBroken = false
+
+    /** False until the first frame has been presented. Camera, MediaPipe, and live stay off until then. */
+    internal var afterFirstFrame = false
+    private var pendingResume = false
     private lateinit var faces: FaceTracker
 
     /** The person mask, shared by the segmenter thread and the drawing thread. */
@@ -222,16 +228,10 @@ class MainActivity : AppCompatActivity() {
         val engine = EffectEngine()
         mic = MicPipeline()
         engine.beatCount = { mic.beats.beats }
-        faces = FaceTracker(this, engine)
-        segmenter = PersonSegmenter(this, engine, masks)
         effects = EffectsController(this, terminalPanel, engine)
-        live = LiveIntegration.install(this, effects, { processor }, lockStore, terminalPanel) // Lane C hook
         effects.lastVideo = { recordingFile() }
         effects.onSettings = { onEffectSettings() }
         effects.onScreenAction = { action -> onScreenAction(action) }
-        effects.start()
-        effects.attachInk(previewView)
-        terminalPanel.useGuides(findViewById(R.id.snap_guides))
         describeCamera(terminalPanel.testDiamondOn)
         val root = findViewById<FrameLayout>(R.id.root)
         ViewCompat.setOnApplyWindowInsetsListener(root) { _, insets ->
@@ -239,9 +239,8 @@ class MainActivity : AppCompatActivity() {
             terminalPanel.onScreenEdges(screenEdges(insets))
             insets
         }
-        darkStage = DarkStage(this, root, previewView) { processor }
         previewView.addOnLayoutChangeListener { _, left, top, right, bottom, _, _, _, _ ->
-            onPreviewLayout(right - left, bottom - top)
+            if (afterFirstFrame) onPreviewLayout(right - left, bottom - top)
         }
         val panelOpenInset = (PANEL_OPEN_EDGE_INSET_DP * resources.displayMetrics.density).toInt()
         root.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
@@ -282,6 +281,39 @@ class MainActivity : AppCompatActivity() {
         }
         playbackView.surfaceTextureListener = playbackSurfaceListener()
         showMessage(R.string.camera_starting, ButtonMode.NONE)
+        android.util.Log.i(STARTUP_TAG, "onCreate_done")
+        window.decorView.viewTreeObserver.addOnPreDrawListener(object : android.view.ViewTreeObserver.OnPreDrawListener {
+            override fun onPreDraw(): Boolean {
+                window.decorView.viewTreeObserver.removeOnPreDrawListener(this)
+                window.decorView.post { startAfterFirstFrame() }
+                return true
+            }
+        })
+    }
+
+    /**
+     * First present, then the heavy work. Camera bind, MediaPipe, and Live NSD on the first
+     * frame were the cold-start FocusEvent ANR (5s wait) on a software GPU.
+     */
+    private fun startAfterFirstFrame() {
+        if (afterFirstFrame || isFinishing || isDestroyed) return
+        afterFirstFrame = true
+        android.util.Log.i(STARTUP_TAG, "first_frame")
+        val engine = effects.engine
+        faces = FaceTracker(this, engine)
+        segmenter = PersonSegmenter(this, engine, masks)
+        live = LiveIntegration.install(this, effects, { processor }, lockStore, terminalPanel)
+        effects.start()
+        effects.attachInk(previewView)
+        terminalPanel.useGuides(findViewById(R.id.snap_guides))
+        val root = findViewById<FrameLayout>(R.id.root)
+        darkStage = DarkStage(this, root, previewView) { processor }
+        android.util.Log.i(STARTUP_TAG, "heavy_ready")
+        if (pendingResume) {
+            pendingResume = false
+            effects.resume()
+            applyCapture()
+        }
     }
 
     override fun onStart() {
@@ -292,7 +324,7 @@ class MainActivity : AppCompatActivity() {
     override fun onStop() {
         lockChrome.onStop()
         // A coach mark still up when the app leaves would be the first thing drawn on resume.
-        coachMark.hide()
+        if (::coachMark.isInitialized) coachMark.hide()
         super.onStop()
     }
 
@@ -356,6 +388,10 @@ class MainActivity : AppCompatActivity() {
     internal fun showUnlockStrip(show: Boolean) {
         if (!::unlockStrip.isInitialized) return
         unlockStrip.visibility = if (show) View.VISIBLE else View.GONE
+        if (show) {
+            unlockStrip.bringToFront()
+            unlockStrip.elevation = 24f
+        }
         unlockBackCallback.isEnabled = show
     }
 
@@ -368,10 +404,14 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         lockChrome.onResume()
-        effects.resume()
         applySystemBars()
         resumed = true
-        applyCapture()
+        if (!afterFirstFrame) {
+            pendingResume = true
+        } else {
+            effects.resume()
+            applyCapture()
+        }
         if (hasCameraPermission()) {
             return
         }
@@ -386,11 +426,11 @@ class MainActivity : AppCompatActivity() {
 
     override fun onPause() {
         lockChrome.onPause()
-        effects.pause()
+        if (::effects.isInitialized) effects.pause()
         hidePlayback()
         stopRecording()
         resumed = false
-        applyCapture()
+        if (afterFirstFrame) applyCapture()
         super.onPause()
     }
 
@@ -399,9 +439,9 @@ class MainActivity : AppCompatActivity() {
         if (::lockTouch.isInitialized) lockTouch.release()
         if (::lockChrome.isInitialized) lockChrome.onDestroy()
         if (::coachMark.isInitialized) coachMark.hide()
-        mic.stop()
-        darkStage.hide()
-        effects.release()
+        if (::mic.isInitialized) mic.stop()
+        if (::darkStage.isInitialized) darkStage.hide()
+        if (::effects.isInitialized) effects.release()
         processor?.onFirstFrame = null
         processor?.onFailed = null
         processor?.onEffectsFailed = null
@@ -456,6 +496,7 @@ class MainActivity : AppCompatActivity() {
         withFrameRate: Boolean,
         withSegment: Boolean = true,
     ) {
+        if (!::faces.isInitialized) return
         val painter = ensureProcessor()
         faces.outputAspect = previewView.width.toFloat() / previewView.height
         rebindGate.bound(previewView.width, previewView.height)
@@ -514,7 +555,7 @@ class MainActivity : AppCompatActivity() {
             .addUseCase(preview)
             .addUseCase(capture)
             .addEffect(effect)
-        if (withSegment) {
+        if (withSegment && ::segmenter.isInitialized) {
             val analysis = ImageAnalysis.Builder()
                 .setResolutionSelector(segmentResolution())
                 .setTargetRotation(rotation)
@@ -616,6 +657,7 @@ class MainActivity : AppCompatActivity() {
 
     private companion object {
         const val TAG = "OffgridCompositor"
+        const val STARTUP_TAG = "OffgridStartup"
 
         /** The panel-open hold zone starts this far in from the screen edges: no edge gestures (V2 7.3). */
         const val PANEL_OPEN_EDGE_INSET_DP = 48f

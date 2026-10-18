@@ -92,6 +92,7 @@ internal fun MainActivity.onMicPermission(granted: Boolean) {
      * match their typed values. The camera and the mic are both let go while the app is hidden.
      */
 internal fun MainActivity.applyCapture() {
+        if (!afterFirstFrame || !effectsReady() || !micReady()) return
         val settings = effects.engine.settings
         val cameraWanted = settings.on(MicKeys.CAM_ON, true)
         val blocked = settings.on(FxKeys.MIC_BLOCKED)
@@ -139,6 +140,7 @@ internal fun MainActivity.askForMic() {
 
     /** Black picture with the effects drawn over it, instead of the camera. */
 internal fun MainActivity.showDark(on: Boolean) {
+        if (!darkStageReady()) return
         if (on == cameraDark) return
         cameraDark = on
         if (on) {

@@ -9,6 +9,14 @@ cd "$root"
 chmod +x "04 Build/gradlew"
 adb shell mkdir -p /data/local/tmp/royalty-fix-evidence
 adb shell chmod 777 /data/local/tmp/royalty-fix-evidence
+# Match independent QA: 1080x2400 phone, animations on, immersive hint armed, cold start.
+adb shell settings delete secure immersive_mode_confirmations >/dev/null 2>&1 || true
+adb shell settings put global window_animation_scale 1
+adb shell settings put global transition_animation_scale 1
+adb shell settings put global animator_duration_scale 1
+adb shell wm size 1080x2400 || true
+adb shell wm density 420 || true
+adb shell am force-stop com.offgrid.compositor >/dev/null 2>&1 || true
 
 set +e
 (

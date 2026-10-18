@@ -49,6 +49,7 @@ class RoyaltyPhoneFixTest {
     @Before
     fun showThePanel() {
         device.executeShellCommand("mkdir -p $EVIDENCE")
+        assertFalse("ANR dialog is up before the test. seen=${deviceAnrText()}", anrVisible())
         activity.scenario.onActivity { act ->
             act.lockChrome.unlock()
             act.terminalPanel.setHiddenForLock(false)
@@ -61,6 +62,7 @@ class RoyaltyPhoneFixTest {
         if (lock == null) dumpUi("setup_missing_lock")
         assertTrue("lock control should be on the panel. seen=${visibleLabels()}", lock != null)
         assertTappableOnScreen(lock!!, "Lock the panel")
+        assertFalse("ANR dialog covered the panel. seen=${deviceAnrText()}", anrVisible())
     }
 
     @Test
@@ -121,6 +123,12 @@ class RoyaltyPhoneFixTest {
         val restore = waitDesc("Open the panel")
         assertTrue("minus must leave a restore tab", restore != null)
         assertTappableOnScreen(restore!!, "Open the panel")
+        val loc = IntArray(2)
+        InstrumentationRegistry.getInstrumentation().runOnMainSync { restore.getLocationOnScreen(loc) }
+        assertTrue(
+            "restore tab must sit below the status bar at y=${loc[1]} size=${restore.width}x${restore.height}",
+            loc[1] >= 80 && restore.width >= 120 && restore.height >= 48,
+        )
         shot("05_hidden_with_restore_tab")
         device.pressBack()
         device.waitForIdle()
@@ -151,6 +159,8 @@ class RoyaltyPhoneFixTest {
     @Test
     fun copyPairingKeyStaysOnLiveAndRemote() {
         tapFolder("Live and Remote")
+        assertOpenedFolder("Live and Remote")
+        assertTrue("Copy pairing key must be on Live and Remote. seen=${visibleLabels()}", waitTextContains("Copy pairing key") != null)
         shot("10_live_and_remote")
         assertTrue(
             "pairing copy must mention a PC or Android phone. seen=${visibleLabels()}",
@@ -171,18 +181,18 @@ class RoyaltyPhoneFixTest {
     @Test
     fun pairingCopyMentionsPcOrAndroidPhone() {
         tapFolder("Live and Remote")
+        assertOpenedFolder("Live and Remote")
+        val mention = waitTextContains("PC or an Android phone") ?: waitTextContains("PC or Android")
+        assertTrue("Live and Remote must say PC or Android phone. seen=${visibleLabels()}", mention != null)
         shot("10b_pairing_pc_or_phone")
-        assertTrue(
-            "Live and Remote must say PC or Android phone",
-            waitTextContains("PC or an Android phone") != null ||
-                waitTextContains("PC or Android") != null,
-        )
     }
 
     @Test
     fun openKickStaysInAppAndNeverOpensPlayStore() {
         tapFolder("Kick")
+        assertOpenedFolder("Kick")
         tapFolder("Effects")
+        assertOpenedFolder("Effects")
         shot("12_kick_effects")
         tapOnScreen(requireText("Open Kick"), "Open Kick")
         assertTrue(waitTextContains("Open Kick") != null)
@@ -202,10 +212,13 @@ class RoyaltyPhoneFixTest {
     @Test
     fun kickTogglesStayOnOffgridAndNeverClaimTikTok() {
         tapFolder("Kick")
+        assertOpenedFolder("Kick")
         tapFolder("Effects")
+        assertOpenedFolder("Effects")
+        assertTrue("Kick Effects must show Red sweep. seen=${visibleLabels()}", waitTextContains("Red sweep") != null)
         shot("19_kick_toggles_offgrid_only")
         assertTrue(
-            "Red sweep must say it cannot change TikTok",
+            "Red sweep must say it cannot change TikTok. seen=${visibleLabels()} status=${statusDescription()}",
             waitTextContains("cannot change TikTok") != null,
         )
         assertTrue(waitTextContains("I got kicked") != null)
@@ -222,7 +235,9 @@ class RoyaltyPhoneFixTest {
             act.terminalPanel.clickerSounds.playHook = { id -> hooked.set(id) }
         }
         tapFolder("Panel settings")
+        assertOpenedFolder("Panel settings")
         tapFolder("Clicker Sounds")
+        assertOpenedFolder("Clicker Sounds")
         shot("14_clicker_sounds")
         repeat(6) {
             activity.scenario.onActivity { it.terminalPanel.playTestClick() }
@@ -250,8 +265,11 @@ class RoyaltyPhoneFixTest {
     @Test
     fun contrastLockBlocksInvisibleWhiteSkin() {
         tapFolder("Panel settings")
+        assertOpenedFolder("Panel settings")
         tapFolder("Colors")
+        assertOpenedFolder("Colors")
         tapFolder("Skin color")
+        assertOpenedFolder("Skin color")
         shot("17_skin_colors")
         val lockedWhite = waitDescContains("Locked White")
         assertTrue("White skin must show the lock. seen=${visibleLabels()}", lockedWhite != null)
@@ -266,7 +284,9 @@ class RoyaltyPhoneFixTest {
     @Test
     fun contrastLockBlocksBlackTypewriterOnBlack() {
         tapFolder("Panel settings")
+        assertOpenedFolder("Panel settings")
         tapFolder("Theme mode")
+        assertOpenedFolder("Theme mode")
         val night = waitDescContains("Night. Use a black panel")
         assertTrue("Night must be on screen in Theme mode. seen=${visibleLabels()}", night != null)
         tapOnScreen(night!!, "Night")
@@ -274,7 +294,9 @@ class RoyaltyPhoneFixTest {
         device.waitForIdle()
         SystemClock.sleep(400)
         tapFolder("Colors")
+        assertOpenedFolder("Colors")
         tapFolder("Typewriter text color")
+        assertOpenedFolder("Typewriter text color")
         val lockedBlack = waitDescContains("Locked Black")
         assertTrue("Black typewriter on black must show the lock. seen=${visibleLabels()}", lockedBlack != null)
         tapOnScreen(lockedBlack!!, "Locked Black")
@@ -290,6 +312,36 @@ class RoyaltyPhoneFixTest {
             !overwritten,
         )
         shot("18b_black_text_locked")
+    }
+
+    @Test
+    fun tenColdStartsDoNotShowAnr() {
+        val traces = StringBuilder()
+        repeat(10) { index ->
+            device.executeShellCommand("am force-stop com.offgrid.compositor")
+            SystemClock.sleep(400)
+            val started = device.executeShellCommand("am start -W -n com.offgrid.compositor/.MainActivity")
+            traces.append("cold_${index + 1}\n$started\n")
+            SystemClock.sleep(900)
+            if (anrVisible()) {
+                shot("cold_${index + 1}_anr")
+                dumpUi("cold_${index + 1}_anr")
+            }
+            assertFalse(
+                "ANR dialog on cold start ${index + 1}/10.\n$started",
+                anrVisible(),
+            )
+            assertTrue(
+                "folders missing on cold start ${index + 1}/10",
+                waitUntil(12_000) {
+                    device.hasObject(By.descContains("Panel settings folder")) ||
+                        device.hasObject(By.textContains("Panel settings"))
+                },
+            )
+            shot("cold_${index + 1}")
+        }
+        android.util.Log.i("OffgridStartup", traces.toString())
+        shot("cold_starts_done")
     }
 
     @Test
@@ -329,6 +381,40 @@ class RoyaltyPhoneFixTest {
         )
         tapOnScreen(view!!, label)
         SystemClock.sleep(500)
+        assertOpenedFolder(name)
+    }
+
+    private fun onHomeGrid(): Boolean =
+        findOnScreen { findDescContains("AR Video Deck folder") } != null &&
+            findOnScreen { findDescContains("Panel settings folder") } != null
+
+    private fun assertOpenedFolder(name: String) {
+        val opened = waitUntil(8_000) {
+            statusDescription().contains("$name is open") || !onHomeGrid()
+        }
+        if (onHomeGrid()) {
+            dumpUi("still_home_${name.replace(' ', '_')}")
+            shot("still_home_${name.replace(' ', '_')}")
+        }
+        assertTrue(
+            "must have opened $name, not the home grid. status=${statusDescription()} seen=${visibleLabels()}",
+            opened && !onHomeGrid(),
+        )
+    }
+
+    private fun anrVisible(): Boolean {
+        return device.hasObject(By.textContains("isn't responding")) ||
+            device.hasObject(By.textContains("isn\u2019t responding")) ||
+            (
+                device.hasObject(By.text("Wait")) &&
+                    (device.hasObject(By.textContains("Close app")) || device.hasObject(By.textContains("Close App")))
+                )
+    }
+
+    private fun deviceAnrText(): String {
+        val wait = device.findObject(By.text("Wait"))
+        val close = device.findObject(By.textContains("Close app"))
+        return "wait=${wait != null} close=${close != null}"
     }
 
     private fun tapOnScreen(view: View, name: String) {

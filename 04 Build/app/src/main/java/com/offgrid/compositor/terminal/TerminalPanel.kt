@@ -720,6 +720,10 @@ class TerminalPanel @JvmOverloads constructor(
         super.onLayout(changed, left, top, right, bottom)
         // The title bar's band reaches up under the status bar when the glass does.
         glass.headerHeight = if (minimized) 0f else (topBar.height + edgeRoom.top).toFloat()
+        if (minimized) {
+            placeRestoreTab()
+            return
+        }
         if (fullBleed) {
             translationX = 0f
             userY = 0f
@@ -840,7 +844,7 @@ class TerminalPanel @JvmOverloads constructor(
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
-        clickerSounds.activate()
+        post { clickerSounds.activate() }
         viewTreeObserver.addOnGlobalFocusChangeListener(focusWatcher)
     }
 
@@ -950,23 +954,30 @@ class TerminalPanel @JvmOverloads constructor(
     internal fun buildPill() {
         pill.orientation = LinearLayout.HORIZONTAL
         pill.gravity = Gravity.CENTER_VERTICAL
-        pill.setPadding(dpi(10f), dpi(7f), dpi(16f), dpi(7f))
+        pill.minimumHeight = dpi(56f)
+        pill.setPadding(dpi(18f), dpi(14f), dpi(22f), dpi(14f))
         pill.clipChildren = false
+        pill.background = android.graphics.drawable.GradientDrawable().apply {
+            setColor(0xE61A1A1A.toInt())
+            setStroke(dpi(2f), 0xFFE7FF78.toInt())
+            cornerRadius = dpi(14f).toFloat()
+        }
+        pill.elevation = dpi(8f).toFloat()
         val frame = FrameLayout(context)
-        frame.addView(pillRing, LayoutParams(dpi(32f), dpi(32f), Gravity.CENTER))
+        frame.addView(pillRing, LayoutParams(dpi(40f), dpi(40f), Gravity.CENTER))
         frame.addView(
             FolderIconView(context, home.folders.size, null, compact = true, special = true),
-            LayoutParams(dpi(19f), dpi(17f), Gravity.CENTER),
+            LayoutParams(dpi(24f), dpi(22f), Gravity.CENTER),
         )
-        pill.addView(frame, LinearLayout.LayoutParams(dpi(32f), dpi(32f)))
+        pill.addView(frame, LinearLayout.LayoutParams(dpi(40f), dpi(40f)))
         pill.addView(
             LaserTitleView(context).apply {
                 text = context.getString(R.string.terminal_pill)
                 typeface = Hud.monoBold(context)
                 letterSpacing = 0.1f
-                styled(TextRole.PILL, 12.5f)
+                styled(TextRole.PILL, 16f)
             },
-            LinearLayout.LayoutParams(WRAP, WRAP).apply { marginStart = dpi(8f) },
+            LinearLayout.LayoutParams(WRAP, WRAP).apply { marginStart = dpi(10f) },
         )
         pill.contentDescription = context.getString(R.string.terminal_open)
         pill.isClickable = true

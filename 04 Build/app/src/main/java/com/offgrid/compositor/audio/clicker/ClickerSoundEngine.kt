@@ -81,15 +81,34 @@ internal class ClickerSoundEngine {
     }
 
     fun play(style: Int, value: Int, volume: Int) {
-        if (!active) return
+        if (!active) {
+            Log.i(TAG, "SoundPool play skipped engine off")
+            return
+        }
         val safeStyle = style.coerceIn(0, ClickerSoundSynth.STYLE_COUNT - 1)
         val variant = ClickerSoundSynth.variantFor(value)
         val safeVolume = volume.coerceIn(0, 100) / 100f
         playCount += 1
-        handler?.post {
+        val audioHandler = handler
+        if (audioHandler == null) {
+            Log.i(TAG, "SoundPool play queued until worker starts")
+            return
+        }
+        audioHandler.post {
             if (!active) return@post
-            if (safeVolume <= 0f) return@post
-            val clip = samples?.get(safeStyle)?.get(variant) ?: return@post
+            if (safeVolume <= 0f) {
+                Log.i(TAG, "SoundPool play skipped volume=0")
+                return@post
+            }
+            val clip = samples?.get(safeStyle)?.get(variant)
+            if (clip == null) {
+                Log.i(TAG, "SoundPool play waiting for samples")
+                audioHandler.postDelayed({
+                    samples?.get(safeStyle)?.get(variant)?.let { playClip(it, safeVolume) }
+                        ?: Log.i(TAG, "SoundPool play samples still empty")
+                }, 80)
+                return@post
+            }
             playClip(clip, safeVolume)
         }
     }
@@ -146,6 +165,7 @@ internal class ClickerSoundEngine {
             audio.setVolume(volume)
             val written = audio.write(clip, 0, clip.size)
             if (written <= 0) {
+                Log.i(TAG, "SoundPool play streamId=0 written=$written")
                 audio.release()
                 return
             }

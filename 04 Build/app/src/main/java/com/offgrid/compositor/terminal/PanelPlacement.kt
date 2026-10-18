@@ -211,6 +211,14 @@ internal fun TerminalPanel.showMinimized(value: Boolean, animate: Boolean, save:
         post { hologramIn(this, margin.toFloat(), margin.toFloat(), isDetail = false) }
         say(context.getString(R.string.terminal_panel_open))
     } else if (value) {
+        placeRestoreTab()
         say(context.getString(R.string.terminal_panel_hidden))
     }
+}
+
+/** The Minus restore tab sits below the status bar, large enough to tap on a phone. */
+internal fun TerminalPanel.placeRestoreTab() {
+    val bar = (visibleWindowEdges ?: edges).top
+    translationY = (bar + dpi(16f)).toFloat()
+    translationX = dpi(16f).toFloat()
 }

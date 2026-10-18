@@ -137,15 +137,16 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|center_horizontal"
-        android:layout_marginBottom="28dp"
-        android:elevation="8dp"
+        android:layout_marginBottom="48dp"
+        android:elevation="12dp"
         android:background="@drawable/hud_bar"
         android:gravity="center_vertical"
+        android:minHeight="56dp"
         android:orientation="horizontal"
-        android:paddingStart="12dp"
-        android:paddingTop="8dp"
-        android:paddingEnd="12dp"
-        android:paddingBottom="8dp"
+        android:paddingStart="16dp"
+        android:paddingTop="12dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="12dp"
         android:visibility="gone">
 
         <TextView
@@ -155,7 +156,7 @@
             android:fontFamily="@font/jetbrains_mono"
             android:text="@string/terminal_locked_label"
             android:textColor="@color/hud_text"
-            android:textSize="12sp" />
+            android:textSize="16sp" />
 
         <TextView
             android:id="@+id/unlock_button"
@@ -171,7 +172,7 @@
             android:paddingBottom="8dp"
             android:text="@string/terminal_unlock"
             android:textColor="@color/hud_button_text"
-            android:textSize="12sp" />
+            android:textSize="16sp" />
     </LinearLayout>
 
     <!-- The floating terminal panel. Royalty's private control, not painted into the video.
