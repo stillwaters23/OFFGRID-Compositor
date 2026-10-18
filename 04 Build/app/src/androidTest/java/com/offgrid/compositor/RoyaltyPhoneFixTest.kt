@@ -3,23 +3,15 @@ package com.offgrid.compositor
 import android.Manifest
 import android.os.SystemClock
 import android.view.View
-import com.offgrid.compositor.terminal.showMinimized
-import androidx.test.espresso.Espresso.onView
-import androidx.test.espresso.Espresso.pressBack
-import androidx.test.espresso.NoMatchingViewException
-import androidx.test.espresso.action.ViewActions.click
-import androidx.test.espresso.action.ViewActions.scrollTo
-import androidx.test.espresso.assertion.ViewAssertions.matches
-import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
-import androidx.test.espresso.matcher.ViewMatchers.withContentDescription
-import androidx.test.espresso.matcher.ViewMatchers.withText
+import android.view.ViewGroup
+import android.widget.TextView
 import androidx.test.ext.junit.rules.ActivityScenarioRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.GrantPermissionRule
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
-import org.hamcrest.CoreMatchers.containsString
+import com.offgrid.compositor.terminal.showMinimized
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -28,8 +20,10 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Royalty's S25 Ultra bugs, tapped through on an emulator with Espresso.
- * Screenshots go to /data/local/tmp so they survive the Gradle uninstall.
+ * Royalty's S25 Ultra bugs, tapped on an emulator.
+ * Espresso cannot run here: MainActivity's window never takes focus
+ * (has-window-focus=false) under ActivityScenario. These tests walk the
+ * real view tree and inject UiDevice taps at the view's screen position.
  */
 @RunWith(AndroidJUnit4::class)
 class RoyaltyPhoneFixTest {
@@ -52,90 +46,90 @@ class RoyaltyPhoneFixTest {
             act.terminalPanel.setHiddenForLock(false)
             act.terminalPanel.showMinimized(false, animate = false)
             act.terminalPanel.visibility = View.VISIBLE
+            act.window.decorView.requestFocus()
         }
-        device.waitForIdle()
-        waitDisplayed(withContentDescription("Lock the panel"))
+        assertTrue("lock control should be on the panel", waitDesc("Lock the panel") != null)
     }
 
     @Test
     fun lockBackAndUnlockWorkAndRestartDoesNotTrap() {
         shot("01_folders_before_lock")
-        tap(withContentDescription("Lock the panel"))
-        waitDisplayed(withContentDescription("Unlock the panel"))
+        tapDesc("Lock the panel")
+        assertTrue(waitDesc("Unlock the panel") != null)
         shot("02_edit_locked")
-        tap(withContentDescription("More choices: view, sort, and folder size"))
+        tapDesc("More choices: view, sort, and folder size")
         shot("03_menu_while_locked")
-        pressBack()
-        pressBack()
-        waitDisplayed(withContentDescription("Lock the panel"))
-        tap(withContentDescription("Lock the panel"))
-        waitDisplayed(withContentDescription("Unlock the panel"))
-        tap(withContentDescription("Unlock the panel"))
-        waitDisplayed(withContentDescription("Lock the panel"))
+        device.pressBack()
+        device.pressBack()
+        assertTrue(waitDesc("Lock the panel") != null)
+        tapDesc("Lock the panel")
+        assertTrue(waitDesc("Unlock the panel") != null)
+        tapDesc("Unlock the panel")
+        assertTrue(waitDesc("Lock the panel") != null)
         activity.scenario.recreate()
         showThePanel()
-        waitDisplayed(withContentDescription("Lock the panel"))
+        assertTrue(waitDesc("Lock the panel") != null)
         shot("04_after_restart_unlocked")
-        assertFalse(exists(withContentDescription("Unlock the panel")))
+        assertTrue(findDesc("Unlock the panel") == null)
     }
 
     @Test
     fun minusAlwaysHasARestorePathIncludingAfterRestart() {
-        tap(withContentDescription("Shrink the panel"))
-        waitDisplayed(withContentDescription("Open the panel"))
+        tapDesc("Shrink the panel")
+        assertTrue(waitDesc("Open the panel") != null)
         shot("05_hidden_with_restore_tab")
-        pressBack()
-        waitDisplayed(withContentDescription("Lock the panel"))
-        tap(withContentDescription("Shrink the panel"))
-        waitDisplayed(withContentDescription("Open the panel"))
-        tap(withContentDescription("Open the panel"))
-        waitDisplayed(withContentDescription("Lock the panel"))
+        device.pressBack()
+        assertTrue(waitDesc("Lock the panel") != null)
+        tapDesc("Shrink the panel")
+        assertTrue(waitDesc("Open the panel") != null)
+        tapDesc("Open the panel")
+        assertTrue(waitDesc("Lock the panel") != null)
         shot("06_restored_from_tab")
-        tap(withContentDescription("Shrink the panel"))
+        tapDesc("Shrink the panel")
         activity.scenario.recreate()
         showThePanel()
-        waitDisplayed(withContentDescription("Lock the panel"))
+        assertTrue(waitDesc("Lock the panel") != null)
         shot("07_after_restart_panel_open")
     }
 
     @Test
     fun foldersShowBeforeAnyDiamondFlash() {
-        waitDisplayed(withContentDescription(containsString("Panel settings")))
+        assertTrue(waitDescContains("Panel settings") != null)
         shot("08_no_splash_folders")
-        waitDisplayed(withContentDescription("Lock the panel"))
+        assertTrue(waitDesc("Lock the panel") != null)
         activity.scenario.recreate()
         showThePanel()
-        waitDisplayed(withContentDescription(containsString("Panel settings")))
+        assertTrue(waitDescContains("Panel settings") != null)
         shot("09_no_splash_after_resume")
     }
 
     @Test
     fun copyPairingKeyStaysOnLiveAndRemote() {
-        openFolder("Live and Remote")
+        tapDescContains("Live and Remote")
         shot("10_live_and_remote")
         assertTrue(
-            exists(withText(containsString("PC or an Android phone"))) ||
-                exists(withText(containsString("PC or Android"))),
+            "pairing copy must mention a PC or Android phone",
+            waitTextContains("PC or an Android phone") != null ||
+                waitTextContains("PC or Android") != null,
         )
-        tap(withText("Copy pairing key"))
-        waitDisplayed(withText("Copy pairing key"))
+        tapText("Copy pairing key")
+        assertTrue(waitTextContains("Copy pairing key") != null)
         val copied = waitUntil(8_000) {
-            activity.scenario.onActivity { }
-            exists(withContentDescription(containsString("copied"))) ||
-                exists(withContentDescription(containsString("Pairing key")))
+            val desc = statusDescription()
+            desc.contains("copied", ignoreCase = true) || desc.contains("Pairing key")
         }
-        assertTrue("copy pairing confirmed", copied)
+        assertTrue("copy pairing confirmed on the status line", copied)
         shot("11_copy_pairing_stayed")
-        waitDisplayed(withText("Copy pairing key"))
+        assertTrue(findTextContains("Copy pairing key") != null)
     }
 
     @Test
     fun openKickStaysInAppAndNeverOpensPlayStore() {
-        openFolder("Kick")
-        openFolder("Effects")
+        tapDescContains("Kick")
+        tapDescContains("Effects")
         shot("12_kick_effects")
-        tap(withText("Open Kick"))
-        waitDisplayed(withText("Open Kick"))
+        tapText("Open Kick")
+        assertTrue(waitTextContains("Open Kick") != null)
         shot("13_open_kick_in_app")
         assertFalse(
             "Open Kick must not send Royalty to Play Store",
@@ -147,8 +141,8 @@ class RoyaltyPhoneFixTest {
     fun reelClickSoundsFireWhenTheToggleIsOn() {
         var before = 0
         activity.scenario.onActivity { before = it.terminalPanel.clickPlayCount() }
-        openFolder("Panel settings")
-        openFolder("Clicker Sounds")
+        tapDescContains("Panel settings")
+        tapDescContains("Clicker Sounds")
         shot("14_clicker_sounds")
         activity.scenario.onActivity { it.terminalPanel.playTestClick() }
         var after = 0
@@ -159,82 +153,110 @@ class RoyaltyPhoneFixTest {
 
     @Test
     fun titleFitsOnScreen() {
-        waitDisplayed(withText("OFFGRID TERMINAL"))
+        val title = waitTextContains("OFFGRID TERMINAL")
+        assertTrue(title != null)
         shot("16_title_default")
-        onView(withText("OFFGRID TERMINAL")).check { view, _ ->
-            assertTrue(view.width > 0)
-            assertTrue(view.right <= device.displayWidth)
-        }
+        val loc = IntArray(2)
+        title!!.getLocationOnScreen(loc)
+        assertTrue(title.width > 0)
+        assertTrue(loc[0] + title.width <= device.displayWidth)
     }
 
     @Test
     fun contrastLockBlocksInvisibleWhiteSkin() {
-        openFolder("Panel settings")
-        openFolder("Colors")
-        openFolder("Skin color")
+        tapDescContains("Panel settings")
+        tapDescContains("Colors")
+        tapDescContains("Skin color")
         shot("17_skin_colors")
-        waitDisplayed(withContentDescription(containsString("Locked")))
-        if (exists(withContentDescription(containsString("Locked White")))) {
-            tap(withContentDescription(containsString("Locked White")))
+        val locked = waitDescContains("Locked")
+        assertTrue("a failing color must show a lock", locked != null)
+        waitDescContains("Locked White")?.let { tapView(it) }
+        val typed = waitUntil(8_000) {
+            statusDescription().contains("Locked:") || findDescContains("Locked:") != null
         }
-        assertTrue(
-            exists(withContentDescription(containsString("Locked:"))) ||
-                exists(withContentDescription(containsString("Locked"))),
-        )
+        assertTrue(typed || findDescContains("Locked") != null)
         shot("18_white_skin_locked")
     }
 
-    private fun openFolder(name: String) {
-        val matcher = withContentDescription(containsString(name))
-        if (!exists(matcher)) {
-            repeat(8) {
-                device.swipe(
-                    device.displayWidth / 2,
-                    device.displayHeight * 3 / 4,
-                    device.displayWidth / 2,
-                    device.displayHeight / 4,
-                    20,
-                )
-                device.waitForIdle()
-                if (exists(matcher)) return@repeat
-            }
-        }
-        tap(matcher)
+    private fun tapDesc(desc: String) {
+        val view = waitDesc(desc)
+        assertTrue("missing $desc", view != null)
+        tapView(view!!)
     }
 
-    private fun tap(matcher: org.hamcrest.Matcher<View>) {
-        waitDisplayed(matcher)
-        try {
-            onView(matcher).perform(scrollTo(), click())
-        } catch (_: RuntimeException) {
-            onView(matcher).perform(click())
+    private fun tapDescContains(desc: String) {
+        val view = waitDescContains(desc)
+        assertTrue("missing desc $desc", view != null)
+        tapView(view!!)
+    }
+
+    private fun tapText(text: String) {
+        val view = waitTextContains(text)
+        assertTrue("missing text $text", view != null)
+        tapView(view!!)
+    }
+
+    private fun tapView(view: View) {
+        val loc = IntArray(2)
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            view.getLocationOnScreen(loc)
+        }
+        val x = loc[0] + view.width / 2
+        val y = loc[1] + view.height / 2
+        if (x > 0 && y > 0) {
+            device.click(x, y)
+        } else {
+            InstrumentationRegistry.getInstrumentation().runOnMainSync { view.performClick() }
         }
         device.waitForIdle()
+        SystemClock.sleep(250)
     }
 
-    private fun waitDisplayed(matcher: org.hamcrest.Matcher<View>) {
-        val ok = waitUntil(15_000) {
-            exists(matcher)
+    private fun waitDesc(desc: String): View? = waitUntilView { findDesc(desc) }
+
+    private fun waitDescContains(desc: String): View? = waitUntilView { findDescContains(desc) }
+
+    private fun waitTextContains(text: String): View? = waitUntilView { findTextContains(text) }
+
+    private fun waitUntilView(find: () -> View?): View? {
+        var found: View? = null
+        waitUntil(15_000) {
+            found = find()
+            found != null
         }
-        if (!ok) {
-            shot("fail_missing")
-            val dump = device.executeShellCommand("uiautomator dump /data/local/tmp/royalty-fix-evidence/hierarchy.xml")
-            android.util.Log.e(TAG, "missing $matcher dump=$dump")
-            android.util.Log.e(
-                TAG,
-                device.executeShellCommand("cat /data/local/tmp/royalty-fix-evidence/hierarchy.xml").take(4000),
-            )
-        }
-        onView(matcher).check(matches(isDisplayed()))
+        return found
     }
 
-    private fun exists(matcher: org.hamcrest.Matcher<View>): Boolean = try {
-        onView(matcher).check(matches(isDisplayed()))
-        true
-    } catch (_: NoMatchingViewException) {
-        false
-    } catch (_: AssertionError) {
-        false
+    private fun findDesc(desc: String): View? = findView { it.contentDescription?.toString() == desc }
+
+    private fun findDescContains(desc: String): View? =
+        findView { it.contentDescription?.toString()?.contains(desc) == true }
+
+    private fun findTextContains(text: String): View? =
+        findView { (it as? TextView)?.text?.toString()?.contains(text) == true }
+
+    private fun findView(match: (View) -> Boolean): View? {
+        var found: View? = null
+        activity.scenario.onActivity { act ->
+            found = walk(act.window.decorView, match)
+        }
+        return found
+    }
+
+    private fun walk(view: View, match: (View) -> Boolean): View? {
+        if (view.isShown && match(view)) return view
+        if (view is ViewGroup) {
+            for (i in 0 until view.childCount) {
+                walk(view.getChildAt(i), match)?.let { return it }
+            }
+        }
+        return null
+    }
+
+    private fun statusDescription(): String {
+        var text = ""
+        activity.scenario.onActivity { text = it.terminalPanel.statusLine.contentDescription?.toString().orEmpty() }
+        return text
     }
 
     private fun waitUntil(ms: Long, check: () -> Boolean): Boolean {
@@ -252,7 +274,6 @@ class RoyaltyPhoneFixTest {
     }
 
     companion object {
-        private const val TAG = "RoyaltyPhoneFix"
         private const val EVIDENCE = "/data/local/tmp/royalty-fix-evidence"
     }
 }
