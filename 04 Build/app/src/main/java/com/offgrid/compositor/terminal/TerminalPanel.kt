@@ -53,7 +53,7 @@ import kotlin.math.roundToInt
 class TerminalPanel @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
-) : FrameLayout(context, attrs) {
+) : FrameLayout(context, attrs), MotionHost {
 
     internal val prefs = PanelPrefs(context)
     internal val store = ThemeStore(context, prefs)
@@ -321,8 +321,18 @@ class TerminalPanel @JvmOverloads constructor(
     /** How many reel clicks were asked to play. For instrumented tests. */
     fun clickPlayCount(): Int = clickerSounds.playCount
 
+    /** Last SoundPool stream id that actually started. 0 means silence. */
+    fun lastClickStreamId(): Int = clickerSounds.lastStreamId
+
     /** Plays one click if the sound toggle is on. For instrumented tests. */
     fun playTestClick() = playWheelClick(50)
+
+    override fun onMotionIdle() {
+        ticking = false
+        headingRing?.spinning = false
+        pillRing.spinning = false
+        restyle(this, look)
+    }
 
     /** The phone's Back key unlocks, restores a hidden panel, closes the menu, then goes up. */
     val backCallback = object : OnBackPressedCallback(false) {
@@ -405,6 +415,8 @@ class TerminalPanel @JvmOverloads constructor(
             say(context.getString(R.string.terminal_unlock_to_edit))
         }
         bodyHost.addView(editLockVeil, LayoutParams(MATCH, MATCH))
+        // The ⋮ menu overlays the folder body only, so the status line stays readable.
+        bodyHost.addView(menu, LayoutParams(MATCH, MATCH))
         expanded.addView(bodyHost, LinearLayout.LayoutParams(MATCH, 0, 1f))
         addView(expanded, LayoutParams(MATCH, MATCH))
 
@@ -426,9 +438,6 @@ class TerminalPanel @JvmOverloads constructor(
             resizeBy(-dp(STEP_DP))
             true
         }
-
-        // The ⋮ menu sits over everything inside the glass.
-        addView(menu, LayoutParams(MATCH, MATCH))
 
         applyLook()
         applyFolderLayout()
@@ -749,6 +758,7 @@ class TerminalPanel @JvmOverloads constructor(
         }
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                GlowClock.nudge()
                 pinch = null
                 pinchDone = false
                 glassArea(glassBox)

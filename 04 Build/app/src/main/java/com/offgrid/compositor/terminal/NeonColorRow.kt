@@ -131,7 +131,11 @@ internal class NeonColorRow(
             style = Paint.Style.STROKE
             strokeWidth = Hud.dp(context, 1.6f)
             strokeCap = Paint.Cap.ROUND
-            color = 0xFFF4F4F4.toInt()
+            color = if (NumberColorGuard.luminance(swatch.color) >= 0.35) {
+                0xFF111111.toInt()
+            } else {
+                0xFFF4F4F4.toInt()
+            }
         }
         private val locked = lockReason != null
         private val lockMessage = lockReason

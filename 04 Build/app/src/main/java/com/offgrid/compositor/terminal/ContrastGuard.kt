@@ -31,12 +31,22 @@ internal object ContrastGuard {
         lockReason(part, color, skin, text, status) == null
 
     private fun skinReason(skin: Int, text: Int, status: Int): String? {
-        val textOk = readable(text, skin)
-        val statusOk = readable(status, skin)
-        if (textOk && statusOk) return null
-        val skinName = nameOf(skin)
-        val textName = nameOf(if (!textOk) text else status)
-        return "Locked: $textName typewriter text on a $skinName background can't be read."
+        val opposite = if (NumberColorGuard.luminance(text) < 0.35) {
+            0xFFFFFFFF.toInt()
+        } else {
+            0xFF000000.toInt()
+        }
+        val checks = listOf(
+            text to "typewriter text",
+            status to "status text",
+            opposite to "typewriter text",
+        )
+        for ((ink, label) in checks) {
+            if (!readable(ink, skin)) {
+                return "Locked: ${nameOf(ink)} $label on a ${nameOf(skin)} background can't be read."
+            }
+        }
+        return null
     }
 
     private fun textReason(color: Int, skin: Int, label: String): String? {

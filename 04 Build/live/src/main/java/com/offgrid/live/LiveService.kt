@@ -92,8 +92,7 @@ class LiveService : Service() {
     }
 
     private fun foregroundTypes(): Int = ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE or
-        (if (streaming && streamCamera) ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA else 0) or
-        (if (streaming && streamMicrophone) ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE else 0)
+        (if (streaming && streamCamera) ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA else 0)
 
     override fun onBind(intent: Intent?): IBinder? = null
 

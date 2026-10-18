@@ -209,7 +209,7 @@ internal class FolderRow(
         setBackgroundColor(if (active) Hud.withAlpha(look.edge, 0.08f) else 0)
         val showRing = active && look.ring
         ring.visibility = if (showRing) VISIBLE else INVISIBLE
-        ring.spinning = showRing
+        ring.spinning = showRing && GlowClock.isLive
     }
 
     private companion object {

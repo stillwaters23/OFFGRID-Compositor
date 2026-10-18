@@ -103,7 +103,7 @@ internal fun TerminalPanel.menuListener() = object : PanelMenu.Listener {
 
 internal fun TerminalPanel.openMenu() {
     hideKeyboard()
-    menu.open(topBar.height)
+    menu.open(0)
     refreshBack()
     say(context.getString(R.string.terminal_menu_opened))
 }

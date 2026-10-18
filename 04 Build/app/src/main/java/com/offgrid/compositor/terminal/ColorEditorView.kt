@@ -99,6 +99,17 @@ internal class ColorEditorView(
             topMargin = Hud.dpi(context, 4f)
         })
         refresh()
+        post { announceLockedSwatch() }
+    }
+
+    /** Types the lock reason after the folder-open line, so White/Black are never silent. */
+    private fun announceLockedSwatch() {
+        val preferred = when (part) {
+            ColorPart.SKIN -> NeonPalette.swatches.firstOrNull { it.name == "White" }?.color
+            ColorPart.TEXT, ColorPart.STATUS -> NeonPalette.swatches.firstOrNull { it.name == "Black" }?.color
+            else -> null
+        } ?: return
+        lockReason(preferred)?.let { say(it) }
     }
 
     private fun label(textRes: Int) = TextView(context).apply {

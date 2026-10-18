@@ -99,24 +99,20 @@ jobs:
             exit 1
           fi
 
-      # Phase 0.2 (Royalty approved 2026-10-15): the stock Android and Material sliders stay banned.
-      # The only slider class allowed anywhere in the sources is OFFGRID's own BioSliderView
-      # (terminal/bio_slider_view.kt), which Phase 2.4 builds out. Any other "Slider" fails.
-      - name: Check there are no sliders except BioSliderView
+      # Phase 0.2: sliders stay banned. BioSliderView was unused and is archived in git history.
+      - name: Check there are no sliders
         run: |
           set -euo pipefail
           if grep -R -n -E "SeekBar|RangeSlider|material\.slider" "04 Build"/*/src; then
-            echo "The stock Android and Material sliders are not allowed. Only BioSliderView is."
+            echo "The stock Android and Material sliders are not allowed."
             exit 1
           fi
-          # Every identifier that names a Slider (Slider, MySlider, SliderView, GlowSliderView, ...) must be
-          # BioSliderView or start with it (BioSliderViewTest). Plural words like "NoSliders" are not class names.
-          if grep -R -n -o -E "\b[A-Za-z0-9_]*Slider([A-Z0-9_][A-Za-z0-9_]*)?\b" "04 Build"/*/src \
-            | grep -v -E ":BioSliderView[A-Za-z0-9_]*$"; then
-            echo "Only BioSliderView is allowed. Every other slider class is banned."
+          # Class-style Slider identifiers. Plural words like "NoSliders" are not class names.
+          if grep -R -n -o -E "\b[A-Za-z0-9_]*Slider([A-Z0-9_][A-Za-z0-9_]*)?\b" "04 Build"/*/src; then
+            echo "Slider classes are not allowed. Numbers stay typed 0 to 100."
             exit 1
           fi
-          echo "No slider other than BioSliderView is in the sources."
+          echo "No slider classes are in the sources."
 
       # Phase 0.3: the emoji guard. It warns in Phase 1 and is flipped to fail in Phase 2 by
       # changing EMOJI_GUARD_MODE to "fail". The allowlist keeps the typographic symbols the
@@ -202,13 +198,11 @@ jobs:
           import sys
           import xml.etree.ElementTree as ET
           allowed = {
-              "CAMERA",  # The front camera.
-              "RECORD_AUDIO",  # Videos and the mic toggle. Royalty approved the mic.
+              "CAMERA",  # The front camera. OFFGRID-Compositor is camera only.
               "INTERNET",  # Local Send to PC and the direct phone link only.
               "SYSTEM_ALERT_WINDOW",  # The floating overlay.
               "FOREGROUND_SERVICE",  # The live overlay service.
               "FOREGROUND_SERVICE_CAMERA",  # Live streaming keeps the camera in that service.
-              "FOREGROUND_SERVICE_MICROPHONE",  # Recording and live audio keep the mic in that service.
               "FOREGROUND_SERVICE_SPECIAL_USE",  # The floating control overlay.
               "POST_NOTIFICATIONS",  # The foreground-service notification on Android 13 and newer.
               # Broadcast Lock auto trigger (Royalty approved 2026-10-15). Normal protection level, no prompt.
@@ -233,10 +227,16 @@ jobs:
           print("Permissions in the built app:")
           for permission in found:
               print("  " + permission)
-          if "android.permission.RECORD_AUDIO" not in found:
-              print("RECORD_AUDIO is approved and must stay in the app.")
+          banned_audio = {
+              "android.permission.RECORD_AUDIO",
+              "android.permission.FOREGROUND_SERVICE_MICROPHONE",
+          }
+          leaked = [p for p in found if p in banned_audio]
+          if leaked:
+              print("OFFGRID-Compositor is camera only. These microphone permissions must not be in the merged manifest:")
+              print("\n".join(leaked))
               sys.exit(1)
-          print("RECORD_AUDIO is allowed.")
+          print("Merged manifest has no RECORD_AUDIO and no FOREGROUND_SERVICE_MICROPHONE.")
           if "android.permission.INTERNET" not in found:
               print("Send to PC and the direct phone link need INTERNET.")
               sys.exit(1)

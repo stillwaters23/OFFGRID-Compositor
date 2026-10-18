@@ -235,7 +235,7 @@ internal class FolderTile(context: Context, private val folder: PanelFolder, ico
         count.setTextColor(if (look.base == Theme.SYSTEM) look.text else look.folder)
         val showRing = active && look.ring
         ring.visibility = if (showRing) VISIBLE else INVISIBLE
-        ring.spinning = showRing
+        ring.spinning = showRing && GlowClock.isLive
     }
 }
 

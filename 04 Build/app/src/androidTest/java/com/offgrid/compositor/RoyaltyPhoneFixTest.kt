@@ -6,6 +6,7 @@ import android.os.SystemClock
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.rules.ActivityScenarioRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -13,6 +14,7 @@ import androidx.test.rule.GrantPermissionRule
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
 import com.offgrid.compositor.terminal.showMinimized
+import java.io.FileInputStream
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -62,6 +64,15 @@ class RoyaltyPhoneFixTest {
     }
 
     @Test
+    fun activityReachesIdleSoEspressoCanSync() {
+        val start = SystemClock.uptimeMillis()
+        Espresso.onIdle()
+        val elapsed = SystemClock.uptimeMillis() - start
+        assertTrue("Espresso must sync to an idle activity. took=${elapsed}ms", elapsed < 20_000)
+        shot("00_activity_idle")
+    }
+
+    @Test
     fun lockBackAndUnlockWorkAndRestartDoesNotTrap() {
         shot("01_folders_before_lock")
         assertChromeNotCoveredByFullscreenHint()
@@ -70,6 +81,7 @@ class RoyaltyPhoneFixTest {
         shot("02_edit_locked")
         tapOnScreen(requireDesc("More choices: view, sort, and folder size"), "menu")
         shot("03_menu_while_locked")
+        assertStatusClearOfMenu()
         device.pressBack()
         device.waitForIdle()
         SystemClock.sleep(300)
@@ -203,15 +215,22 @@ class RoyaltyPhoneFixTest {
 
     @Test
     fun reelClickSoundsFireWhenTheToggleIsOn() {
-        var before = 0
-        activity.scenario.onActivity { before = it.terminalPanel.clickPlayCount() }
+        device.executeShellCommand("logcat -c")
+        val hooked = java.util.concurrent.atomic.AtomicInteger(0)
+        activity.scenario.onActivity { act ->
+            act.terminalPanel.clickerSounds.playHook = { id -> hooked.set(id) }
+        }
         tapFolder("Panel settings")
         tapFolder("Clicker Sounds")
         shot("14_clicker_sounds")
-        activity.scenario.onActivity { it.terminalPanel.playTestClick() }
-        var after = 0
-        activity.scenario.onActivity { after = it.terminalPanel.clickPlayCount() }
-        assertTrue("clicker should fire while enabled ($before -> $after)", after > before)
+        repeat(6) {
+            activity.scenario.onActivity { it.terminalPanel.playTestClick() }
+            if (waitUntil(2_000) { lastClickStreamId() > 0 }) return@repeat
+        }
+        val streamId = lastClickStreamId()
+        assertTrue("SoundPool play hook must fire. hooked=${hooked.get()} stream=$streamId", streamId > 0 && hooked.get() > 0)
+        val log = shellOutput("logcat -d -s OffgridClicker:I")
+        assertTrue("logcat must show SoundPool play. log=$log", log.contains("SoundPool play streamId="))
         shot("15_click_played")
     }
 
@@ -233,14 +252,44 @@ class RoyaltyPhoneFixTest {
         tapFolder("Colors")
         tapFolder("Skin color")
         shot("17_skin_colors")
-        val locked = waitDescContains("Locked")
-        assertTrue("a failing color must show a lock. seen=${visibleLabels()}", locked != null)
-        waitDescContains("Locked White")?.let { tapOnScreen(it, "Locked White") }
+        val lockedWhite = waitDescContains("Locked White")
+        assertTrue("White skin must show the lock. seen=${visibleLabels()}", lockedWhite != null)
+        tapOnScreen(lockedWhite!!, "Locked White")
         val typed = waitUntil(8_000) {
-            statusDescription().contains("Locked:") || findDescContains("Locked:") != null
+            statusDescription().contains("Locked:") && statusDescription().contains("white")
         }
-        assertTrue(typed || findDescContains("Locked") != null)
+        assertTrue("Termux must type the white-skin lock reason: ${statusDescription()}", typed)
         shot("18_white_skin_locked")
+    }
+
+    @Test
+    fun contrastLockBlocksBlackTypewriterOnBlack() {
+        tapFolder("Panel settings")
+        tapFolder("Themes")
+        tapFolder("Theme mode")
+        tapOnScreen(requireText("Night"), "Night")
+        backTowardHome()
+        tapFolder("Panel settings")
+        tapFolder("Colors")
+        tapFolder("Typewriter text color")
+        val lockedBlack = waitDescContains("Locked Black")
+        assertTrue("Black typewriter on black must show the lock. seen=${visibleLabels()}", lockedBlack != null)
+        tapOnScreen(lockedBlack!!, "Locked Black")
+        val typed = waitUntil(8_000) {
+            statusDescription().contains("Locked:") && statusDescription().contains("black")
+        }
+        assertTrue("Termux must type the black-on-black reason: ${statusDescription()}", typed)
+        shot("18b_black_text_locked")
+    }
+
+    @Test
+    fun viewMenuDoesNotCoverTheStatusLine() {
+        tapOnScreen(requireDesc("More choices: view, sort, and folder size"), "menu")
+        assertTrue(waitTextContains("Done") != null)
+        assertStatusClearOfMenu()
+        shot("06b_menu_clears_status")
+        device.pressBack()
+        device.waitForIdle()
     }
 
     /** Home list is long: Kick starts below the fold. A user swipe is allowed; silent scroll is not. */
@@ -430,6 +479,46 @@ class RoyaltyPhoneFixTest {
         var text = ""
         activity.scenario.onActivity { text = it.terminalPanel.statusLine.contentDescription?.toString().orEmpty() }
         return text
+    }
+
+    private fun lastClickStreamId(): Int {
+        var id = 0
+        activity.scenario.onActivity { id = it.terminalPanel.lastClickStreamId() }
+        return id
+    }
+
+    private fun backTowardHome() {
+        repeat(8) {
+            if (findOnScreen { findDescContains("Panel settings folder") } != null) return
+            device.pressBack()
+            device.waitForIdle()
+            SystemClock.sleep(250)
+        }
+    }
+
+    private fun assertStatusClearOfMenu() {
+        var status = Rect()
+        var menu = Rect()
+        var statusShown = false
+        activity.scenario.onActivity { act ->
+            statusShown = act.terminalPanel.statusLine.isShown
+            act.terminalPanel.statusLine.getGlobalVisibleRect(status)
+            act.terminalPanel.menu.getGlobalVisibleRect(menu)
+        }
+        assertTrue("status line must stay on screen while the view menu is open", statusShown && status.height() > 4)
+        val overlap = Rect(status)
+        val covers = overlap.intersect(menu) && overlap.width() > 8 && overlap.height() > 8
+        assertFalse(
+            "view menu $menu must not cover the status line $status",
+            covers || status.bottom > menu.top + 8 && status.right > menu.centerX(),
+        )
+    }
+
+    private fun shellOutput(command: String): String {
+        val stream = InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(command)
+        stream.use {
+            return FileInputStream(it.fileDescriptor).bufferedReader().readText()
+        }
     }
 
     private fun waitUntil(ms: Long, check: () -> Boolean): Boolean {

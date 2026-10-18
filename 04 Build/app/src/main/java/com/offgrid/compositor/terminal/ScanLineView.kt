@@ -74,7 +74,7 @@ internal class ScanLineView(context: Context) : View(context), Styled {
     }
 
     private fun start() {
-        if (sweep != null || !shown) return
+        if (sweep != null || !shown || !ValueAnimator.areAnimatorsEnabled()) return
         val travel = (parent as? View)?.height ?: 0
         if (travel == 0 || height == 0) {
             post { start() }
@@ -86,7 +86,7 @@ internal class ScanLineView(context: Context) : View(context), Styled {
         sweep = ValueAnimator.ofFloat(from, to).apply {
             duration = SWEEP_MS
             interpolator = LinearInterpolator()
-            repeatCount = ValueAnimator.INFINITE
+            repeatCount = 0
             addUpdateListener { translationY = it.animatedValue as Float }
             start()
         }

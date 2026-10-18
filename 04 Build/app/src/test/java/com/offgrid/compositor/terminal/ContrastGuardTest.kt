@@ -26,8 +26,17 @@ class ContrastGuardTest {
     }
 
     @Test
+    fun locksWhiteSkinInDayModeAgainstTheNightInk() {
+        val reason = ContrastGuard.lockReason(ColorPart.SKIN, white, white, black, black)
+        assertNotNull(reason)
+        assertTrue(reason!!.startsWith("Locked:"))
+        assertTrue(reason.contains("white"))
+    }
+
+    @Test
     fun acceptsReadablePairs() {
-        assertNull(ContrastGuard.lockReason(ColorPart.SKIN, black, black, white, white))
+        assertNotNull(ContrastGuard.lockReason(ColorPart.SKIN, white, white, black, black))
+        assertNotNull(ContrastGuard.lockReason(ColorPart.SKIN, black, black, white, white))
         assertNull(ContrastGuard.lockReason(ColorPart.TEXT, white, black, white, white))
         assertNull(ContrastGuard.lockReason(ColorPart.STATUS, black, white, black, black))
     }

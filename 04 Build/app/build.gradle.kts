@@ -52,6 +52,7 @@ kotlin {
 dependencies {
     implementation(project(":live"))
     implementation("androidx.core:core-ktx:1.16.0")
+    implementation("androidx.core:core-splashscreen:1.0.1")
     implementation("androidx.appcompat:appcompat:1.7.1")
     implementation("androidx.activity:activity-ktx:1.10.1")
     val cameraX = "1.6.2"

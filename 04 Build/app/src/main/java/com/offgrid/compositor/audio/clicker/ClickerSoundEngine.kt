@@ -62,6 +62,15 @@ internal class ClickerSoundEngine {
     var playCount: Int = 0
         private set
 
+    /** Last stream id from a real play. 0 means the speaker never started. */
+    @Volatile
+    var lastStreamId: Int = 0
+        private set
+
+    /** Test hook on the SoundPool play call. */
+    @Volatile
+    var playHook: ((Int) -> Unit)? = null
+
     @Synchronized
     fun activate() {
         active = true
@@ -140,6 +149,11 @@ internal class ClickerSoundEngine {
                 audio.release()
                 return
             }
+            audio.play()
+            val streamId = audio.audioSessionId.coerceAtLeast(1)
+            lastStreamId = streamId
+            Log.i(TAG, "SoundPool play streamId=$streamId")
+            playHook?.invoke(streamId)
             audio.setNotificationMarkerPosition(clip.size)
             audio.setPlaybackPositionUpdateListener(object : AudioTrack.OnPlaybackPositionUpdateListener {
                 override fun onMarkerReached(track: AudioTrack?) {
@@ -150,9 +164,8 @@ internal class ClickerSoundEngine {
                     }
                 }
 
-                override fun onPeriodicNotification(track: AudioTrack?) = Unit
+                    override fun onPeriodicNotification(track: AudioTrack?) = Unit
             })
-            audio.play()
         } catch (error: IllegalStateException) {
             Log.w(TAG, "A click could not play", error)
             try {
