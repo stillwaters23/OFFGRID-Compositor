@@ -83,6 +83,16 @@ jobs:
           print("No saved secrets found.")
           PY
 
+      # Voice Phase 0. Allowlist, by exact path, is only the WAV files already in git:
+      #   06 Prompts and Skills/Rex Voice/Rex 01.wav
+      #   06 Prompts and Skills/Rex Voice/Rex 02.wav
+      #   06 Prompts and Skills/Rex Voice/Rex 03.wav
+      # They move to the private OFFGRID_Voice_Assets repo after Royalty decides about history.
+      # Any other *.wav, *.gguf, *.onnx, *.pt, or *.safetensors file fails this step,
+      # and so does an obvious secret (a private key or an API key pattern).
+      - name: Check voice assets and obvious secrets
+        run: python3 .github/scripts/repo_hygiene.py
+
       - name: Check capture uses the processed mic path
         run: |
           set -euo pipefail
