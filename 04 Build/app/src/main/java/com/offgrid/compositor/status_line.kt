@@ -254,6 +254,14 @@ internal fun MainActivity.screenEdges(insets: WindowInsetsCompat): ScreenEdges {
         )
     }
 
+/** Immersive only while Broadcast Lock hid the panel. Editing must keep the bars. */
+internal fun shouldHideSystemBars(broadcastLocked: Boolean): Boolean = broadcastLocked
+
+internal fun MainActivity.showSystemBars() {
+        val controller = WindowInsetsControllerCompat(window, window.decorView)
+        controller.show(WindowInsetsCompat.Type.systemBars())
+    }
+
 internal fun MainActivity.hideSystemBars() {
         val controller = WindowInsetsControllerCompat(window, window.decorView)
         controller.hide(WindowInsetsCompat.Type.systemBars())

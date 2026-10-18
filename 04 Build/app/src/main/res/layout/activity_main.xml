@@ -131,14 +131,14 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-    <!-- Unlock strip: the guaranteed way out of a Broadcast Lock when a share is not live. -->
+    <!-- Unlock strip sits at the bottom so Android 15's "Viewing full screen" hint cannot cover it. -->
     <LinearLayout
         android:id="@+id/unlock_strip"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_gravity="top|end"
-        android:layout_marginTop="20dp"
-        android:layout_marginEnd="12dp"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="28dp"
+        android:elevation="8dp"
         android:background="@drawable/hud_bar"
         android:gravity="center_vertical"
         android:orientation="horizontal"

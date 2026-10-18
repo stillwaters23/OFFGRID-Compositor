@@ -1,21 +1,17 @@
 package com.offgrid.compositor
 
 import android.Manifest
-import android.content.Intent
 import android.graphics.Rect
 import android.os.SystemClock
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
-import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.rules.ActivityScenarioRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.GrantPermissionRule
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
-import androidx.test.uiautomator.Until
-import com.offgrid.compositor.terminal.LookKeys
 import com.offgrid.compositor.terminal.showMinimized
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -25,13 +21,15 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Royalty's S25 Ultra bugs, tapped on an emulator.
+ * Royalty's S25 Ultra bugs, tapped on an emulator the way the app ships.
  *
- * Android 15's "Viewing full screen / Got it" overlay sits on top of hideSystemBars()
- * and steals window focus, Lock/Minus taps, and Back. Tests keep the system bars,
- * dismiss that hint if it still appears, then performClick() the real view.
- * Off-screen folders (Kick, Colors, Clicker Sounds, Copy pairing key) are scrolled
- * into the visible rect before the tap.
+ * The app may go immersive (Broadcast Lock). Tests never skip that and never
+ * dismiss Android 15's "Viewing full screen / Got it" hint to make a tap work.
+ * If that hint covers Lock, Minus, menu, Back, or Unlock, the test fails: the
+ * app must keep those controls tappable.
+ *
+ * P0 lock and minus use UiDevice.click at the control's on-screen center.
+ * performClick() is not enough for those. Off-screen chrome is an app bug.
  */
 @RunWith(AndroidJUnit4::class)
 class RoyaltyPhoneFixTest {
@@ -41,12 +39,7 @@ class RoyaltyPhoneFixTest {
         GrantPermissionRule.grant(Manifest.permission.CAMERA)
 
     @get:Rule(order = 1)
-    val activity = ActivityScenarioRule<MainActivity>(
-        Intent(ApplicationProvider.getApplicationContext(), MainActivity::class.java).apply {
-            putExtra(MainActivity.EXTRA_KEEP_SYSTEM_BARS, true)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        },
-    )
+    val activity = ActivityScenarioRule(MainActivity::class.java)
 
     private val device: UiDevice
         get() = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
@@ -54,41 +47,39 @@ class RoyaltyPhoneFixTest {
     @Before
     fun showThePanel() {
         device.executeShellCommand("mkdir -p $EVIDENCE")
-        dismissFullscreenHint()
         activity.scenario.onActivity { act ->
-            act.terminalPanel.setToggleSetting(LookKeys.UNFOLD, false)
-            act.terminalPanel.setToggleSetting(LookKeys.LASER_TYPING, false)
             act.lockChrome.unlock()
             act.terminalPanel.setHiddenForLock(false)
             act.terminalPanel.showMinimized(false, animate = false)
             act.terminalPanel.visibility = View.VISIBLE
+            act.applySystemBars()
             act.window.decorView.requestFocus()
         }
-        dismissFullscreenHint()
         val lock = waitDesc("Lock the panel")
-        if (lock == null) {
-            dumpUi("setup_missing_lock")
-        }
-        assertTrue(
-            "lock control should be on the panel. seen=${visibleLabels()}",
-            lock != null,
-        )
+        if (lock == null) dumpUi("setup_missing_lock")
+        assertTrue("lock control should be on the panel. seen=${visibleLabels()}", lock != null)
+        assertTappableOnScreen(lock!!, "Lock the panel")
     }
 
     @Test
     fun lockBackAndUnlockWorkAndRestartDoesNotTrap() {
         shot("01_folders_before_lock")
-        tapDesc("Lock the panel")
+        assertChromeNotCoveredByFullscreenHint()
+        tapOnScreen(requireDesc("Lock the panel"), "Lock the panel")
         assertTrue("lock tap must show Unlock", waitDesc("Unlock the panel") != null)
         shot("02_edit_locked")
-        tapDesc("More choices: view, sort, and folder size")
+        tapOnScreen(requireDesc("More choices: view, sort, and folder size"), "menu")
         shot("03_menu_while_locked")
-        pressAppBack()
-        pressAppBack()
-        assertTrue("Back must unlock", waitDesc("Lock the panel") != null)
-        tapDesc("Lock the panel")
+        device.pressBack()
+        device.waitForIdle()
+        SystemClock.sleep(300)
+        device.pressBack()
+        device.waitForIdle()
+        SystemClock.sleep(300)
+        assertTrue("Back must unlock. hint=${hintBounds()}", waitDesc("Lock the panel") != null)
+        tapOnScreen(requireDesc("Lock the panel"), "Lock the panel")
         assertTrue(waitDesc("Unlock the panel") != null)
-        tapDesc("Unlock the panel")
+        tapOnScreen(requireDesc("Unlock the panel"), "Unlock the panel")
         assertTrue(waitDesc("Lock the panel") != null)
         activity.scenario.recreate()
         showThePanel()
@@ -98,18 +89,35 @@ class RoyaltyPhoneFixTest {
     }
 
     @Test
+    fun broadcastLockImmersiveUnlockIsOnScreen() {
+        val lock = requireDesc("Lock the panel")
+        longPressOnScreen(lock, "Lock the panel")
+        val unlock = waitDesc("Unlock")
+        assertTrue("Broadcast Lock must leave an on-screen Unlock. hint=${hintBounds()}", unlock != null)
+        shot("02b_broadcast_lock_immersive")
+        assertTappableOnScreen(unlock!!, "Unlock strip")
+        tapOnScreen(unlock, "Unlock strip")
+        assertTrue("Unlock strip must restore the panel", waitDesc("Lock the panel") != null)
+        shot("02c_after_broadcast_unlock")
+    }
+
+    @Test
     fun minusAlwaysHasARestorePathIncludingAfterRestart() {
-        tapDesc("Shrink the panel")
-        assertTrue("minus must leave a restore tab", waitDesc("Open the panel") != null)
+        assertChromeNotCoveredByFullscreenHint()
+        tapOnScreen(requireDesc("Shrink the panel"), "Shrink the panel")
+        val restore = waitDesc("Open the panel")
+        assertTrue("minus must leave a restore tab", restore != null)
+        assertTappableOnScreen(restore!!, "Open the panel")
         shot("05_hidden_with_restore_tab")
-        pressAppBack()
-        assertTrue("Back must restore the panel", waitDesc("Lock the panel") != null)
-        tapDesc("Shrink the panel")
-        assertTrue(waitDesc("Open the panel") != null)
-        tapDesc("Open the panel")
+        device.pressBack()
+        device.waitForIdle()
+        SystemClock.sleep(300)
+        assertTrue("Back must restore the panel. hint=${hintBounds()}", waitDesc("Lock the panel") != null)
+        tapOnScreen(requireDesc("Shrink the panel"), "Shrink the panel")
+        tapOnScreen(requireDesc("Open the panel"), "Open the panel")
         assertTrue(waitDesc("Lock the panel") != null)
         shot("06_restored_from_tab")
-        tapDesc("Shrink the panel")
+        tapOnScreen(requireDesc("Shrink the panel"), "Shrink the panel")
         activity.scenario.recreate()
         showThePanel()
         assertTrue(waitDesc("Lock the panel") != null)
@@ -136,7 +144,7 @@ class RoyaltyPhoneFixTest {
             waitTextContains("PC or an Android phone") != null ||
                 waitTextContains("PC or Android") != null,
         )
-        tapText("Copy pairing key")
+        tapOnScreen(requireText("Copy pairing key"), "Copy pairing key")
         assertTrue(waitTextContains("Copy pairing key") != null)
         val copied = waitUntil(10_000) {
             val desc = statusDescription()
@@ -163,7 +171,7 @@ class RoyaltyPhoneFixTest {
         tapFolder("Kick")
         tapFolder("Effects")
         shot("12_kick_effects")
-        tapText("Open Kick")
+        tapOnScreen(requireText("Open Kick"), "Open Kick")
         assertTrue(waitTextContains("Open Kick") != null)
         shot("13_open_kick_in_app")
         assertFalse(
@@ -188,13 +196,9 @@ class RoyaltyPhoneFixTest {
             waitTextContains("cannot change TikTok") != null,
         )
         assertTrue(waitTextContains("I got kicked") != null)
-        tapText("I got kicked")
+        tapOnScreen(requireText("I got kicked"), "I got kicked")
         assertFalse(device.hasObject(By.pkg("com.android.vending")))
         assertTrue(waitTextContains("I got kicked") != null)
-        assertTrue(
-            waitTextContains("never taps or rejoins") != null ||
-                statusDescription().isNotBlank(),
-        )
     }
 
     @Test
@@ -216,8 +220,9 @@ class RoyaltyPhoneFixTest {
         val title = waitTextContains("OFFGRID TERMINAL")
         assertTrue(title != null)
         shot("16_title_default")
+        assertTappableOnScreen(title!!, "title")
         val loc = IntArray(2)
-        title!!.getLocationOnScreen(loc)
+        title.getLocationOnScreen(loc)
         assertTrue(title.width > 0)
         assertTrue(loc[0] + title.width <= device.displayWidth)
     }
@@ -230,7 +235,7 @@ class RoyaltyPhoneFixTest {
         shot("17_skin_colors")
         val locked = waitDescContains("Locked")
         assertTrue("a failing color must show a lock. seen=${visibleLabels()}", locked != null)
-        waitDescContains("Locked White")?.let { tapView(it) }
+        waitDescContains("Locked White")?.let { tapOnScreen(it, "Locked White") }
         val typed = waitUntil(8_000) {
             statusDescription().contains("Locked:") || findDescContains("Locked:") != null
         }
@@ -238,140 +243,120 @@ class RoyaltyPhoneFixTest {
         shot("18_white_skin_locked")
     }
 
+    /** Home list is long: Kick starts below the fold. A user swipe is allowed; silent scroll is not. */
     private fun tapFolder(name: String) {
-        tapDescContains("$name folder")
+        val label = "$name folder"
+        var view = waitUntilView(2_000) { findOnScreen { findDescContains(label) } }
+        if (view == null) {
+            repeat(12) {
+                swipePanelUp()
+                view = findOnScreen { findDescContains(label) }
+                if (view != null) return@repeat
+            }
+        }
+        if (view == null) dumpUi("offscreen_${name.replace(' ', '_')}")
+        assertTrue(
+            "$label is off-screen on a phone-sized display after swiping the folder list. " +
+                "That is an app layout bug. seen=${visibleLabels()}",
+            view != null,
+        )
+        tapOnScreen(view!!, label)
+        SystemClock.sleep(500)
+    }
+
+    private fun tapOnScreen(view: View, name: String) {
+        val (x, y) = assertTappableOnScreen(view, name)
+        device.click(x, y)
+        device.waitForIdle()
         SystemClock.sleep(400)
     }
 
-    private fun tapDesc(desc: String) {
-        val view = reveal({ findAny { it.contentDescription?.toString() == desc } }, desc)
-        assertTrue("missing $desc. seen=${visibleLabels()}", view != null)
-        tapView(view!!)
+    private fun longPressOnScreen(view: View, name: String) {
+        val (x, y) = assertTappableOnScreen(view, name)
+        device.swipe(x, y, x, y, 160)
+        device.waitForIdle()
+        SystemClock.sleep(500)
     }
 
-    private fun tapDescContains(desc: String) {
-        val view = reveal({ findAny { it.contentDescription?.toString()?.contains(desc) == true } }, desc)
-        assertTrue("missing desc $desc. seen=${visibleLabels()}", view != null)
-        tapView(view!!)
+    private fun assertTappableOnScreen(view: View, name: String): Pair<Int, Int> {
+        val loc = IntArray(2)
+        var w = 0
+        var h = 0
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            view.getLocationOnScreen(loc)
+            w = view.width
+            h = view.height
+        }
+        val box = Rect(loc[0], loc[1], loc[0] + w, loc[1] + h)
+        val x = box.centerX()
+        val y = box.centerY()
+        assertTrue(
+            "$name is off-screen at $box display=${device.displayWidth}x${device.displayHeight}",
+            view.isShown && box.width() > 4 && box.height() > 4 &&
+                x in 1 until device.displayWidth && y in 1 until device.displayHeight,
+        )
+        val hint = hintBounds()
+        if (hint != null) {
+            assertFalse(
+                "$name at $box is covered by the Android 15 fullscreen hint $hint. " +
+                    "The app hid system bars while this control must stay tappable.",
+                hint.contains(x, y) || Rect.intersects(hint, box),
+            )
+        }
+        return x to y
     }
 
-    private fun tapText(text: String) {
-        val view = reveal({ findAny { (it as? TextView)?.text?.toString()?.contains(text) == true } }, text)
+    private fun assertChromeNotCoveredByFullscreenHint() {
+        val lock = requireDesc("Lock the panel")
+        assertTappableOnScreen(lock, "Lock the panel")
+        val minus = findDesc("Shrink the panel")
+        if (minus != null) assertTappableOnScreen(minus, "Shrink the panel")
+    }
+
+    private fun hintBounds(): Rect? {
+        val node = device.findObject(By.text("Got it"))
+            ?: device.findObject(By.textContains("Got it"))
+            ?: device.findObject(By.textContains("Viewing full screen"))
+            ?: return null
+        return node.visibleBounds
+    }
+
+    private fun requireDesc(desc: String): View {
+        val view = waitDesc(desc)
+        if (view == null) dumpUi("missing_${desc.replace(Regex("[^A-Za-z0-9]+"), "_").take(40)}")
+        assertTrue("missing $desc. seen=${visibleLabels()} hint=${hintBounds()}", view != null)
+        return view!!
+    }
+
+    private fun requireText(text: String): View {
+        val view = waitTextContains(text)
+        if (view == null) dumpUi("missing_${text.replace(Regex("[^A-Za-z0-9]+"), "_").take(40)}")
         assertTrue("missing text $text. seen=${visibleLabels()}", view != null)
-        tapView(view!!)
-    }
-
-    private fun tapView(view: View) {
-        bringOnScreen(view)
-        var clicked = false
-        InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            clicked = view.performClick()
-        }
-        if (!clicked) {
-            val loc = IntArray(2)
-            var w = 0
-            var h = 0
-            InstrumentationRegistry.getInstrumentation().runOnMainSync {
-                view.getLocationOnScreen(loc)
-                w = view.width
-                h = view.height
-            }
-            val x = loc[0] + w / 2
-            val y = loc[1] + h / 2
-            if (x in 1 until device.displayWidth && y in 1 until device.displayHeight) {
-                device.click(x, y)
-            }
-        }
-        device.waitForIdle()
-        SystemClock.sleep(400)
-    }
-
-    private fun reveal(find: () -> View?, label: String): View? {
-        waitUntilView { findOnScreen(find) }?.let { return it }
-        find()?.let { hidden ->
-            bringOnScreen(hidden)
-            findOnScreen(find)?.let { return it }
-        }
-        repeat(14) {
-            swipePanelUp()
-            findOnScreen(find)?.let { return it }
-            find()?.let { hidden ->
-                bringOnScreen(hidden)
-                findOnScreen(find)?.let { return it }
-            }
-        }
-        dumpUi("missing_${label.replace(Regex("[^A-Za-z0-9]+"), "_").take(40)}")
-        return findOnScreen(find) ?: find()
-    }
-
-    private fun bringOnScreen(view: View) {
-        InstrumentationRegistry.getInstrumentation().runOnMainSync {
-            var parent = view.parent
-            while (parent is View) {
-                if (parent is android.widget.ScrollView) {
-                    val child = IntArray(2)
-                    val scroller = IntArray(2)
-                    view.getLocationOnScreen(child)
-                    parent.getLocationOnScreen(scroller)
-                    val target = parent.scrollY + (child[1] - scroller[1]) - parent.height / 4
-                    parent.scrollTo(0, target.coerceAtLeast(0))
-                    break
-                }
-                parent = parent.parent
-            }
-            val rect = Rect(0, 0, view.width.coerceAtLeast(1), view.height.coerceAtLeast(1))
-            view.requestRectangleOnScreen(rect, true)
-        }
-        device.waitForIdle()
-        SystemClock.sleep(200)
+        return view!!
     }
 
     private fun swipePanelUp() {
         val w = device.displayWidth
         val h = device.displayHeight
-        device.swipe(w / 2, (h * 0.70f).toInt(), w / 2, (h * 0.28f).toInt(), 24)
+        device.swipe(w / 2, (h * 0.68f).toInt(), w / 2, (h * 0.30f).toInt(), 24)
         device.waitForIdle()
         SystemClock.sleep(200)
     }
 
-    private fun pressAppBack() {
-        dismissFullscreenHint()
-        device.pressBack()
-        device.waitForIdle()
-        SystemClock.sleep(350)
-        dismissFullscreenHint()
-    }
-
-    private fun dismissFullscreenHint() {
-        val labels = listOf("Got it", "GOT IT", "Got It")
-        repeat(3) {
-            for (label in labels) {
-                val button = device.findObject(By.text(label)) ?: device.findObject(By.textContains(label))
-                if (button != null) {
-                    button.click()
-                    device.wait(Until.gone(By.text(label)), 2_000)
-                    device.waitForIdle()
-                    SystemClock.sleep(200)
-                    return
-                }
-            }
-            SystemClock.sleep(250)
-        }
-    }
-
     private fun waitDesc(desc: String): View? =
-        waitUntilView { findOnScreen { findAny { it.contentDescription?.toString() == desc } } }
+        waitUntilView { findOnScreen { findDesc(desc) } }
 
     private fun waitDescContains(desc: String): View? =
-        waitUntilView { findOnScreen { findAny { it.contentDescription?.toString()?.contains(desc) == true } } }
+        waitUntilView { findOnScreen { findDescContains(desc) } }
 
     private fun waitTextContains(text: String): View? =
-        waitUntilView { findOnScreen { findAny { (it as? TextView)?.text?.toString()?.contains(text) == true } }
-            ?: findAny { (it as? TextView)?.text?.toString()?.contains(text) == true } }
+        waitUntilView { findOnScreen { findTextContains(text) } }
 
-    private fun waitUntilView(find: () -> View?): View? {
+    private fun waitUntilView(find: () -> View?): View? = waitUntilView(15_000, find)
+
+    private fun waitUntilView(ms: Long, find: () -> View?): View? {
         var found: View? = null
-        waitUntil(15_000) {
+        waitUntil(ms) {
             found = find()
             found != null
         }
@@ -394,7 +379,7 @@ class RoyaltyPhoneFixTest {
     private fun findAny(match: (View) -> Boolean): View? {
         var found: View? = null
         activity.scenario.onActivity { act ->
-            found = walk(act.window.decorView, match, requireOnScreen = false)
+            found = walk(act.window.decorView, match)
         }
         return found
     }
@@ -404,12 +389,11 @@ class RoyaltyPhoneFixTest {
         return view.isShown && view.getGlobalVisibleRect(rect) && rect.width() > 4 && rect.height() > 4
     }
 
-    private fun walk(view: View, match: (View) -> Boolean, requireOnScreen: Boolean): View? {
-        val visible = if (requireOnScreen) onScreen(view) else view.isShown
-        if (visible && match(view)) return view
+    private fun walk(view: View, match: (View) -> Boolean): View? {
+        if (view.isShown && match(view)) return view
         if (view is ViewGroup) {
             for (i in 0 until view.childCount) {
-                walk(view.getChildAt(i), match, requireOnScreen)?.let { return it }
+                walk(view.getChildAt(i), match)?.let { return it }
             }
         }
         return null

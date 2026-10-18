@@ -179,7 +179,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        hideSystemBarsForUser()
+        applySystemBars()
 
         previewView = findViewById(R.id.camera_view)
         playbackView = findViewById(R.id.playback_view)
@@ -211,6 +211,7 @@ class MainActivity : AppCompatActivity() {
         lockStore = BroadcastLockStore(PrefsLockPersistence(this))
         lockChrome = BroadcastLockChrome(this, lockStore)
         lockChrome.onCreate()
+        applySystemBars()
         terminalPanel.renderProbeMayOpen = { !recording && !lockStore.locked }
         // Tap is the escapable edit lock on the panel. Hold still arms the Broadcast Lock.
         terminalPanel.onLockTapped = null
@@ -282,6 +283,23 @@ class MainActivity : AppCompatActivity() {
         super.onStop()
     }
 
+    /**
+     * Broadcast Lock hides the bars (immersive). If the Android 15 fullscreen hint
+     * did not eat this Back, unlock here so Royalty is never stuck on a black stage.
+     */
+    override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
+        if (event.keyCode == android.view.KeyEvent.KEYCODE_BACK &&
+            event.action == android.view.KeyEvent.ACTION_UP &&
+            ::lockStore.isInitialized &&
+            lockStore.locked &&
+            !lockStore.state.recordingVisible
+        ) {
+            lockChrome.unlock()
+            return true
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
     /** Phase 1.3: the touch sink and the stage holds see every touch before any view does. */
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
         if (::lockTouch.isInitialized) {
@@ -312,6 +330,13 @@ class MainActivity : AppCompatActivity() {
     internal fun onLockApplied(state: LockState) {
         if (state.locked && playRequested) hidePlayback()
         if ((state.locked || state.armed) && ::coachMark.isInitialized) coachMark.hide()
+        applySystemBars()
+    }
+
+    /** Bars stay up while the panel is visible. Immersive only while Broadcast Lock hid chrome. */
+    internal fun applySystemBars() {
+        val broadcastLocked = ::lockStore.isInitialized && lockStore.locked
+        if (shouldHideSystemBars(broadcastLocked)) hideSystemBars() else showSystemBars()
     }
 
     /** Visible Unlock control whenever the Broadcast Lock hid the panel and a share is not live. */
@@ -327,17 +352,11 @@ class MainActivity : AppCompatActivity() {
         if (::live.isInitialized) live.tellPhone2(com.offgrid.live.RemoteMessage.STATUS_LINE_KEY, message)
     }
 
-    /** Immersive bars stay on for people. Tests keep them so the fullscreen hint never covers Lock. */
-    private fun hideSystemBarsForUser() {
-        if (intent.getBooleanExtra(EXTRA_KEEP_SYSTEM_BARS, false)) return
-        hideSystemBars()
-    }
-
     override fun onResume() {
         super.onResume()
         lockChrome.onResume()
         effects.resume()
-        hideSystemBarsForUser()
+        applySystemBars()
         resumed = true
         applyCapture()
         if (hasCameraPermission()) {
@@ -582,14 +601,8 @@ class MainActivity : AppCompatActivity() {
         RECORDING,
     }
 
-    companion object {
+    private companion object {
         const val TAG = "OffgridCompositor"
-
-        /**
-         * Instrumented tests set this so Android 15 does not show the
-         * "Viewing full screen / Got it" overlay that covers Lock, Minus, and Back.
-         */
-        const val EXTRA_KEEP_SYSTEM_BARS = "com.offgrid.compositor.KEEP_SYSTEM_BARS"
 
         /** The panel-open hold zone starts this far in from the screen edges: no edge gestures (V2 7.3). */
         const val PANEL_OPEN_EDGE_INSET_DP = 48f

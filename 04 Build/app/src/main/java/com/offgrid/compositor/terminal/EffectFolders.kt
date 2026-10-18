@@ -22,6 +22,12 @@ internal object EffectFolders {
         tag = null,
         kind = FolderKind.EFFECTS,
         items = listOf(
+            ActionItem(
+                PanelAction.COPY_PAIRING_KEY,
+                "Copy pairing key",
+                "Copies the pairing key and stays here. Send it to a PC or an Android phone, then enter the pairing address and port there.",
+            ),
+            ActionItem(PanelAction.REMOTE_OPEN_PAIRING, "Pairing", "Make, paste, forget, or replace a secure local key. Pair a PC or an Android phone on this Wi-Fi."),
             ToggleItem(FxKeys.AUTO_CURTAIN_ON, "Auto blackout when idle", "Turns the stream solid black, white, or your color when no effect or mic is on.", true, isTest = false),
             ChoiceItem(
                 FxKeys.AUTO_CURTAIN_MODE,
@@ -58,12 +64,6 @@ internal object EffectFolders {
                     Choice(FxKeys.REMOTE_ROLE_REMOTE, "Remote phone", "Show a paired camera phone's finished picture."),
                 ),
                 FxKeys.REMOTE_ROLE_OFF,
-            ),
-            ActionItem(PanelAction.REMOTE_OPEN_PAIRING, "Pairing", "Make, paste, forget, or replace a secure local key. Pair a PC or an Android phone on this Wi-Fi."),
-            ActionItem(
-                PanelAction.COPY_PAIRING_KEY,
-                "Copy pairing key",
-                "Copies the pairing key and stays here. Send it to a PC or an Android phone, then enter the pairing address and port there.",
             ),
             ActionItem(PanelAction.REMOTE_OPEN_PREVIEW, "Remote preview", "Find the camera phone on this Wi-Fi network, or type its address from the Pairing screen."),
             ToggleItem(FxKeys.LIVE_PC_ON, "Send to PC", "Send the finished picture to OBS on a PC, or keep using the Android phone link above.", false, isTest = false),

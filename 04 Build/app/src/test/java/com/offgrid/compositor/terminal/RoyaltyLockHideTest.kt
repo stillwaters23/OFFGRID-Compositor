@@ -3,6 +3,7 @@ package com.offgrid.compositor.terminal
 import android.content.Context
 import android.view.View
 import android.widget.FrameLayout
+import com.offgrid.compositor.shouldHideSystemBars
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -73,6 +74,12 @@ class RoyaltyLockHideTest {
         val second = attachedPanel()
         assertFalse(second.minimized)
         assertEquals(View.VISIBLE, second.expanded.visibility)
+    }
+
+    @Test
+    fun systemBarsStayUpUnlessBroadcastLockHidThePanel() {
+        assertFalse(shouldHideSystemBars(false))
+        assertTrue(shouldHideSystemBars(true))
     }
 
     @Test
