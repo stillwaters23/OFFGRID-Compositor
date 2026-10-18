@@ -387,11 +387,15 @@ jobs:
           api-level: ${{ matrix.api-level }}
           arch: x86_64
           target: google_apis
-          force-avd-creation: false
+          profile: Nexus 6
+          ram-size: 3072
+          force-avd-creation: true
           disable-animations: true
+          emulator-boot-timeout: 600
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          # The action runs this with /usr/bin/sh (dash). pipefail is a bash option and fails the job.
           script: |
-            set -euo pipefail
+            set -eu
             cd "04 Build"
             chmod +x ./gradlew
             ./gradlew connectedDebugAndroidTest --stacktrace

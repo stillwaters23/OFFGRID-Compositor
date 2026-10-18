@@ -2,7 +2,6 @@ package com.offgrid.compositor
 
 import android.Manifest
 import android.content.Context
-import android.content.Context
 import android.os.Environment
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.espresso.Espresso.pressBack
@@ -100,17 +99,18 @@ class RoyaltyPhoneFixTest {
         waitForPanel()
         openFolder("Live and Remote")
         shot("10_live_and_remote")
-        assertTrue(device.hasObject(By.textContains("PC or an Android phone")) ||
-            device.hasObject(By.textContains("PC or Android")))
-        clickText("Copy pairing key")
         assertTrue(
-            waitText("Copy pairing key"),
+            device.hasObject(By.textContains("PC or an Android phone")) ||
+                device.hasObject(By.textContains("PC or Android")) ||
+                device.hasObject(By.descContains("PC or an Android phone")),
         )
+        clickText("Copy pairing key")
+        assertTrue(waitText("Copy pairing key"))
         val copied = device.wait(Until.hasObject(By.descContains("copied")), 8_000) ||
             device.wait(Until.hasObject(By.descContains("Pairing key")), 8_000)
-        assertTrue("copy pairing stayed on the folder and confirmed", copied || device.hasObject(By.text("Copy pairing key")))
+        assertTrue("copy pairing stayed on Live and Remote", device.hasObject(By.text("Copy pairing key")))
+        assertTrue("copy pairing confirmed on the status line", copied)
         shot("11_copy_pairing_stayed")
-        assertTrue(device.hasObject(By.text("Copy pairing key")))
     }
 
     @Test
@@ -178,7 +178,11 @@ class RoyaltyPhoneFixTest {
     private fun openFolder(name: String) {
         val scroll = androidx.test.uiautomator.UiScrollable(UiSelector().scrollable(true))
         scroll.setAsVerticalList()
+        scroll.setMaxSearchSwipes(30)
         runCatching { scroll.scrollIntoView(UiSelector().descriptionContains(name)) }
+        if (!device.hasObject(By.descContains(name)) && !device.hasObject(By.text(name))) {
+            runCatching { scroll.scrollIntoView(UiSelector().text(name)) }
+        }
         val row = device.findObject(UiSelector().descriptionContains(name))
         if (row.exists()) {
             row.click()

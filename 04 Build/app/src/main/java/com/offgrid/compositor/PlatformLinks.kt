@@ -8,8 +8,8 @@ import android.content.Intent
  * Opens a platform's own app with one tap, so Royalty can ask to join again herself
  * (feature 28, final build M4). It never taps, joins, or rejoins for her.
  *
- * App ids come from each app's public store page. When an app isn't on the phone, or its
- * id is UNCONFIRMED, the phone's app store opens a search for it instead.
+ * App ids come from each app's public store page. When an app isn't on the phone,
+ * OFFGRID says so in the panel. It never opens the Play Store.
  */
 internal object PlatformLinks {
     /** Platform folder id to the app's id on the phone. Ids not listed here are UNCONFIRMED. */
