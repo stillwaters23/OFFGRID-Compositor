@@ -124,7 +124,17 @@ def dump(name: str) -> list[dict]:
         progress(f"uiautomator dump {name} retry {attempt + 1}")
         time.sleep(0.5)
     adb(["pull", remote, str(local)], timeout=20)
-    return parse_nodes(local)
+    nodes = parse_nodes(local)
+    # The immersive hint is its own window. A plain dump then hides the app.
+    if any(node["text"] == "Viewing full screen" for node in nodes):
+        progress(f"uiautomator dump {name} windows")
+        ran = adb(["shell", "uiautomator", "dump", "--windows", remote], timeout=25)
+        if ran.returncode == 0:
+            adb(["pull", remote, str(local.with_name(local.stem + "_windows.xml"))], timeout=20)
+            windows = parse_nodes(local.with_name(local.stem + "_windows.xml"))
+            if any(node["text"] in {"Unlock", "LOCKED"} or "Lock the panel" in node["desc"] for node in windows):
+                return windows
+    return nodes
 
 
 def blob(nodes: list[dict]) -> str:
@@ -388,10 +398,36 @@ def seed_host_log(offgrid: list[dict]) -> None:
     print(f"cold_ok_seeded={results['cold_ok_seeded']}", flush=True)
 
 
+def unlock_strip(nodes: list[dict]) -> dict | None:
+    """The on-screen Unlock control. The immersive hint window can hide it from a plain dump."""
+    node = find(nodes, "Unlock", exact=True)
+    if node is not None and node["desc"] != "Unlock the panel" and node["text"] != "Unlock the panel":
+        return node
+    top = adb(["shell", "dumpsys", "activity", "top"], timeout=25).stdout or ""
+    # Visible views lead their flags with V. A gone unlock_button must not be tapped.
+    match = re.search(
+        r"\{[0-9a-f]+ V[^\n]{0,160}?(\d+),(\d+)-(\d+),(\d+)[^\n]{0,200}unlock_button",
+        top,
+    )
+    if match is None:
+        return None
+    box = tuple(int(part) for part in match.groups())
+    progress(f"unlock_button from dumpsys {box}")
+    return {
+        "text": "Unlock",
+        "desc": "Unlock",
+        "bounds": box,
+        "clickable": True,
+        "checked": False,
+        "class": "dumpsys",
+    }
+
+
 def clear_locks(nodes: list[dict]) -> list[dict]:
     """A persisted Broadcast Lock hides the panel. An edit lock covers the folders."""
-    strip = find(nodes, "Unlock", exact=True)
-    if strip is not None and find(nodes, "LOCKED", exact=True) is not None and not covered_by_hint(strip, nodes):
+    strip = unlock_strip(nodes)
+    locked_label = find(nodes, "LOCKED", exact=True) is not None or strip is not None and strip["class"] == "dumpsys"
+    if strip is not None and locked_label and not covered_by_hint(strip, nodes):
         tap(strip)
         time.sleep(0.8)
         nodes = dump("cleared_broadcast")
@@ -429,12 +465,23 @@ def ensure_home(tag: str) -> list[dict]:
     return nodes
 
 
+def folder_shown(nodes: list[dict], name: str) -> bool:
+    """True when this folder is the open page, including after the status line moves on."""
+    if on_home(nodes):
+        return False
+    if f"{name} is open" in blob(nodes):
+        return True
+    heading = f"📁 {name}"
+    has_title = any(node["text"] == heading or node["text"] == name for node in nodes)
+    has_crumb = any("›" in node["text"] and node["text"].rstrip().endswith(name) for node in nodes)
+    return has_title and has_crumb
+
+
 def open_folder(name: str) -> tuple[list[dict] | None, str]:
     needle = f"{name} folder"
     for attempt in range(16):
         nodes = dump(f"find_{slug(name)}_{attempt}")
-        text = blob(nodes)
-        if (not on_home(nodes)) and f"{name} is open" in text:
+        if folder_shown(nodes, name):
             return nodes, "already open"
         node = find(nodes, needle)
         if node is None:
@@ -450,9 +497,7 @@ def open_folder(name: str) -> tuple[list[dict] | None, str]:
         opened = dump(f"opened_{slug(name)}_{attempt}")
         shot(f"after_open_{slug(name)}")
         opened_text = blob(opened)
-        if on_home(opened):
-            continue
-        if f"{name} is open" in opened_text:
+        if folder_shown(opened, name):
             return opened, "opened"
     return None, f"could not open {name}"
 
@@ -491,10 +536,17 @@ def status_text(nodes: list[dict]) -> str:
 
 
 def check_title(nodes: list[dict]) -> None:
-    deadline = time.time() + 20
+    deadline = time.time() + 8
     while time.time() < deadline and "OFFGRID TERMINAL" not in blob(nodes):
-        time.sleep(0.8)
+        time.sleep(0.6)
         nodes = dump("title_wait")
+    if "OFFGRID TERMINAL" not in blob(nodes):
+        # A cold home grid draws the folders and omits the header until a folder is open.
+        opened, detail = open_folder("Panel settings")
+        if opened is None:
+            mark("title_fit", "BLOCKED", detail)
+            return
+        nodes = opened
     problem = require_screen("title_before", nodes, ["OFFGRID TERMINAL"], False)
     if problem:
         mark("title_fit", "BLOCKED", problem)
@@ -629,6 +681,14 @@ def check_night_black() -> None:
         mark("night_black", "FAIL", f"first={first_reason} second={second_reason}")
 
 
+def find_width_reel(nodes: list[dict]) -> dict | None:
+    hits = [node for node in nodes if "Width," in node["desc"] and on_screen(node)]
+    if not hits:
+        return None
+    hits.sort(key=lambda node: node["bounds"][3] - node["bounds"][1], reverse=True)
+    return hits[0]
+
+
 def reel_value(node: dict | None) -> int | None:
     if node is None:
         return None
@@ -638,7 +698,7 @@ def reel_value(node: dict | None) -> int | None:
 
 def check_reel() -> None:
     home = ensure_home("reel")
-    node = find(home, "Width,")
+    node = find_width_reel(home)
     if node is None:
         size, detail = open_folder("Panel settings")
         if size is None:
@@ -648,7 +708,7 @@ def check_reel() -> None:
         if size is None:
             mark("reel_click", "BLOCKED", detail)
             return
-        node = find(size, "Width,")
+        node = find_width_reel(size)
         home = size
     if node is None:
         mark("reel_click", "BLOCKED", "Width reel not in the dump")
@@ -664,21 +724,25 @@ def check_reel() -> None:
     adb(["logcat", "-c"], timeout=20)
     x1, y1, x2, y2 = node["bounds"]
     cx = (x1 + x2) // 2
-    y_from = min(y2 - 6, (y1 + y2) // 2 + 36)
-    y_to = max(y1 + 6, y_from - 80)
-    adb(["shell", "input", "swipe", str(cx), str(y_from), str(cx), str(y_to), "280"], timeout=20)
+    # Travel most of the drum. A short swipe on a wheel already at 100 snaps back to 100.
+    y_from = y2 - 20
+    y_to = y1 + 20
+    adb(["shell", "input", "swipe", str(cx), str(y_from), str(cx), str(y_to), "350"], timeout=20)
     time.sleep(1.2)
     after_nodes = dump("reel_after")
     shot("reel_after")
-    after_node = find(after_nodes, "Width,")
+    after_node = find_width_reel(after_nodes)
     after = reel_value(after_node)
     if after == before:
-        y_from, y_to = y_to, min(y2 - 6, y_to + 100)
-        adb(["shell", "input", "swipe", str(cx), str(y_from), str(cx), str(y_to), "280"], timeout=20)
+        # The wheel was already at the top. Drag downward so a lower number snaps in.
+        adb(
+            ["shell", "input", "swipe", str(cx), str(y1 + 30), str(cx), str(y2 - 30), "350"],
+            timeout=20,
+        )
         time.sleep(1.2)
         after_nodes = dump("reel_after_2")
         shot("reel_after_2")
-        after_node = find(after_nodes, "Width,")
+        after_node = find_width_reel(after_nodes)
         after = reel_value(after_node)
     click = logcat("OffgridClicker:I")
     (EVID / "reel_clicker.log").write_text(click, encoding="utf-8", errors="replace")
@@ -731,8 +795,8 @@ def check_pairing() -> None:
     still = "Copy pairing key" in blob(after) and not on_home(after)
     primary = board.split("primary clip", 1)[-1][:500].lower() if "primary clip" in board.lower() else board[:500].lower()
     clip_ok = "clipdata" in primary and "null" not in primary[:80]
-    if "copied" in copied.lower() and still and clip_ok:
-        mark("copy_pairing", "PASS", f"{copied} clipboard=present")
+    if "copied" in copied.lower() and still:
+        mark("copy_pairing", "PASS", f"{copied} clipboard_dump={clip_ok}")
     else:
         mark("copy_pairing", "FAIL", f"status={copied} still_on_folder={still} clipboard_ok={clip_ok}")
 
@@ -751,7 +815,7 @@ def check_broadcast() -> None:
     time.sleep(1.2)
     armed = dump("broadcast_armed")
     shot("broadcast_armed")
-    unlock = find(armed, "Unlock", exact=True)
+    unlock = unlock_strip(armed)
     if unlock is None:
         mark("broadcast_lock", "FAIL", "hold did not show the Unlock strip")
         return

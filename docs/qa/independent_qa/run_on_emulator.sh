@@ -141,8 +141,8 @@ printf 'walk_exit=%s\ninstrument_exit=%s\n' "$walk_status" "$instrument_status" 
 progress "stop screenrecord"
 touch "$ev/recording.stop"
 adb_t 20 shell 'kill -2 $(pidof screenrecord) 2>/dev/null || true' || true
-# Do not wait forever for the recorder loop.
-timeout --signal=KILL 45 wait "$rec_pid" || true
+# wait is a shell builtin, so GNU timeout cannot run it. The recorder loop exits on the flag.
+kill "$rec_pid" 2>/dev/null || true
 progress "script end walk=${walk_status} instrument=${instrument_status}"
 
 if [ "$walk_status" -ne 0 ] || [ "$instrument_status" -ne 0 ]; then
