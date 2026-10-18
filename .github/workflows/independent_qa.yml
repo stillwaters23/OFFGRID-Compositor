@@ -1,0 +1,139 @@
+name: Independent QA
+
+# Independent of the fixer. Checks out PR 56 head 6c7936e, builds that
+# debug APK, and walks the panel with this branch's own adb taps.
+# GitHub-hosted ubuntu-latest provides /dev/kvm. This file does not change app code.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - qa/pr56_independent_qa
+
+permissions:
+  contents: read
+
+concurrency:
+  group: independent-qa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  independent-qa:
+    name: API 35 KVM walk
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Enable KVM
+        run: |
+          set -euo pipefail
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          sudo chmod 666 /dev/kvm
+          ls -l /dev/kvm
+          egrep -c '(vmx|svm)' /proc/cpuinfo || true
+
+      - name: Check out the QA branch
+        uses: actions/checkout@v4
+
+      - name: Check out PR 56 head 6c7936e
+        run: |
+          set -euo pipefail
+          git fetch --depth 1 origin 6c7936e5da9935305904b712fed10e9af287bcfa \
+            || git fetch --depth 1 origin cursor/royalty-v033-phone-fixes-1373
+          git worktree add --detach offgrid-head 6c7936e5da9935305904b712fed10e9af287bcfa
+          test "$(git -C offgrid-head rev-parse HEAD)" = "6c7936e5da9935305904b712fed10e9af287bcfa"
+          git -C offgrid-head log -1 --oneline
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Android tools
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/android-sdk/cmdline-tools"
+          curl -fsSL -o /tmp/cmdtools.zip https://dl.google.com/android/repository/commandlinetools-linux-13114758_latest.zip
+          rm -rf /tmp/cmdline-tools
+          unzip -q /tmp/cmdtools.zip -d /tmp
+          rm -rf "$HOME/android-sdk/cmdline-tools/latest"
+          mv /tmp/cmdline-tools "$HOME/android-sdk/cmdline-tools/latest"
+          echo "ANDROID_HOME=$HOME/android-sdk" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$HOME/android-sdk" >> "$GITHUB_ENV"
+          yes | "$HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$HOME/android-sdk" --licenses >/dev/null || true
+          "$HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$HOME/android-sdk" --install "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+
+      - name: Build debug and androidTest APKs from 6c7936e
+        working-directory: offgrid-head/04 Build
+        run: |
+          set -euo pipefail
+          chmod +x ./gradlew
+          ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace
+          test -s app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Record manifest and slider checks
+        run: |
+          set -euo pipefail
+          mkdir -p docs/qa/independent_qa/evidence
+          merged="$(find "offgrid-head/04 Build/app/build" -path "*merged_manifest*" -name AndroidManifest.xml | head -n 1)"
+          test -n "$merged"
+          cp "$merged" docs/qa/independent_qa/evidence/merged-manifest.xml
+          python3 - "$merged" << 'PY'
+          import pathlib, sys
+          import xml.etree.ElementTree as ET
+          name = "{http://schemas.android.com/apk/res/android}name"
+          root = ET.parse(sys.argv[1]).getroot()
+          found = sorted(
+              node.get(name)
+              for tag in ("uses-permission", "uses-permission-sdk-23")
+              for node in root.iter(tag)
+              if node.get(name)
+          )
+          out = pathlib.Path("docs/qa/independent_qa/evidence/static_checks.txt")
+          lines = ["HEAD=6c7936e5da9935305904b712fed10e9af287bcfa", "permissions:"]
+          lines += [f"  {item}" for item in found]
+          for banned in ("android.permission.RECORD_AUDIO", "android.permission.FOREGROUND_SERVICE_MICROPHONE"):
+              lines.append(f"{banned}={'PRESENT' if banned in found else 'absent'}")
+          out.write_text("\n".join(lines) + "\n", encoding="utf-8")
+          print(out.read_text())
+          PY
+          {
+            echo "slider_source:"
+            if grep -R -n -E "SeekBar|RangeSlider|BioSliderView" "offgrid-head/04 Build/app/src"; then
+              echo "slider_grep=PRESENT"
+            else
+              echo "slider_grep=absent"
+            fi
+          } | tee -a docs/qa/independent_qa/evidence/static_checks.txt
+
+      - name: Build the empty calibration activity
+        run: bash docs/qa/independent_qa/build_empty_apk.sh
+
+      - name: Boot API 35 with KVM and walk the panel
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          profile: pixel_7
+          cores: 2
+          ram-size: 3072
+          force-avd-creation: true
+          disable-animations: false
+          emulator-boot-timeout: 900
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -no-boot-anim -no-metrics -accel on
+          pre-emulator-launch-script: bash docs/qa/independent_qa/host_kvm.sh
+          script: bash docs/qa/independent_qa/run_on_emulator.sh
+
+      - name: Upload PNGs, MP4s, logcat, and dumps
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: independent-qa-api-35
+          if-no-files-found: warn
+          path: |
+            docs/qa/independent_qa/evidence
+            offgrid-head/04 Build/app/build/reports/androidTests
+            offgrid-head/04 Build/app/build/outputs/androidTest-results
