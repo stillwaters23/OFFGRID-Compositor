@@ -5,12 +5,12 @@ Reviewer: independent QA. This note did not change product code. Nothing was mer
 | | |
 | --- | --- |
 | Pull request | [#54](https://github.com/stillwaters23/OFFGRID-Compositor/pull/54), draft, `cursor/voice-phase0-hygiene-ae3d` into `final-build` |
-| Head reviewed | `387dd45c5b9e8d6d49b971b3d44fefd69cb5ae95` |
+| Head reviewed | `f6a989f685bbf3524627a6014a879d4595f515aa`. Checks 1–4 and 6 were measured at `387dd45`; `f6a989f` changes only `docs/voice/phase0_plan.md`. |
 | Base | `origin/final-build` at `541588cb9208e06a9a3292a91af70446abfbd05d` |
-| CI | [run 39084968489](https://github.com/stillwaters23/OFFGRID-Compositor/actions/runs/39084968489), conclusion success, head SHA matches |
-| Review time | 2026-10-18 UTC. Check 5 rechecked the same day against the attached GLM review. |
+| CI | [run 39084968489](https://github.com/stillwaters23/OFFGRID-Compositor/actions/runs/39084968489) on `387dd45`, and [run 39086462539](https://github.com/stillwaters23/OFFGRID-Compositor/actions/runs/39086462539) on `f6a989f`. Both succeeded. |
+| Review time | 2026-10-18 UTC. Check 5 rechecked at `f6a989f` against the attached GLM review. |
 
-`git log origin/final-build..387dd45` is one commit: `387dd45 Add voice Phase 0 hygiene files and asset guard.`
+`git log origin/final-build..f6a989f` is two commits: `387dd45 Add voice Phase 0 hygiene files and asset guard.` and `f6a989f Fix the Gate G1 mute rule in the Phase 0 plan.` The second commit is three lines in `docs/voice/phase0_plan.md`.
 
 ## Verdicts
 
@@ -20,7 +20,7 @@ Reviewer: independent QA. This note did not change product code. Nothing was mer
 | 2 | `repo_hygiene.py` fails on a new `.wav`, `.gguf`, `.onnx`, `.pt`, or `.safetensors`, and on a fake private key or API key. Allowlist is the 3 Rex WAV paths by exact path. Output does not contain the fixture secrets. | **PASS** |
 | 3 | The workflow still builds and keeps every existing check. | **PASS** |
 | 4 | `THIRD_PARTY_NOTICES.md` covers every Gradle dependency with the published license. `LICENSE` is proprietary, all rights reserved, stillwaters23 2026. | **PASS** |
-| 5 | `phase0_plan.md` matches GLM's top 5 and the Gate G1 matrix (on-device spike, second BIGO account, auto-cutoff, watchdog, muted until green), with no Route A code and no sliders. | **FAIL** |
+| 5 | `phase0_plan.md` matches GLM's top 5 and the Gate G1 matrix (on-device spike, second BIGO account, auto-cutoff, watchdog, muted until green), with no Route A code and no sliders. | **PASS** |
 | 6 | `./gradlew testDebugUnitTest lintDebug assembleDebug` in `04 Build`. | **PASS** |
 
 ## 1. Product code and manifests — PASS
@@ -138,9 +138,17 @@ The `camera-core` POM description says: "This library includes code from libyuv,
 
 `LICENSE` is 11 lines. It says `Copyright © 2026 stillwaters23`, `All rights reserved.`, and `OFFGRID Compositor is proprietary.`
 
-## 5. Phase 0 plan against GLM and Gate G1 — FAIL
+## 5. Phase 0 plan against GLM and Gate G1 — PASS
 
-Rechecked against the attached review `uploads/GLM_5.3_Voice_Review.md` (read from `GLM_5.3_Voice_Review_fd81.md`). Section "6. Top Five Changes" is lines 68–75. Gate G1 is Phase 1, lines 56–58. Checks 1–4 and 6 were not rerun.
+Rechecked at `f6a989f` against the attached review `uploads/GLM_5.3_Voice_Review.md` (read from `GLM_5.3_Voice_Review_fd81.md`). Section "6. Top Five Changes" is lines 68–75. Gate G1 is Phase 1, lines 56–58. Checks 1–4 and 6 were not rerun. `git diff 387dd45 f6a989f` is only `docs/voice/phase0_plan.md`.
+
+The earlier mismatch is closed. At `387dd45`, line 29 kept "the far side stays muted, until every row below is green," and row 11 required rows 1–10 and row 12 to be green before anything was unmuted. That blocked GLM Phase 1.5, "other party hears Rex ≥5 min."
+
+At `f6a989f`, line 29 says: "Royalty's real microphone stays off the far side until every safety row is green. … Once those rows are green, the far side hears Rex. Row 12 is the 5-minute second-account hearing test, and it runs after that."
+
+Row 11, line 45, says: "While UID scoping, auto-cutoff, the watchdog, or the fail-safe is red, the physical microphone does not reach the far side. … Once those safety rows are green, the far side hears Rex, and row 12 is the 5-minute second-account hearing test that runs after that."
+
+That matches finding E6, "keep-BIGO-muted-until-green," and top-5 change 3. The hold is Royalty's real microphone. The 5-minute call is the moment the other party hears Rex. Row 12, line 46, still requires a second account, at least 5 minutes, no BIGO crash, and a written decision.
 
 The five numbered changes in `docs/voice/phase0_plan.md:11-15` match GLM's five changes, in the same order:
 
@@ -171,19 +179,11 @@ These Gate G1 acceptance tests match:
 | "BIGO live test on a secondary account — AT: other party hears Rex ≥5 min; no BIGO crash; G1 decision recorded." | Row 12, line 46 |
 | "Partial pass (e.g., works only unscoped) = FAIL" and "FAIL → … shelve Shizuku" | Lines 14, 31, and 38 |
 
-Mismatch, quoted:
-
-GLM Phase 1.5: "other party hears Rex ≥5 min".
-
-Plan line 29: "the far side stays muted, until every row below is green."
-
-Plan row 11, line 45: "Rows 1–10 and row 12 are green before anything is unmuted."
-
-Row 12 is the row on which the second account hears the Rex tone. The mute rule keeps the far side muted until that row is already green, so the hearing test has no legal step under the rule that requires it. GLM's "keep-BIGO-muted-until-green" (finding E6 and top-5 change 3) holds Royalty's real voice until the safety checks are green. The 5-minute call is the moment the other party hears the Rex tone.
+No mismatch remains. The five changes, the on-device spike, the second BIGO account, auto-cutoff, the watchdog, and muted-until-green all match the review. The plan still says this change adds no Route A code (`docs/voice/phase0_plan.md:3`) and keeps the constraint "no sliders" (`docs/voice/phase0_plan.md:17`). `f6a989f` adds no product code.
 
 ## 6. Gradle totals — PASS
 
-Command, from `04 Build`, on this head:
+Command, from `04 Build`, at `387dd45`. `f6a989f` does not change the Gradle tree:
 
 ```
 ./gradlew testDebugUnitTest lintDebug assembleDebug
@@ -210,4 +210,4 @@ Lint XML:
 
 ## One-line verdict
 
-FAIL: checks 1, 2, 3, 4, and 6 pass; check 5 fails because the plan keeps the far side muted until the second-account hearing test is already green, which contradicts GLM's Gate G1 requirement that the other party hears Rex for at least 5 minutes.
+PASS: checks 1 through 6 pass at `f6a989f`. The mute rule now holds Royalty's real microphone until the safety rows are green, and the second account then hears Rex for the 5-minute Gate G1 call.
