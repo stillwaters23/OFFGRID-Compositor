@@ -199,8 +199,8 @@ internal fun TerminalPanel.setSizePercent(key: String, value: Int, announce: Boo
     store.setNumber(key, value)
     liveSize = null
     showSizeNumbers(store.number(LookKeys.WIDTH), store.number(LookKeys.HEIGHT))
-    requestLayout()
     if (announce) {
+        requestLayout()
         val label = context.getString(if (key == LookKeys.WIDTH) R.string.terminal_width else R.string.terminal_height)
         say(context.getString(R.string.terminal_number_saved, label, value))
         post { savePosition() }

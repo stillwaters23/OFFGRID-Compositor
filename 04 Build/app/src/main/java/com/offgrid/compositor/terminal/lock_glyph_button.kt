@@ -43,6 +43,7 @@ internal class LockGlyphButton(context: Context) : View(context), Styled {
         isClickable = true
         isFocusable = true
         isLongClickable = true
+        importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
         contentDescription = describe(word)
         setOnClickListener {
             if (tick) performHapticFeedback(HapticFeedbackConstants.CONFIRM)
@@ -101,8 +102,8 @@ internal class LockGlyphButton(context: Context) : View(context), Styled {
 
     private fun describe(value: String): String = when (value) {
         "live" -> "Broadcast Lock. A share is live and the lock holds. Tap for nothing. Hold to arm."
-        "locked" -> "Broadcast Lock is on. Hold to arm or disarm."
-        "armed" -> "Broadcast Lock is armed. Tap to lock now. Hold to disarm."
-        else -> "Broadcast Lock is off. Tap to lock now. Hold to arm it for the next share."
+        "locked" -> "Unlock the panel"
+        "armed" -> "Broadcast Lock is armed. Tap to lock the panel. Hold to disarm."
+        else -> "Lock the panel"
     }
 }

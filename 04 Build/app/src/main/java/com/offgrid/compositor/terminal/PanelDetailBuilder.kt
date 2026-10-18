@@ -188,7 +188,7 @@ internal fun TerminalPanel.folderHeading(folder: PanelFolder): View {
     })
     row.addView(names, LinearLayout.LayoutParams(0, WRAP, 1f))
     ring.isVisible = look.ring
-    ring.spinning = look.ring
+    ring.spinning = look.ring && GlowClock.isLive
     return row
 }
 

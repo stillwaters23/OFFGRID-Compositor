@@ -36,11 +36,11 @@ internal fun TerminalPanel.applyLook() {
     expanded.alpha = contentAlpha
     pill.alpha = contentAlpha
     scanLine.isVisible = current.scanLine && !minimized
-    pillRing.isVisible = current.ring
-    pillRing.spinning = minimized && current.ring
+    pillRing.isVisible = minimized && current.ring
+    pillRing.spinning = minimized && current.ring && GlowClock.isLive
     headingRing?.let {
         it.isVisible = current.ring
-        it.spinning = current.ring
+        it.spinning = current.ring && GlowClock.isLive
     }
     styleTyper(statusLine, current.status, STATUS_SP)
     guidance?.let { styleGuidance(it) }

@@ -81,12 +81,13 @@ internal class HoloRingView(context: Context, private val special: Boolean = fal
     }
 
     private fun refreshSpin() {
-        if (spinning && shown) {
+        val want = spinning && shown && ValueAnimator.areAnimatorsEnabled() && GlowClock.isLive
+        if (want) {
             if (spin == null) {
                 spin = ObjectAnimator.ofFloat(this, ROTATION, rotation, rotation + 360f).apply {
                     duration = TURN_MS
                     interpolator = LinearInterpolator()
-                    repeatCount = ValueAnimator.INFINITE
+                    repeatCount = 0
                     start()
                 }
             }

@@ -92,6 +92,7 @@ internal fun MainActivity.onMicPermission(granted: Boolean) {
      * match their typed values. The camera and the mic are both let go while the app is hidden.
      */
 internal fun MainActivity.applyCapture() {
+        if (!afterFirstFrame || !effectsReady() || !micReady()) return
         val settings = effects.engine.settings
         val cameraWanted = settings.on(MicKeys.CAM_ON, true)
         val blocked = settings.on(FxKeys.MIC_BLOCKED)
@@ -139,6 +140,7 @@ internal fun MainActivity.askForMic() {
 
     /** Black picture with the effects drawn over it, instead of the camera. */
 internal fun MainActivity.showDark(on: Boolean) {
+        if (!darkStageReady()) return
         if (on == cameraDark) return
         cameraDark = on
         if (on) {
@@ -187,6 +189,15 @@ internal fun MainActivity.showPermissionHelp() {
 internal fun MainActivity.showMessage(textRes: Int, buttonMode: MainActivity.ButtonMode) {
         if (playRequested && buttonMode != MainActivity.ButtonMode.LIVE && buttonMode != MainActivity.ButtonMode.RECORDING) {
             hidePlayback()
+        }
+        val current = terminalPanel.statusLine.contentDescription?.toString().orEmpty()
+        val cameraBind =
+            textRes == R.string.camera_starting ||
+                textRes == R.string.camera_missing ||
+                textRes == R.string.camera_failed
+        if (cameraBind && current.startsWith("Locked:")) {
+            shownMessage = textRes
+            return
         }
         shownMessage = textRes
         val words = if (buttonMode == MainActivity.ButtonMode.RECORDING) {
@@ -252,6 +263,14 @@ internal fun MainActivity.screenEdges(insets: WindowInsetsCompat): ScreenEdges {
             gestureBottom = maxOf(gestures.bottom, mandatory.bottom),
             cornerRadius = corner,
         )
+    }
+
+/** Immersive only while Broadcast Lock hid the panel. Editing must keep the bars. */
+internal fun shouldHideSystemBars(broadcastLocked: Boolean): Boolean = broadcastLocked
+
+internal fun MainActivity.showSystemBars() {
+        val controller = WindowInsetsControllerCompat(window, window.decorView)
+        controller.show(WindowInsetsCompat.Type.systemBars())
     }
 
 internal fun MainActivity.hideSystemBars() {

@@ -23,7 +23,13 @@
     <string name="try_again">Try again</string>
     <string name="open_settings">Open Settings</string>
     <!-- Phase 1.2: shown once on the stage after the first shrink. The pill is gone. -->
-    <string name="coach_panel_open">Panel hidden. Hold one finger here for one second to bring it back.</string>
+    <string name="coach_panel_open">Panel hidden. Tap the OFFGRID tab, or press Back, to bring it back.</string>
+    <string name="terminal_panel_hidden">Panel hidden. Tap the OFFGRID tab, or press Back, to bring it back.</string>
+    <string name="terminal_unlock">Unlock</string>
+    <string name="terminal_locked_label">LOCKED</string>
+    <string name="terminal_edit_locked">Panel is locked. Back, the menu, and Unlock still work. Tap the lock or press Back to unlock.</string>
+    <string name="terminal_edit_unlocked">The panel is unlocked. You can edit again.</string>
+    <string name="terminal_unlock_to_edit">Unlock the panel to change settings. Tap the lock, or press Back.</string>
     <string name="mic_toggle_on">Microphone on. Tap to turn it off.</string>
     <string name="mic_toggle_off">Microphone off. Tap to turn it on.</string>
     <string name="mic_toggle_blocked">Microphone blocked. Open Microphone Effects to unblock it.</string>
@@ -180,7 +186,8 @@
     <string name="fx_ink_cleared">Your drawing is wiped off the video.</string>
     <string name="fx_kicked">You were kicked from %1$s. Wait a moment. Then tap Open %1$s and ask to join again yourself. Never use auto rejoin. It can get you banned.</string>
     <string name="fx_opened_app">%1$s is open. Ask to join again with your own tap.</string>
-    <string name="fx_opened_store">%1$s is not on this phone, so the app store is open.</string>
+    <string name="fx_opened_store">%1$s is not installed. OFFGRID will not open the Play Store.</string>
+    <string name="fx_app_missing">%1$s is not installed on this phone. Install it yourself, then tap Open again. OFFGRID will not send you to the Play Store.</string>
     <string name="fx_open_failed">%1$s could not open on this phone.</string>
     <string name="fx_no_video">There is no video yet. Tap Record first.</string>
     <string name="fx_saving">Saving to your gallery now.</string>

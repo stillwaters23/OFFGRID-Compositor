@@ -37,7 +37,7 @@ internal object WheelPhysics {
     fun frictionAfter(frames: Int): Double = FRICTION.pow(frames.coerceAtLeast(0))
 
     /**
-     * One frame. Finger-up is positive: the wheel rolls toward higher numbers.
+     * One frame. The wheel follows the finger: a swipe up lowers the number.
      * [reducedMotion] lands on the nearest number in this same step.
      */
     fun step(position: Double, velocity: Double, reducedMotion: Boolean = false): Sample {
@@ -65,15 +65,15 @@ internal object WheelPhysics {
     /** Drag distance for this event, and the velocity to keep when the finger lifts. */
     fun dragDelta(dyPixels: Double, dtMs: Double, pixelsPerNotch: Double = PIXELS_PER_NOTCH): Pair<Double, Double> {
         val notch = pixelsPerNotch.coerceAtLeast(1.0)
-        val delta = -dyPixels / notch
+        val delta = dyPixels / notch
         val velocity = delta * (FRAME_MS / dtMs.coerceAtLeast(8.0))
         return delta to velocity
     }
 
-    /** Pixel speed from a fling, turned into notches per 60fps frame. Up is positive. */
+    /** Pixel speed from a fling, turned into notches per 60fps frame. Swipe up lowers the number. */
     fun flingNotchesPerFrame(yVelocityPxPerSecond: Double, pixelsPerNotch: Double): Double {
         val notch = pixelsPerNotch.coerceAtLeast(1.0)
-        return (-yVelocityPxPerSecond / notch * (FRAME_MS / 1000.0)).coerceIn(-8.0, 8.0)
+        return (yVelocityPxPerSecond / notch * (FRAME_MS / 1000.0)).coerceIn(-8.0, 8.0)
     }
 
     fun keyTarget(current: Int, key: Key): Int = when (key) {

@@ -1,5 +1,8 @@
 package com.offgrid.compositor.terminal
 
+import android.os.SystemClock
+import android.util.Log
+import com.offgrid.compositor.audio.clicker.ClickerSoundEngine
 import com.offgrid.compositor.audio.clicker.ClickerSoundSynth
 
 internal val CLICKER_STYLES = listOf("soft", "wood", "digital", "rubber", "glass", "metal", "muted")
@@ -12,15 +15,25 @@ internal fun TerminalPanel.syncClicker() {
     clickerVolume = store.number(PanelTree.CLICKER_VOLUME)
 }
 
-/** One notch on a width or height drum. Silent when the clicker is off. */
+/** One notch or settle on a width or height drum. Silent when the clicker is off. */
 internal fun TerminalPanel.playWheelClick(value: Int) {
-    if (!clickerEnabled) return
+    clickerEnabled = store.toggle(PanelTree.CLICKER_ENABLED)
+    if (!clickerEnabled) {
+        Log.i(ClickerSoundEngine.TAG, "SoundPool play skipped clicker off")
+        return
+    }
+    val now = SystemClock.uptimeMillis()
+    if (value == lastWheelClickValue && now - lastWheelClickAt < CLICK_GAP_MS) return
+    lastWheelClickValue = value
+    lastWheelClickAt = now
     clickerSounds.play(
         clickerStyle.coerceIn(0, ClickerSoundSynth.STYLE_COUNT - 1),
         ClickerSoundSynth.mixTone(clickerVariant, value),
         clickerVolume,
     )
 }
+
+private const val CLICK_GAP_MS = 35L
 
 /** The Auric laser color, or the panel edge when the saved hex is missing. */
 internal fun TerminalPanel.auricLaserColor(): Int {

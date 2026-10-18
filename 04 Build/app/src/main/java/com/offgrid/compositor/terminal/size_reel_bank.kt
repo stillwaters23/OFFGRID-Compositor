@@ -127,9 +127,13 @@ internal class SizeReelBank(
         setValue(value)
         onValueChanged = { number ->
             boxFor(key).let { box -> if (!box.hasFocus()) box.show(number) }
+            onNotch(number)
             onChange(key, number, false)
         }
-        onValueSettled = { number -> onChange(key, number, true) }
+        onValueSettled = { number ->
+            onNotch(number)
+            onChange(key, number, true)
+        }
         onNotch = onNotch
     }
 

@@ -5,14 +5,12 @@ import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.InsetDrawable
 import android.text.InputFilter
 import android.text.InputType
-import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.LinearLayout
-import android.widget.PopupMenu
 import android.widget.TextView
 import com.offgrid.compositor.R
 import com.offgrid.compositor.effects.FxKeys
@@ -28,6 +26,7 @@ internal class TopBar(
     onToggle: (String, Boolean, String) -> Unit,
     private val onDimensionChanged: (String, Int) -> Unit,
     onViewModeChanged: (Int) -> Unit,
+    onOpenMenu: () -> Unit = {},
     onLockTapped: () -> Unit = {},
     onLockHeld: () -> Unit = {},
     private val onNotch: (Int) -> Unit = {},
@@ -39,7 +38,7 @@ internal class TopBar(
     val heightReel: DrumReelView
     private val widthControl: FrameLayout
     private val heightControl: FrameLayout
-    private val titleView: TextView
+    private val titleView: FitTextView
     private val camera = QuickToggleView(context, false, prefs.toggle(FxKeys.CAMERA_ON, true))
     private val microphone = QuickToggleView(context, true, prefs.toggle(FxKeys.MIC_ON, false))
     private val moreButton: View
@@ -62,20 +61,22 @@ internal class TopBar(
         clipChildren = false
         clipToPadding = false
         setPadding(Hud.dpi(context, 8f), 0, Hud.dpi(context, 8f), 0)
-        contentDescription = context.getString(R.string.terminal_drag)
+        // A group description hides Lock, Minus, and the menu from TalkBack and UI tests.
+        importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
 
         backOrb.layoutParams = LayoutParams(controlWidth, Hud.dpi(context, CONTROL_HEIGHT_DP))
         addView(backOrb)
-        titleView = TextView(context).apply {
+        titleView = FitTextView(context).apply {
             text = context.getString(R.string.terminal_title)
             typeface = Hud.monoBold(context)
             textSize = 12f
             includeFontPadding = false
             letterSpacing = 0.08f
-            maxLines = 1
-            ellipsize = TextUtils.TruncateAt.END
+            fitWholeLine = false
+            maxLines = 2
             setShadowLayer(Hud.dp(context, 1.5f), 0f, 0f, Hud.withAlpha(NeonPalette.ELECTRIC_PURPLE, 0.2f))
             gravity = Gravity.CENTER_VERTICAL
+            contentDescription = context.getString(R.string.terminal_title)
         }
         addView(titleView, LayoutParams(0, Hud.dpi(context, CONTROL_HEIGHT_DP), 1f).apply {
             marginStart = sideGap
@@ -108,7 +109,7 @@ internal class TopBar(
         addControl(lockButton, controlWidth)
         moreButton = MoreButton(context).apply {
             contentDescription = context.getString(R.string.terminal_menu_button)
-            setOnClickListener { showViewMenu(this, onViewModeChanged) }
+            setOnClickListener { onOpenMenu() }
         }
         addControl(moreButton, controlWidth)
         shrinkButton = ShrinkButton(context).apply {
@@ -161,7 +162,9 @@ internal class TopBar(
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         super.onLayout(changed, left, top, right, bottom)
         laidOutWidth = right - left
-        titleView.textSize = if (laidOutWidth < Hud.dpi(context, 480f)) 9f else 12f
+        // Never change textSize here. TextView.textSize is px, the setter is sp,
+        // so assigning 9f/12f every pass asks for another layout forever.
+        // FitTextView already shrinks the title to the reserved width.
     }
 
     fun setDimensions(width: Int, height: Int) {
@@ -210,17 +213,6 @@ internal class TopBar(
         }
         camera.applyAccent(look.edge, look.outerGlow)
         microphone.applyAccent(look.edge, look.outerGlow)
-    }
-
-    private fun showViewMenu(anchor: View, onViewModeChanged: (Int) -> Unit) {
-        PopupMenu(context, anchor).apply {
-            menu.add("Big tiles").setOnMenuItemClickListener { onViewModeChanged(0); true }
-            menu.add("List").setOnMenuItemClickListener { onViewModeChanged(1); true }
-            menu.add("Grid 2").setOnMenuItemClickListener { onViewModeChanged(2); true }
-            menu.add("Grid 3").setOnMenuItemClickListener { onViewModeChanged(3); true }
-            PanelPopups.track(this)
-            show()
-        }
     }
 
     private fun dimensionInput(
@@ -338,7 +330,7 @@ internal class TopBar(
     private companion object {
         const val CONTROL_HEIGHT_DP = 40f
         const val FIXED_CONTROLS = 6
-        const val MIN_TITLE_DP = 36f
+        const val MIN_TITLE_DP = 72f
         const val MIN_CONTROL_DP = 28f
     }
 }

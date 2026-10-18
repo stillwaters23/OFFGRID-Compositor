@@ -49,7 +49,7 @@ internal class ColorEditorView(
         })
         addView(top, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
         addView(label(R.string.terminal_color_swatches))
-        neonColors = NeonColorRow(context, store.color(part), ::onSwatch)
+        neonColors = NeonColorRow(context, store.color(part), ::lockReason, ::onSwatch, ::onLockedColor)
         addView(neonColors, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
 
         val systemItem = ToggleItem(
@@ -99,6 +99,18 @@ internal class ColorEditorView(
             topMargin = Hud.dpi(context, 4f)
         })
         refresh()
+        post { announceLockedSwatch() }
+        postDelayed({ announceLockedSwatch() }, 500)
+    }
+
+    /** Types the lock reason after the folder-open line, so White/Black are never silent. */
+    private fun announceLockedSwatch() {
+        val preferred = when (part) {
+            ColorPart.SKIN -> NeonPalette.swatches.firstOrNull { it.name == "White" }?.color
+            ColorPart.TEXT, ColorPart.STATUS -> NeonPalette.swatches.firstOrNull { it.name == "Black" }?.color
+            else -> null
+        } ?: return
+        lockReason(preferred)?.let { say(it) }
     }
 
     private fun label(textRes: Int) = TextView(context).apply {
@@ -129,8 +141,8 @@ internal class ColorEditorView(
     }
 
     private fun onHex(color: Int) {
-        if (!acceptsNumberColor(color)) {
-            rejectNumberColor()
+        lockReason(color)?.let { reason ->
+            rejectColor(reason)
             return
         }
         store.setCustom(part, color, RainbowMix.split(color))
@@ -140,18 +152,26 @@ internal class ColorEditorView(
     }
 
     private fun onSwatch(color: Int) {
+        lockReason(color)?.let { reason ->
+            rejectColor(reason)
+            return
+        }
         store.setCustom(part, color, RainbowMix.split(color))
         refresh()
         onLookChanged()
         say(context.getString(R.string.terminal_color_saved, part.title, RainbowMix.hex(color)))
     }
 
+    private fun onLockedColor(reason: String) {
+        say(reason)
+    }
+
     private fun onNumber(index: Int, value: Int, announce: Boolean) {
         val weights = IntArray(RainbowMix.NAMES.size) { boxes.getOrNull(it)?.value ?: 0 }
         weights[index] = value
         val color = RainbowMix.mix(weights)
-        if (!acceptsNumberColor(color)) {
-            rejectNumberColor()
+        lockReason(color)?.let { reason ->
+            rejectColor(reason)
             return
         }
         store.setCustom(part, color, weights)
@@ -165,9 +185,11 @@ internal class ColorEditorView(
     }
 
     private fun onSystem(on: Boolean) {
-        if (on && !acceptsNumberColor(store.part(part).role.resolve(context))) {
-            rejectNumberColor()
-            return
+        if (on) {
+            lockReason(store.part(part).role.resolve(context))?.let { reason ->
+                rejectColor(reason)
+                return
+            }
         }
         store.setSystem(part, on)
         refresh()
@@ -183,29 +205,37 @@ internal class ColorEditorView(
         say(context.getString(R.string.terminal_color_reset_done, part.title))
     }
 
-    private fun acceptsNumberColor(color: Int): Boolean {
+    private fun lockReason(color: Int): String? {
+        val skin = store.color(ColorPart.SKIN)
+        val text = store.color(ColorPart.TEXT)
+        val status = store.color(ColorPart.STATUS)
+        ContrastGuard.lockReason(part, color, skin, text, status)?.let { return it }
         val backgrounds = when (part) {
             ColorPart.NUMBER_DARK -> (Theme.entries.map { store.preview(it)[0] } +
                 NumberColorGuard.DARK_BACKGROUND).let { themes ->
-                if (NumberColorGuard.luminance(store.color(ColorPart.SKIN)) < 0.35) {
-                    themes + store.color(ColorPart.SKIN)
+                if (NumberColorGuard.luminance(skin) < 0.35) {
+                    themes + skin
                 } else {
                     themes
                 }
             }
-            ColorPart.NUMBER_LIGHT -> if (NumberColorGuard.luminance(store.color(ColorPart.SKIN)) >= 0.35) {
-                listOf(NumberColorGuard.LIGHT_BACKGROUND, store.color(ColorPart.SKIN))
+            ColorPart.NUMBER_LIGHT -> if (NumberColorGuard.luminance(skin) >= 0.35) {
+                listOf(NumberColorGuard.LIGHT_BACKGROUND, skin)
             } else {
                 listOf(NumberColorGuard.LIGHT_BACKGROUND)
             }
-            else -> return true
+            else -> return null
         }
-        return backgrounds.all { NumberColorGuard.accepts(color, it) }
+        return if (backgrounds.all { NumberColorGuard.accepts(color, it) }) {
+            null
+        } else {
+            context.getString(R.string.terminal_color_low_contrast, part.title)
+        }
     }
 
-    private fun rejectNumberColor() {
+    private fun rejectColor(reason: String) {
         refresh()
-        say(context.getString(R.string.terminal_color_low_contrast, part.title))
+        say(reason)
     }
 
     private companion object {

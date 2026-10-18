@@ -22,6 +22,12 @@ internal object EffectFolders {
         tag = null,
         kind = FolderKind.EFFECTS,
         items = listOf(
+            ActionItem(
+                PanelAction.COPY_PAIRING_KEY,
+                "Copy pairing key",
+                "Copies the pairing key and stays here. Send it to a PC or an Android phone, then enter the pairing address and port there.",
+            ),
+            ActionItem(PanelAction.REMOTE_OPEN_PAIRING, "Pairing", "Make, paste, forget, or replace a secure local key. Pair a PC or an Android phone on this Wi-Fi."),
             ToggleItem(FxKeys.AUTO_CURTAIN_ON, "Auto blackout when idle", "Turns the stream solid black, white, or your color when no effect or mic is on.", true, isTest = false),
             ChoiceItem(
                 FxKeys.AUTO_CURTAIN_MODE,
@@ -59,9 +65,8 @@ internal object EffectFolders {
                 ),
                 FxKeys.REMOTE_ROLE_OFF,
             ),
-            ActionItem(PanelAction.REMOTE_OPEN_PAIRING, "Pairing", "Make, paste, forget, or replace a secure local key. Shows this phone's Wi-Fi address and port for the remote phone."),
             ActionItem(PanelAction.REMOTE_OPEN_PREVIEW, "Remote preview", "Find the camera phone on this Wi-Fi network, or type its address from the Pairing screen."),
-            ToggleItem(FxKeys.LIVE_PC_ON, "Send to PC", "Send the finished picture to OBS on your local network.", false, isTest = false),
+            ToggleItem(FxKeys.LIVE_PC_ON, "Send to PC", "Send the finished picture to OBS on a PC, or keep using the Android phone link above.", false, isTest = false),
             ChoiceItem(
                 FxKeys.LIVE_PC_PROTOCOL,
                 "PC protocol",
@@ -89,6 +94,7 @@ internal object EffectFolders {
             "The controls and overlay never go into the finished picture.",
             "Collapse the panel to its bubble before sharing your screen.",
             "Normal Bigo camera live shows Bigo's camera, not OFFGRID's effects.",
+            "Pairing works for a PC or an Android phone on the same Wi-Fi.",
             "For the PC route, OBS receives the finished picture over SRT or RTMP.",
             "Check Bigo and TikTok rules. Never fake viewers, gifts, or engagement.",
         ),
@@ -743,12 +749,12 @@ internal object EffectFolders {
             ToggleItem(
                 FxKeys.SWEEP_GO_PREFIX + id,
                 "Red sweep on kick",
-                "When you tap I got kicked, a red carpet sweeps across your video.",
+                "When you tap I got kicked, a red carpet sweeps across OFFGRID's own video. It cannot change TikTok or other apps.",
                 true,
                 isTest = false,
             ),
-            ActionItem(PanelAction.KICKED, "I got kicked", "Tells you what to do next. It never rejoins for you.", id),
-            ActionItem(PanelAction.OPEN_PLATFORM, "Open $title", "Opens $title, so you can ask to join again yourself.", id),
+            ActionItem(PanelAction.KICKED, "I got kicked", "Runs the OFFGRID kick sweep on this overlay. It never taps or rejoins another app.", id),
+            ActionItem(PanelAction.OPEN_PLATFORM, "Open $title", "Opens $title if it is installed. If it is not, OFFGRID says so here. It never opens the Play Store.", id),
             ActionItem(
                 PanelAction.SAFE_START,
                 "Use safe start",

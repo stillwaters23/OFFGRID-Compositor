@@ -235,7 +235,7 @@ internal class FolderTile(context: Context, private val folder: PanelFolder, ico
         count.setTextColor(if (look.base == Theme.SYSTEM) look.text else look.folder)
         val showRing = active && look.ring
         ring.visibility = if (showRing) VISIBLE else INVISIBLE
-        ring.spinning = showRing
+        ring.spinning = showRing && GlowClock.isLive
     }
 }
 
@@ -706,6 +706,7 @@ internal class ShrinkButton(context: Context) : View(context), Styled {
     init {
         isClickable = true
         isFocusable = true
+        importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_YES
     }
 
     override fun applyLook(look: PanelLook) {

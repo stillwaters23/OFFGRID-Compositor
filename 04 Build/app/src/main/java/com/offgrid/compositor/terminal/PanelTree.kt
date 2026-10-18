@@ -103,6 +103,7 @@ internal enum class PanelAction {
     REMOTE_OPEN_PAIRING,
     REMOTE_OPEN_PREVIEW,
     LIVE_SEND_TO_PC,
+    COPY_PAIRING_KEY,
     OPEN_EFFECT_LINK,
 
     /** Opens the system file picker for one local AR clip. No library permission. */
@@ -263,7 +264,7 @@ internal object PanelTree {
 
     /**
      * Panel settings. Every control sits inside a folder. Nothing is loose here.
-     * The theme office is the Themes, Colors, and Glow effects folders.
+     * The theme office is Theme mode, Themes, Colors, and Glow effects.
      */
     private fun settingsFolder() = PanelFolder(
         id = "panel_settings",
@@ -275,6 +276,7 @@ internal object PanelTree {
             displayFolder(),
             glowFolder(),
             colorsFolder(),
+            themeModeFolder(),
             auricWheelFolder(),
             clickerSoundsFolder(),
             themesFolder(),
@@ -474,11 +476,11 @@ internal object PanelTree {
         title = "📁 Themes",
         tag = null,
         kind = FolderKind.OFFICE,
-        folders = listOf(themeModeFolder(), toggleStyleFolder(), presetsFolder()),
+        folders = listOf(toggleStyleFolder(), presetsFolder()),
         items = listOf(ThemeItem(Theme.SYSTEM)),
         notes = listOf(
             "System is the only built-in theme.",
-            "Its black and white colors follow Auto, Day, or Night.",
+            "Its black and white colors follow Auto, Day, or Night in Theme mode.",
         ),
     )
 
@@ -597,12 +599,12 @@ internal object PanelTree {
     )
 
     private val PART_HELP = mapOf(
-        ColorPart.SKIN to "This colors the panel glass.",
+        ColorPart.SKIN to "This colors the panel glass. A color that hides text is locked.",
         ColorPart.NUMBER_DARK to "This colors numbers on dark panels. Keep at least 4.5 to 1 contrast.",
         ColorPart.NUMBER_LIGHT to "This colors numbers on light panels. Keep at least 4.5 to 1 contrast.",
         ColorPart.EDGE to "This colors the thin line around the panel.",
         ColorPart.OUTER_GLOW to "This colors the soft glow outside the panel.",
-        ColorPart.TEXT to "This colors the typed guidance text.",
+        ColorPart.TEXT to "This colors the typed guidance text. A color that fails 4.5 to 1 contrast on the skin is locked.",
         ColorPart.CURSOR to "This colors the laser cursor. It is one solid color.",
         ColorPart.FOLDER to "This colors the folder icons.",
         ColorPart.STATUS to "This colors the status line at the top.",
@@ -710,6 +712,16 @@ internal object PanelTree {
 
     private val PLATFORMS = listOf(
         Platform(
+            "kick",
+            "Kick",
+            Guide(
+                canDo = "Kick's help says phone apps can go live with a stream key.",
+                cantDo = "Never paste your stream key in chat. Other limits: UNCONFIRMED.",
+                where = "Copy the stream key from the Kick dashboard in a browser. Exact address: UNCONFIRMED.",
+                browser = "UNCONFIRMED.",
+            ),
+        ),
+        Platform(
             "bigo_live",
             "Bigo Live",
             Guide(
@@ -752,16 +764,6 @@ internal object PanelTree {
             ),
         ),
         Platform("twitch", "Twitch", KEY_NOT_CHECKED),
-        Platform(
-            "kick",
-            "Kick",
-            Guide(
-                canDo = "Kick's help says phone apps can go live with a stream key.",
-                cantDo = "Never paste your stream key in chat. Other limits: UNCONFIRMED.",
-                where = "Copy the stream key from the Kick dashboard in a browser. Exact address: UNCONFIRMED.",
-                browser = "UNCONFIRMED.",
-            ),
-        ),
         Platform(
             "youtube_live",
             "YouTube Live",

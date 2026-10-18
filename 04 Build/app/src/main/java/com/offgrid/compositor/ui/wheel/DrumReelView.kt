@@ -202,11 +202,12 @@ internal class DrumReelView(context: Context) : View(context) {
             MotionEvent.ACTION_MOVE -> {
                 velocityTracker?.addMovement(event)
                 val now = SystemClock.uptimeMillis()
+                parent?.requestDisallowInterceptTouchEvent(true)
                 if (!dragging && abs(event.y - downY) > touchSlop) dragging = true
                 if (dragging) {
                     val dy = event.y - lastY
                     val dt = (now - lastMoveAt).coerceAtLeast(8L)
-                    val (delta, nextVelocity) = WheelPhysics.dragDelta(dy.toDouble(), dt.toDouble(), 28.0 * density)
+                    val (delta, nextVelocity) = WheelPhysics.dragDelta(dy.toDouble(), dt.toDouble(), 16.0 * density)
                     velocity = nextVelocity
                     updatePosition((position + delta).toFloat())
                     parent?.requestDisallowInterceptTouchEvent(true)
@@ -224,7 +225,7 @@ internal class DrumReelView(context: Context) : View(context) {
                     velocityTracker?.computeCurrentVelocity(1000)
                     velocity = WheelPhysics.flingNotchesPerFrame(
                         velocityTracker?.yVelocity?.toDouble() ?: 0.0,
-                        28.0 * density,
+                        16.0 * density,
                     )
                     lastFrame = SystemClock.uptimeMillis()
                     postFrame()
@@ -355,6 +356,7 @@ internal class DrumReelView(context: Context) : View(context) {
             position = WheelPhysics.snap(sample.position).toFloat()
             invalidate()
             isInteracting = false
+            onNotch?.invoke(value)
             onValueSettled?.invoke(value)
             return@Runnable
         }

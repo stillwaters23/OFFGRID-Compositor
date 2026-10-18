@@ -5,8 +5,7 @@ import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import android.widget.Toast
-import androidx.activity.ComponentActivity
-import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.ActivityResultLauncher
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import com.offgrid.compositor.terminal.TerminalPanel
@@ -36,6 +35,7 @@ internal class LiveIntegration(
     processor: () -> CompositorProcessor?,
     private val lock: BroadcastLockStore,
     panel: TerminalPanel,
+    private val pickArVideo: ActivityResultLauncher<Intent>?,
 ) : DefaultLifecycleObserver {
     private val appContext = activity.applicationContext
     private val main = Handler(Looper.getMainLooper())
@@ -67,13 +67,6 @@ internal class LiveIntegration(
     )
     private var activity: Activity? = activity
     private var activeRole = "off"
-    private val pickArVideo = (activity as? ComponentActivity)?.registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult(),
-    ) { result ->
-        if (result.resultCode != Activity.RESULT_OK) return@registerForActivityResult
-        val uri = result.data?.data ?: return@registerForActivityResult
-        onArClipPicked(uri)
-    }
 
     init {
         host.onPcOutputChanged = { enabled -> if (enabled) pc.startFromSettings() else pc.stop() }
@@ -201,6 +194,7 @@ internal class LiveIntegration(
                 lock.arm()
             }
             LiveActions.OPEN_PAIRING -> launch(PairingActivity::class.java)
+            LiveActions.COPY_PAIRING_KEY -> copyPairingKey()
             LiveActions.OPEN_PREVIEW -> launch(RemotePreviewActivity::class.java)
             LiveActions.SEND_TO_PC -> pc.startFromSettings()
             PanelAction.AR_PICK_CLIP.name -> pickArVideo?.launch(ArDeckCatalog.pickIntent())
@@ -208,7 +202,7 @@ internal class LiveIntegration(
         }
     }
 
-    private fun onArClipPicked(uri: android.net.Uri) {
+    internal fun onArClipPicked(uri: android.net.Uri) {
         val owner = activity ?: return
         runCatching {
             owner.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -231,6 +225,33 @@ internal class LiveIntegration(
         if (lock.unlock() == UnlockResult.REFUSED_SHARE_VISIBLE) {
             tellPhone2Status("Unlock refused. A screen share is live.")
         }
+    }
+
+    /** Copies the pairing key and stays on Live and Remote. Works for a PC or an Android phone. */
+    private fun copyPairingKey() {
+        pairing.loadKey(
+            onLoaded = { _, _ ->
+                try {
+                    pairing.copyCurrentKey()
+                    tellPhone2Status("Pairing key copied. Paste it on a PC or an Android phone.")
+                } catch (error: IllegalStateException) {
+                    tellPhone2Status(error.message ?: "Make a pairing key first.")
+                }
+            },
+            onFailure = {
+                pairing.makeKey(
+                    onCreated = { _, _ ->
+                        try {
+                            pairing.copyCurrentKey()
+                            tellPhone2Status("Pairing key made and copied. Paste it on a PC or an Android phone.")
+                        } catch (error: IllegalStateException) {
+                            tellPhone2Status(error.message ?: "Could not copy the pairing key.")
+                        }
+                    },
+                    onFailure = { reason -> tellPhone2Status(reason) },
+                )
+            },
+        )
     }
 
     /** No OFFGRID screen opens over the stage while it is locked, whoever asked (panel or Phone 2). */
@@ -411,6 +432,7 @@ internal class LiveIntegration(
             processor: () -> CompositorProcessor?,
             lock: BroadcastLockStore,
             panel: TerminalPanel,
-        ): LiveIntegration = LiveIntegration(activity, effects, processor, lock, panel)
+            pickArVideo: ActivityResultLauncher<Intent>?,
+        ): LiveIntegration = LiveIntegration(activity, effects, processor, lock, panel, pickArVideo)
     }
 }

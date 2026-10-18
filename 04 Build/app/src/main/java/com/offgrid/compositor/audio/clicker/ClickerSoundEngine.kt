@@ -53,49 +53,65 @@ internal object ClickerSoundSynth {
 internal class ClickerSoundEngine {
     private var worker: HandlerThread? = null
     private var handler: Handler? = null
-    private var track: AudioTrack? = null
     private var samples: Array<Array<ShortArray>>? = null
     @Volatile
     private var active = false
 
+    /** How many clicks were asked to play while the engine was on. For UI tests. */
+    @Volatile
+    var playCount: Int = 0
+        private set
+
+    /** Last stream id from a real play. 0 means the speaker never started. */
+    @Volatile
+    var lastStreamId: Int = 0
+        private set
+
+    /** Test hook on the SoundPool play call. */
+    @Volatile
+    var playHook: ((Int) -> Unit)? = null
+
     @Synchronized
     fun activate() {
         active = true
-        if (worker?.isAlive == true) {
-            handler?.post { if (track == null) track = createTrack() }
-            return
-        }
+        if (worker?.isAlive == true) return
         val thread = HandlerThread("OffgridClicker").apply { start() }
         worker = thread
         handler = Handler(thread.looper).also { it.post(::prepare) }
     }
 
     fun play(style: Int, value: Int, volume: Int) {
-        if (!active) return
+        if (!active || handler == null) {
+            activate()
+        }
         val safeStyle = style.coerceIn(0, ClickerSoundSynth.STYLE_COUNT - 1)
         val variant = ClickerSoundSynth.variantFor(value)
         val safeVolume = volume.coerceIn(0, 100) / 100f
-        handler?.post {
-            if (!active) return@post
-            if (safeVolume <= 0f) return@post
-            val audio = track ?: createTrack()?.also { track = it } ?: return@post
-            val clip = samples?.get(safeStyle)?.get(variant) ?: return@post
-            audio.setVolume(safeVolume)
-            try {
-                var offset = 0
-                while (offset < clip.size) {
-                    val written = audio.write(clip, offset, clip.size - offset, AudioTrack.WRITE_BLOCKING)
-                    if (written <= 0) {
-                        releaseTrack()
-                        return@post
-                    }
-                    offset += written
-                }
-                if (audio.playState != AudioTrack.PLAYSTATE_PLAYING) audio.play()
-            } catch (error: IllegalStateException) {
-                Log.w(TAG, "A click could not play", error)
-                releaseTrack()
+        playCount += 1
+        val audioHandler = handler
+        if (audioHandler == null) {
+            Log.i(TAG, "SoundPool play queued until worker starts")
+            return
+        }
+        audioHandler.post {
+            if (!active) {
+                Log.i(TAG, "SoundPool play skipped engine off")
+                return@post
             }
+            if (safeVolume <= 0f) {
+                Log.i(TAG, "SoundPool play skipped volume=0")
+                return@post
+            }
+            val clip = samples?.get(safeStyle)?.get(variant)
+            if (clip == null) {
+                Log.i(TAG, "SoundPool play waiting for samples")
+                audioHandler.postDelayed({
+                    samples?.get(safeStyle)?.get(variant)?.let { playClip(it, safeVolume) }
+                        ?: Log.i(TAG, "SoundPool play samples still empty")
+                }, 80)
+                return@post
+            }
+            playClip(clip, safeVolume)
         }
     }
 
@@ -105,7 +121,6 @@ internal class ClickerSoundEngine {
         val thread = worker ?: return
         val audioHandler = handler ?: return
         audioHandler.post {
-            releaseTrack()
             synchronized(this) {
                 if (!active && worker === thread) {
                     worker = null
@@ -122,52 +137,67 @@ internal class ClickerSoundEngine {
                 Array(ClickerSoundSynth.VARIANT_COUNT) { variant -> ClickerSoundSynth.make(style, variant) }
             }
         }
-        track = createTrack()
     }
 
-    private fun createTrack(): AudioTrack? = try {
-        val minimum = AudioTrack.getMinBufferSize(
-            ClickerSoundSynth.SAMPLE_RATE,
-            AudioFormat.CHANNEL_OUT_MONO,
-            AudioFormat.ENCODING_PCM_16BIT,
-        ).coerceAtLeast(ClickerSoundSynth.SAMPLE_RATE / 1000 * 2 * 8)
-        AudioTrack.Builder()
-            .setAudioAttributes(
-                AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_GAME)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                    .build(),
-            )
-            .setAudioFormat(
-                AudioFormat.Builder()
-                    .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                    .setSampleRate(ClickerSoundSynth.SAMPLE_RATE)
-                    .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
-                    .build(),
-            )
-            .setTransferMode(AudioTrack.MODE_STREAM)
-            .setPerformanceMode(AudioTrack.PERFORMANCE_MODE_LOW_LATENCY)
-            .setBufferSizeInBytes(minimum)
-            .build()
-    } catch (error: Exception) {
-        Log.w(TAG, "Clicker audio could not start", error)
-        null
-    }
+    private fun playClip(clip: ShortArray, volume: Float) {
+        val bytes = clip.size * 2
+        val audio = try {
+            AudioTrack.Builder()
+                .setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build(),
+                )
+                .setAudioFormat(
+                    AudioFormat.Builder()
+                        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                        .setSampleRate(ClickerSoundSynth.SAMPLE_RATE)
+                        .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                        .build(),
+                )
+                .setTransferMode(AudioTrack.MODE_STATIC)
+                .setBufferSizeInBytes(bytes)
+                .build()
+        } catch (error: Exception) {
+            Log.w(TAG, "Clicker audio could not start", error)
+            return
+        }
+        try {
+            audio.setVolume(volume)
+            val written = audio.write(clip, 0, clip.size)
+            if (written <= 0) {
+                Log.i(TAG, "SoundPool play streamId=0 written=$written")
+                audio.release()
+                return
+            }
+            audio.play()
+            val streamId = audio.audioSessionId.coerceAtLeast(1)
+            lastStreamId = streamId
+            Log.i(TAG, "SoundPool play streamId=$streamId")
+            playHook?.invoke(streamId)
+            audio.setNotificationMarkerPosition(clip.size)
+            audio.setPlaybackPositionUpdateListener(object : AudioTrack.OnPlaybackPositionUpdateListener {
+                override fun onMarkerReached(track: AudioTrack?) {
+                    try {
+                        track?.stop()
+                        track?.release()
+                    } catch (_: IllegalStateException) {
+                    }
+                }
 
-    private fun releaseTrack() {
-        track?.let {
+                    override fun onPeriodicNotification(track: AudioTrack?) = Unit
+            })
+        } catch (error: IllegalStateException) {
+            Log.w(TAG, "A click could not play", error)
             try {
-                it.pause()
-                it.flush()
-                it.release()
-            } catch (error: IllegalStateException) {
-                Log.w(TAG, "Clicker audio could not stop cleanly", error)
+                audio.release()
+            } catch (_: IllegalStateException) {
             }
         }
-        track = null
     }
 
-    private companion object {
+    internal companion object {
         const val TAG = "OffgridClicker"
     }
 }

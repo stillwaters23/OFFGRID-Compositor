@@ -14,11 +14,14 @@ import android.widget.TextView
 internal class NeonColorRow(
     context: Context,
     selectedColor: Int,
+    private val lockReason: (Int) -> String?,
     onColorChanged: (Int) -> Unit,
+    onLocked: (String) -> Unit,
 ) : LinearLayout(context) {
     private val swatchViews = ArrayList<NeonSwatchView>(NeonPalette.swatches.size)
     private val selected = selectedColor
     private val chooseColor = onColorChanged
+    private val lockedColor = onLocked
 
     init {
         orientation = VERTICAL
@@ -43,8 +46,14 @@ internal class NeonColorRow(
                 gravity = Gravity.CENTER_VERTICAL
             }
             group.forEachIndexed { index, swatch ->
-                val swatchView = NeonSwatchView(context, swatch, swatch.color == selected)
+                val reason = lockReason(swatch.color)
+                val swatchView = NeonSwatchView(context, swatch, swatch.color == selected, reason)
                 swatchView.setOnClickListener {
+                    val locked = lockReason(swatch.color)
+                    if (locked != null) {
+                        lockedColor(locked)
+                        return@setOnClickListener
+                    }
                     swatchViews.forEach { it.isSelectedSwatch = it === swatchView }
                     it.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
                     chooseColor(swatch.color)
@@ -100,6 +109,7 @@ internal class NeonColorRow(
         context: Context,
         val swatch: NeonSwatch,
         selected: Boolean,
+        lockReason: String?,
     ) : View(context) {
         private val halo = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = swatch.color
@@ -117,6 +127,18 @@ internal class NeonColorRow(
             strokeWidth = Hud.dp(context, 1f)
             color = 0xFFA8B0C2.toInt()
         }
+        private val lockPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = Hud.dp(context, 1.6f)
+            strokeCap = Paint.Cap.ROUND
+            color = if (NumberColorGuard.luminance(swatch.color) >= 0.35) {
+                0xFF111111.toInt()
+            } else {
+                0xFFF4F4F4.toInt()
+            }
+        }
+        private val locked = lockReason != null
+        private val lockMessage = lockReason
         var isSelectedSwatch = selected
             set(value) {
                 if (field == value) return
@@ -128,7 +150,11 @@ internal class NeonColorRow(
             setLayerType(LAYER_TYPE_SOFTWARE, null)
             isClickable = true
             isFocusable = true
-            contentDescription = "${swatch.name}, ${RainbowMix.hex(swatch.color)}. ${swatch.meaning}"
+            contentDescription = if (locked) {
+                "Locked ${swatch.name}. $lockMessage"
+            } else {
+                "${swatch.name}, ${RainbowMix.hex(swatch.color)}. ${swatch.meaning}"
+            }
         }
 
         override fun onDraw(canvas: Canvas) {
@@ -141,6 +167,26 @@ internal class NeonColorRow(
                 canvas.drawCircle(center, height / 2f, radius, contrastRing)
             }
             if (isSelectedSwatch) canvas.drawCircle(center, height / 2f, Hud.dp(context, 17f), ring)
+            if (locked) {
+                val midY = height / 2f
+                val body = android.graphics.RectF(
+                    center - Hud.dp(context, 4f),
+                    midY - Hud.dp(context, 1f),
+                    center + Hud.dp(context, 4f),
+                    midY + Hud.dp(context, 6f),
+                )
+                canvas.drawRoundRect(body, Hud.dp(context, 1.2f), Hud.dp(context, 1.2f), lockPaint)
+                canvas.drawArc(
+                    center - Hud.dp(context, 2.6f),
+                    midY - Hud.dp(context, 7f),
+                    center + Hud.dp(context, 2.6f),
+                    midY + Hud.dp(context, 1f),
+                    180f,
+                    180f,
+                    false,
+                    lockPaint,
+                )
+            }
         }
     }
 

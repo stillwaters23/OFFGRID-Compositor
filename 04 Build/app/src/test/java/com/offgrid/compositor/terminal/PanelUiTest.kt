@@ -287,12 +287,16 @@ class PanelUiTest {
 
     @Test
     fun themePickerContainsOnlySystemAndModePickerContainsAutoDayNight() {
-        val themes = PanelTree.build().folders.single { it.id == "panel_settings" }
-            .folders.single { it.id == "themes" }
+        val settings = PanelTree.build().folders.single { it.id == "panel_settings" }
+        val themes = settings.folders.single { it.id == "themes" }
         assertEquals(listOf(Theme.SYSTEM), themes.items.filterIsInstance<ThemeItem>().map { it.theme })
         assertEquals(ArchivedTheme.entries.toSet(), ArchivedThemes.definitions.keys)
         assertTrue(ArchivedThemes.definitions.values.all { it.parts.keys.containsAll(ColorPart.entries) })
-        val mode = themes.folders.single { it.id == "theme_mode" }.items.single() as ChoiceItem
+        assertTrue(
+            "Theme mode must sit on Panel settings so a phone user can scroll to it.",
+            themes.folders.none { it.id == "theme_mode" },
+        )
+        val mode = settings.folders.single { it.id == "theme_mode" }.items.single() as ChoiceItem
         assertEquals(listOf("auto", "day", "night"), mode.choices.map { it.value })
     }
 

@@ -26,6 +26,7 @@ internal class MoreButton(context: Context) : View(context), Styled {
     init {
         isClickable = true
         isFocusable = true
+        importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
     }
 
     override fun applyLook(look: PanelLook) {
@@ -255,6 +256,13 @@ internal class PanelMenu(
 
     var isOpen = false
         private set
+
+    /** On-screen box of the menu card, for overlap checks. Empty when closed. */
+    fun cardScreenRect(): android.graphics.Rect {
+        val box = android.graphics.Rect()
+        if (isOpen && visibility == VISIBLE) card.getGlobalVisibleRect(box)
+        return box
+    }
 
     init {
         visibility = GONE

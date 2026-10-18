@@ -132,6 +132,9 @@ internal class PanelGlassDrawable(
         }
 
 
+    /** First present is a flat fill. Blur masks wait until the next frame so cold start can focus. */
+    private var firstPresent = true
+
     var look: PanelLook? = null
         set(value) {
             val reshape = field?.roundness != value?.roundness || field?.holo != value?.holo ||
@@ -591,6 +594,15 @@ internal class PanelGlassDrawable(
     override fun draw(canvas: Canvas) {
         val current = look ?: return
         if (bounds.isEmpty || glass.isEmpty) return
+        if (firstPresent) {
+            firstPresent = false
+            canvas.drawPath(shape, fill)
+            line.strokeWidth = dp(if (pane) 1f else 2f)
+            line.color = current.edge
+            canvas.drawPath(if (fullBleed) edgeShape else shape, line)
+            invalidateSelf()
+            return
+        }
         if (sapphireOn()) {
             drawSapphire(canvas, current)
             if (resizeBarVisible) masksFor()?.let { drawResizeBar(canvas, it, current) }

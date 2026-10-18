@@ -33,9 +33,13 @@ internal class WheelNumberRow(
         reel.setValue(value)
         reel.onValueChanged = { number ->
             if (!fallback.hasFocus()) fallback.show(number)
+            onNotch(number)
             onChange(number, false)
         }
-        reel.onValueSettled = { onChange(it, true) }
+        reel.onValueSettled = { number ->
+            onNotch(number)
+            onChange(number, true)
+        }
         reel.onNotch = onNotch
         addView(reel, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
         addView(fallback, LayoutParams(LayoutParams.MATCH_PARENT, Hud.dpi(context, 46f)).apply {
