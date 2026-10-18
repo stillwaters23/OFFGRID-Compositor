@@ -13,6 +13,8 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.GrantPermissionRule
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
+import com.offgrid.compositor.terminal.ThemeMode
+import com.offgrid.compositor.terminal.refreshLook
 import com.offgrid.compositor.terminal.showMinimized
 import java.io.FileInputStream
 import org.junit.Assert.assertFalse
@@ -80,6 +82,7 @@ class RoyaltyPhoneFixTest {
         assertTrue("lock tap must show Unlock", waitDesc("Unlock the panel") != null)
         shot("02_edit_locked")
         tapOnScreen(requireDesc("More choices: view, sort, and folder size"), "menu")
+        assertTrue("menu must open while locked", waitUntil(8_000) { menuIsOpen() })
         shot("03_menu_while_locked")
         assertStatusClearOfMenu()
         device.pressBack()
@@ -264,11 +267,10 @@ class RoyaltyPhoneFixTest {
 
     @Test
     fun contrastLockBlocksBlackTypewriterOnBlack() {
-        tapFolder("Panel settings")
-        tapFolder("Themes")
-        tapFolder("Theme mode")
-        tapOnScreen(requireText("Night"), "Night")
-        backTowardHome()
+        activity.scenario.onActivity { act ->
+            act.terminalPanel.store.setThemeMode(ThemeMode.NIGHT)
+            act.terminalPanel.refreshLook()
+        }
         tapFolder("Panel settings")
         tapFolder("Colors")
         tapFolder("Typewriter text color")
@@ -285,7 +287,8 @@ class RoyaltyPhoneFixTest {
     @Test
     fun viewMenuDoesNotCoverTheStatusLine() {
         tapOnScreen(requireDesc("More choices: view, sort, and folder size"), "menu")
-        assertTrue(waitTextContains("Done") != null)
+        assertTrue("view menu must open", waitUntil(8_000) { menuIsOpen() })
+        assertTrue(waitTextContains("Big tiles") != null || waitTextContains("List") != null)
         assertStatusClearOfMenu()
         shot("06b_menu_clears_status")
         device.pressBack()
@@ -496,22 +499,30 @@ class RoyaltyPhoneFixTest {
         }
     }
 
+    private fun menuIsOpen(): Boolean {
+        var open = false
+        activity.scenario.onActivity { open = it.terminalPanel.menu.isOpen }
+        return open
+    }
+
     private fun assertStatusClearOfMenu() {
         var status = Rect()
-        var menu = Rect()
+        var card = Rect()
         var statusShown = false
+        var open = false
         activity.scenario.onActivity { act ->
+            open = act.terminalPanel.menu.isOpen
             statusShown = act.terminalPanel.statusLine.isShown
             act.terminalPanel.statusLine.getGlobalVisibleRect(status)
-            act.terminalPanel.menu.getGlobalVisibleRect(menu)
+            card = act.terminalPanel.menu.cardScreenRect()
         }
+        assertTrue("view menu must be open", open)
         assertTrue("status line must stay on screen while the view menu is open", statusShown && status.height() > 4)
+        assertTrue("menu card must be on screen $card", card.height() > 4 && card.width() > 4)
         val overlap = Rect(status)
-        val covers = overlap.intersect(menu) && overlap.width() > 8 && overlap.height() > 8
-        assertFalse(
-            "view menu $menu must not cover the status line $status",
-            covers || status.bottom > menu.top + 8 && status.right > menu.centerX(),
-        )
+        val covers = overlap.intersect(card) && overlap.height() > 8
+        assertFalse("view menu card $card must not cover the status line $status", covers)
+        assertTrue("menu card must start at or below the status line", card.top + 4 >= status.bottom)
     }
 
     private fun shellOutput(command: String): String {

@@ -903,6 +903,7 @@ class TerminalPanel @JvmOverloads constructor(
                 }
                 applyFolderLayout()
             },
+            onOpenMenu = { openMenu() },
         ).apply {
             setOnTouchListener(dragHandle())
         }

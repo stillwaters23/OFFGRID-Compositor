@@ -257,6 +257,13 @@ internal class PanelMenu(
     var isOpen = false
         private set
 
+    /** On-screen box of the menu card, for overlap checks. Empty when closed. */
+    fun cardScreenRect(): android.graphics.Rect {
+        val box = android.graphics.Rect()
+        if (isOpen && visibility == VISIBLE) card.getGlobalVisibleRect(box)
+        return box
+    }
+
     init {
         visibility = GONE
         clipChildren = false

@@ -11,7 +11,6 @@ import android.view.ViewGroup
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.LinearLayout
-import android.widget.PopupMenu
 import android.widget.TextView
 import com.offgrid.compositor.R
 import com.offgrid.compositor.effects.FxKeys
@@ -27,6 +26,7 @@ internal class TopBar(
     onToggle: (String, Boolean, String) -> Unit,
     private val onDimensionChanged: (String, Int) -> Unit,
     onViewModeChanged: (Int) -> Unit,
+    onOpenMenu: () -> Unit = {},
     onLockTapped: () -> Unit = {},
     onLockHeld: () -> Unit = {},
     private val onNotch: (Int) -> Unit = {},
@@ -109,7 +109,7 @@ internal class TopBar(
         addControl(lockButton, controlWidth)
         moreButton = MoreButton(context).apply {
             contentDescription = context.getString(R.string.terminal_menu_button)
-            setOnClickListener { showViewMenu(this, onViewModeChanged) }
+            setOnClickListener { onOpenMenu() }
         }
         addControl(moreButton, controlWidth)
         shrinkButton = ShrinkButton(context).apply {
@@ -213,17 +213,6 @@ internal class TopBar(
         }
         camera.applyAccent(look.edge, look.outerGlow)
         microphone.applyAccent(look.edge, look.outerGlow)
-    }
-
-    private fun showViewMenu(anchor: View, onViewModeChanged: (Int) -> Unit) {
-        PopupMenu(context, anchor).apply {
-            menu.add("Big tiles").setOnMenuItemClickListener { onViewModeChanged(0); true }
-            menu.add("List").setOnMenuItemClickListener { onViewModeChanged(1); true }
-            menu.add("Grid 2").setOnMenuItemClickListener { onViewModeChanged(2); true }
-            menu.add("Grid 3").setOnMenuItemClickListener { onViewModeChanged(3); true }
-            PanelPopups.track(this)
-            show()
-        }
     }
 
     private fun dimensionInput(
