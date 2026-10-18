@@ -276,11 +276,19 @@ class RoyaltyPhoneFixTest {
         tapFolder("Typewriter text color")
         val lockedBlack = waitDescContains("Locked Black")
         assertTrue("Black typewriter on black must show the lock. seen=${visibleLabels()}", lockedBlack != null)
-        tapOnScreen(lockedBlack!!, "Locked Black")
-        val typed = waitUntil(8_000) {
-            statusDescription().contains("Locked:") && statusDescription().contains("black")
+        repeat(3) {
+            tapOnScreen(lockedBlack!!, "Locked Black")
+            if (waitUntil(4_000) {
+                    statusDescription().contains("Locked:") && statusDescription().contains("black")
+                }
+            ) {
+                return@repeat
+            }
         }
-        assertTrue("Termux must type the black-on-black reason: ${statusDescription()}", typed)
+        assertTrue(
+            "Termux must type the black-on-black reason: ${statusDescription()}",
+            statusDescription().contains("Locked:") && statusDescription().contains("black"),
+        )
         shot("18b_black_text_locked")
     }
 

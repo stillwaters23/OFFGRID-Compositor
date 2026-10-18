@@ -188,6 +188,15 @@ internal fun MainActivity.showMessage(textRes: Int, buttonMode: MainActivity.But
         if (playRequested && buttonMode != MainActivity.ButtonMode.LIVE && buttonMode != MainActivity.ButtonMode.RECORDING) {
             hidePlayback()
         }
+        val current = terminalPanel.statusLine.contentDescription?.toString().orEmpty()
+        val cameraBind =
+            textRes == R.string.camera_starting ||
+                textRes == R.string.camera_missing ||
+                textRes == R.string.camera_failed
+        if (cameraBind && current.startsWith("Locked:")) {
+            shownMessage = textRes
+            return
+        }
         shownMessage = textRes
         val words = if (buttonMode == MainActivity.ButtonMode.RECORDING) {
             recordSeconds().takeIf { it > 0 }?.let { getString(R.string.recording_timed, it) } ?: getString(textRes)

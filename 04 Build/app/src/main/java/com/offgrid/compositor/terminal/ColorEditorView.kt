@@ -100,6 +100,7 @@ internal class ColorEditorView(
         })
         refresh()
         post { announceLockedSwatch() }
+        postDelayed({ announceLockedSwatch() }, 500)
     }
 
     /** Types the lock reason after the folder-open line, so White/Black are never silent. */
