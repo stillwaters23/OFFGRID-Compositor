@@ -19,7 +19,9 @@ Round 3 retested head `6c7936e` on the nested emulator. That section follows Rou
 
 A calibration section follows Round 3. Same nested emulator. The environment verdict there is **UNFIT**.
 
-Round 4 is the KVM retest of the same head on a GitHub-hosted runner. That section is the current verdict. Its overall verdict is **FAIL**: the Width reel moved from 100 to 96 and the click log stayed empty. The Round 3 cold-start ANR did not repeat on this runner.
+Round 4 is the KVM retest of head `6c7936e`. Its overall verdict is **FAIL**: the Width reel moved from 100 to 96 and the click log stayed empty. The Round 3 cold-start ANR did not repeat on that runner.
+
+Round 5 retests head `2fea30e` on the same kind of KVM runner. That section is the current verdict. Its overall verdict is **BLOCKED**: the emulator left adb after the first Width swipe, before the click log and before Broadcast Lock, Minus, edit lock, the view menu, and copy pairing.
 
 **Overall verdict (Round 1): FAIL.**
 
@@ -863,4 +865,109 @@ On the unfit nested emulator, the startup trace before the first frame showed ma
 ### Evidence
 
 Artifact `independent-qa-api-35` from run 39146533836. Stills used above live under `docs/qa/independent_qa/evidence/steps/` and `evidence/cold/`. Also in that artifact: `verdict.json`, `progress.log`, `kvm.txt`, `device.txt`, `static_checks.txt`, `reel_clicker.log` (empty), five `video/qa_r*.mp4` clips, and the instrument reports. `walk_exit=1` because the click item failed. `instrument_exit=0`.
+
+## Round 5 — head 2fea30e on a KVM runner
+
+Retest of every Round 4 item on the click-sound head. The fixer’s CI is not evidence. App code was not changed.
+
+- Head built and installed: `2fea30ec71f29cfce4c20531d66f6ee15a759b70` ("Fire clicker on real drum drag and settle"). `evidence/static_checks.txt` records that SHA.
+- Run: https://github.com/stillwaters23/OFFGRID-Compositor/actions/runs/39150242408 (QA commit `b54694b`). The emulator step ran from 17:37:25Z to 17:56:43Z. It finished. It did not hang.
+- Host: 4 cores, 15 GiB, `/dev/kvm` mode 0666, `emulator -accel-check` printed "KVM (version 12) is installed and usable."
+- Guest: API 35, `sdk_gphone64_x86_64`, 1080×2400 at 420 dpi, animation scales 1/1/1, `immersive_mode_confirmations` empty, SwiftShader 4.0.0.1.
+- The click check issues a real `input swipe` up and down on Width and on Height, and runs `logcat -d -s OffgridClicker` after each swipe. A pass needs `SoundPool play streamId=` with a non-zero id in that read.
+- I looked at the PNGs in artifact `independent-qa-api-35`. Frames taken after 17:49:42Z are 0-byte files.
+
+**Overall verdict: BLOCKED.**
+
+Splash, cold start, white skin, Night plus one black tap, the merged manifest, slider classes, and the title passed on the frames taken before the emulator dropped. The Width-up swipe was sent while both drums showed 100. The next `uiautomator dump` did not return a hierarchy, and the following screencap got `adb: device offline`. `emulator-5554` was then "not found". The click log was read after that, so an empty log is not a click result. Width down, Height up, Height down, copy pairing, Broadcast Lock, Minus, edit lock, and the view menu were not seen on a live screen. The instrument suite did not start on a device.
+
+### Verdict table
+
+| Item | Verdict | What was shown on this device |
+| --- | --- | --- |
+| (1) Splash / diamond | PASS | `cold/offgrid_01_early.png` is black with the status bar. Yellow samples on that frame: 0. `cold/offgrid_01.png` is the folder grid. Status: "The front camera is starting." |
+| (2) Cold start | PASS | Ten force-stop starts of Settings, of an empty activity, and of OFFGRID. No ANR dialog. OFFGRID `Displayed` is 2.5–2.9 s. Settings is 2.4–4.6 s. The empty activity is 1.3–1.7 s. |
+| (3) White skin | PASS | Skin color is open. Status: "Locked: white typewriter text on a white background can't be read." Lock glyphs sit on the swatches. Hex box shows `#FFFFFF`. Header W 100 H 100. |
+| (4) Night + one black tap | PASS | Night is selected. Status: "Theme mode is now Night." The later typewriter frame still says "Locked: black typewriter text on a black background can't be read." |
+| (5) Click sounds | BLOCKED | Before the swipe, both drums and the header are 100 (`steps/reel_width_up_before.png`). `input swipe 277 1488 277 1249 350` was sent at 17:48:30Z. The after-frame is 0 bytes. `logcat -s OffgridClicker` ran after `adb: device offline` and is empty. The other three swipes were not sent. |
+| (6) Manifest | PASS | Merged debug manifest of `2fea30e` has no `RECORD_AUDIO` and no `FOREGROUND_SERVICE_MICROPHONE`. |
+| (7) View menu vs status | BLOCKED | The menu was not opened. `steps/menu_open.png` was not produced. `steps/menu_before.png` is 0 bytes, taken after the device left adb. |
+| (8) No slider classes | PASS | Source grep for `SeekBar`, `RangeSlider`, and `BioSliderView` is absent. Panel settings says "No sliders here. Only typed numbers and toggles." |
+| Lock (edit) | BLOCKED | The lock was not tapped. `steps/lock_before.png` is 0 bytes. |
+| Broadcast Lock | BLOCKED | The long-press was not shown. `steps/broadcast_before.png` is 0 bytes. |
+| Minus | BLOCKED | Shrink was not shown. `steps/minus_before.png` is 0 bytes. |
+| Copy pairing key | BLOCKED | Live and Remote was not opened. `steps/copy_pairing_blocked.png` is 0 bytes. The home probe ran after `emulator-5554` was not found. |
+| PC or Android text | BLOCKED | Same gap as copy pairing. No frame shows the pairing sentence. |
+| Title fit | PASS | With Panel settings open, "OFFGRID TERMINAL" is two lines at (137, 157, 241, 262), inside 1080×2400. The cold home grid omits that header. |
+| P1-2 Kick flood | DEFERRED | Out of scope. Kick was not opened. |
+| P1-3 Red sweep | DEFERRED | Out of scope. |
+
+### (1) Splash — PASS
+
+`cold/offgrid_01_early.png` is a black 1080×2400 frame with status icons and the gesture bar. The yellow-pixel sample is 0. `cold/offgrid_01.png` is the folder grid. No launcher-icon splash and no yellow diamond.
+
+### (2) Ten cold starts — PASS
+
+Each start was force-stop, then `am start -W`. No ANR dialog and no `ANR in` line. `Status: ok` on all thirty.
+
+| Series | Displayed (ms) | LaunchState |
+| --- | --- | --- |
+| Settings | 4415, 4648, 3530, 2916, 3632, 3196, 2611, 2370, 2555, 3038 | COLD, except starts 2, 5, and 9 which are WARM |
+| Empty activity | 1319, 1601, 1441, 1577, 1529, 1502, 1677, 1638, 1300, 1271 | all COLD |
+| OFFGRID | 2906, 2609, 2804, 2710, 2628, 2597, 2536, 2583, 2532, 2516 | all COLD |
+
+`cold/settings_01.png` is the Settings list. `cold/empty_01.png` is a blank activity titled "QA Empty". `cold/offgrid_01.png` is the folder grid. OFFGRID’s few seconds sit next to Settings. This runner is fit to time the app.
+
+The instrument suite did not produce a result. `connectedDebugAndroidTest` failed in 7 seconds with `emulator-5554` not found. That is the dead emulator, not a test verdict.
+
+### (3) White skin — PASS
+
+`steps/white_after_tap.png`. Skin color is open. The status line is "Locked: white typewriter text on a white background can't be read." The hex box is `#FFFFFF`. Lock glyphs are on the swatches. The header still shows W 100 and H 100.
+
+### (4) Night, then one black tap — PASS
+
+`steps/night_chosen.png`: Night’s radio is selected, status "Theme mode is now Night."
+
+`steps/black_after_2.png`: Typewriter text color is open, status "Locked: black typewriter text on a black background can't be read." The script’s first dump after the tap carried the same sentence.
+
+### (5) Click sounds — BLOCKED
+
+`steps/reel_width_up_before.png` at 17:48:28Z: Size is open, both drums on 100, the boxes under them on 100, header W 100 H 100, status "Size is open." The panel chrome is the normal header. That is the last good frame.
+
+At 17:48:30Z the script cleared logcat and sent `adb shell input swipe 277 1488 277 1249 350` (finger moving up the Width drum). `uiautomator dump` then ran out its 25 second cap twice and never printed a hierarchy. The pull of that dump did not leave a file. At 17:49:42Z `screencap` printed `adb: device offline`. `steps/reel_width_up.png` is 0 bytes. At 17:50:01Z `logcat -d -s OffgridClicker` ran against that offline adb and returned nothing. At 17:50:21Z the job log says `error: device 'emulator-5554' not found`.
+
+Width down, Height up, and Height down were skipped because the Width reel was no longer in a dump. No `SoundPool play` line was observed on a live device, and none was shown to be absent on a live device.
+
+Screen recordings `qa_r1.mp4` through `qa_r3.mp4` end at 17:47:32Z, about a minute before the swipe. Clip 4 was not pulled.
+
+### (6) Manifest — PASS
+
+`evidence/static_checks.txt` for `2fea30e`:
+
+- `android.permission.RECORD_AUDIO=absent`
+- `android.permission.FOREGROUND_SERVICE_MICROPHONE=absent`
+
+### (7) View menu — BLOCKED
+
+The walk reached the menu step only after the emulator was gone. There is no open-menu frame to compare with the status line.
+
+### (8) Sliders — PASS
+
+`slider_grep=absent` in `static_checks.txt`. `steps/title_fit_pass.png` shows "No sliders here. Only typed numbers and toggles."
+
+### Reconfirm — BLOCKED
+
+Edit lock, Broadcast Lock, Minus, copy pairing, and the PC-or-Android sentence all run after the click check. Their screenshots are 0 bytes and their dumps were not saved. The before-swipe Size frame still shows the header lock, menu, and minus glyphs, and the folder grid from the cold start is intact, but those controls were not tapped on this run.
+
+### Title — PASS
+
+`cold/offgrid_01.png` is the home grid with no "OFFGRID TERMINAL" header. `steps/title_fit_pass.png` opens Panel settings. The header draws "OFFGRID TERMINAL" on two lines at (137, 157, 241, 262), inside 1080×2400.
+
+### Non-blocking startup note
+
+Unchanged from Round 4. On the unfit nested emulator, startup main-thread work before the first frame included `AppCompatTextView` class verification during `setContentView` and `ResourcesCompat.loadFont`. This run did not repeat that trace. It is not a Round 5 failure.
+
+### Evidence
+
+Artifact `independent-qa-api-35` from run 39150242408. Usable stills are the cold-start PNGs and the step PNGs through `reel_width_up_before.png`. `progress.log` has the swipe command, the two dump timeouts, `adb: device offline`, and `emulator-5554` not found. `reel_clicker.log` contains only the header `Width up 100 -> None`. `logcat.txt` is empty because the end-of-job `logcat -d` hit its 120 second cap on a missing device. `walk_exit=1`. `instrument_exit=1`.
 
