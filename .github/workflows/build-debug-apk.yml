@@ -393,15 +393,9 @@ jobs:
           disable-animations: true
           emulator-boot-timeout: 600
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
-          # The action runs this with /usr/bin/sh (dash). pipefail is a bash option and fails the job.
-          script: |
-            set -eu
-            cd "04 Build"
-            chmod +x ./gradlew
-            ./gradlew connectedDebugAndroidTest --stacktrace
-            mkdir -p ../docs/bugs/screenshots/api-${{ matrix.api-level }}
-            adb pull /sdcard/Android/data/com.offgrid.compositor/files/Pictures/royalty-fix-evidence \
-              ../docs/bugs/screenshots/api-${{ matrix.api-level }} || true
+          # One bash line. The action starts a new /usr/bin/sh for every YAML line,
+          # so cd and bash options cannot live in this block.
+          script: bash .github/scripts/run-royalty-ui-tests.sh ${{ matrix.api-level }}
 
       - name: Upload emulator evidence
         if: always()

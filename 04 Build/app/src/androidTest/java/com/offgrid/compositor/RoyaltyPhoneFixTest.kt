@@ -27,11 +27,11 @@ import java.io.File
 @RunWith(AndroidJUnit4::class)
 class RoyaltyPhoneFixTest {
 
-    @get:Rule
+    @get:Rule(order = 0)
     val cameraPermission: GrantPermissionRule =
         GrantPermissionRule.grant(Manifest.permission.CAMERA)
 
-    @get:Rule
+    @get:Rule(order = 1)
     val activity = ActivityScenarioRule(MainActivity::class.java)
 
     private val device: UiDevice
