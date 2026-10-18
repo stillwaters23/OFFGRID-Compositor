@@ -15,9 +15,11 @@ Tester: independent of the fixer. The fixer's log and CI screenshots were not tr
 
 Round 2 retested head `ffaec30` on the same phone. That section is at the bottom. Its overall verdict is **FAIL**, and it replaces the verdict below. The table in this section is Round 1 only.
 
-Round 3 retested head `6c7936e`. That section follows Round 2. Its overall verdict is **FAIL**, and it is the current verdict. Round 1 and Round 2 stay in this file as written.
+Round 3 retested head `6c7936e` on the nested emulator. That section follows Round 2. Its phone verdict is **FAIL**. Round 1 and Round 2 stay in this file as written.
 
-A calibration section follows Round 3. Same emulator, same flags. The environment verdict there is **UNFIT**.
+A calibration section follows Round 3. Same nested emulator. The environment verdict there is **UNFIT**.
+
+Round 4 is the KVM retest of the same head on a GitHub-hosted runner. That section is the current verdict. Its overall verdict is **FAIL**: the Width reel moved from 100 to 96 and the click log stayed empty. The Round 3 cold-start ANR did not repeat on this runner.
 
 **Overall verdict (Round 1): FAIL.**
 
@@ -748,3 +750,117 @@ On the way there the main thread logged `Choreographer: Skipped 250 frames` and 
 Baselines do not start in under 2 seconds, so this run does not support "the phone is fine and only OFFGRID is slow." Baselines do take tens of seconds, or they never display within 40 seconds, and the emulator ANRs System UI, Phone, the keyboard, and search while those starts are in progress. One of those ANRs is a System UI `FocusEvent(hasFocus=true)`.
 
 That is the UNFIT case. Round 3's 53–57 s `first_frame` and its FocusEvent ANRs were measured on this same unfit emulator. The trace still shows OFFGRID's main thread inside `MainActivity.onCreate` inflating `AppCompatTextView` and verifying classes for the first 18 seconds of a 52-second first frame. That work is real. It was not timed on a device where Settings and an empty activity start in under 2 seconds.
+
+## Round 4 — head 6c7936e on a KVM runner
+
+Independent walk on GitHub Actions, not on the nested emulator from Round 3. The app tree is still `6c7936e5da9935305904b712fed10e9af287bcfa`. The QA branch only holds this report, the workflow, and the tap script. App code was not changed.
+
+- Run: https://github.com/stillwaters23/OFFGRID-Compositor/actions/runs/39146533836 (commit `4c23355`). The emulator step ran from 16:49:42Z to 17:08:20Z. It finished. It did not hang.
+- Earlier hang: run 39135791813 sat on "Boot API 35 with KVM and walk the panel" for 1h41m and was cancelled when the timeout harness landed. Run 39143358574 then finished in 27 minutes and showed harness false-fails (a Locked status hid an open folder, the immersive cling hid Unlock from a plain dump, a short reel swipe stayed at 100, and `timeout wait` failed because `wait` is a shell builtin). Those script bugs are fixed in `4c23355`. The screenshots below are from the re-run.
+- Host: `ubuntu-latest`, 4 cores, 15 GiB RAM, `/dev/kvm` mode 0666, `emulator -accel-check` printed "KVM (version 12) is installed and usable."
+- Guest: API 35, `sdk_gphone64_x86_64`, 1080×2400 at 420 dpi, animation scales 1/1/1, `immersive_mode_confirmations` empty, 2 cores, about 3 GiB RAM. GLES: SwiftShader 4.0.0.1. Profile Pixel 7.
+- The job `timeout-minutes` is 60. Every adb command in the walk is wrapped in `timeout`. Boot completion is polled with a cap. `PROGRESS` lines go to the job log and to `evidence/progress.log`. Artifacts upload with `if: always()`.
+- Taps are `adb shell input tap`, `input swipe`, and a long-press, at centers from `uiautomator dump`. When the "Viewing full screen" cling was the only dumped window, Unlock came from `dumpsys activity top` (`unlock_button` bounds). `performClick` was not used.
+- I looked at the PNGs in the artifact `independent-qa-api-35`. The table follows those pictures and the dumps, not the fixer's CI.
+
+**Overall verdict: FAIL.**
+
+Splash, cold start, white skin, Night plus one black tap, the merged manifest, the view menu, slider classes, edit lock, Broadcast Lock, Minus, copy pairing, the PC-or-Android sentence, and the title all passed on this runner. The Width reel did change, and the independent log taken right after that change has no `SoundPool play` line. That one item fails the round.
+
+### Verdict table
+
+| Item | Verdict | What was shown on this device |
+| --- | --- | --- |
+| (1) Splash / diamond | PASS | `cold/offgrid_01_early.png` is black with the status bar. Yellow samples on that frame: 0. `cold/offgrid_01.png` is the folder grid. Status: "The front camera is starting." |
+| (2) Cold start + suite | PASS | Ten force-stop starts of Settings, of an empty activity, and of OFFGRID. No ANR dialog and no `ANR in` line. OFFGRID `Displayed` is 2.8–3.6 s, in the same band as Settings after its first start. `RoyaltyPhoneFixTest` finished 15 tests, 0 failures, in the same job. |
+| (3) White skin | PASS | Skin color is open. Status: "Locked: white typewriter text on a white background can't be read." Lock glyphs sit on the swatches. Hex box shows `#FFFFFF`. |
+| (4) Night + one black tap | PASS | Night is selected. Status: "Theme mode is now Night." One tap on the locked black swatch leaves "Locked: black typewriter text on a black background can't be read." The same sentence is still the status on the later frame. |
+| (5) Click sounds | FAIL | Width reel moved 100 → 96. Status: "Width is now 96." `OffgridClicker` log read at 17:01:44Z, after that change, is empty. |
+| (6) Manifest | PASS | Merged debug manifest from `6c7936e` has no `RECORD_AUDIO` and no `FOREGROUND_SERVICE_MICROPHONE`. |
+| (7) View menu vs status | PASS | Menu open under "> Choose how folders look." Status bounds (14, 283, 1066, 399). Card bounds (231, 413, 1019, 1962). Overlap height 0. |
+| (8) No slider classes | PASS | Source grep for `SeekBar`, `RangeSlider`, and `BioSliderView` is absent. Panel settings says "No sliders here. Only typed numbers and toggles." |
+| Lock (edit) | PASS | Status: "Panel is locked. Back, the menu, and Unlock still work." Then: "The panel is unlocked. You can edit again." The folder grid stays up both times. |
+| Broadcast Lock | PASS | Long-press hides the panel. The cling "Viewing full screen / Got it" is at the top and was not tapped. Bottom strip reads LOCKED and Unlock at (524, 2134, 738, 2242). Tapping Unlock restores the folder grid: "Back at the folder list." |
+| Minus | PASS | The panel hides to a large OFFGRID tab at (126, 262, 563, 441), below the status bar, with "Panel hidden. Tap the OFFGRID tab, or press Back." Tapping it restores the grid: "The panel is open again." |
+| Copy pairing key | PASS | Live and Remote stays open. Status: "Pairing key made and copied. Paste it on a PC or an Android phone." The Copy pairing key button is still on that page. A system clipboard chip is on the screenshot. `dumpsys clipboard` was empty. |
+| PC or Android text | PASS | The open folder says "Pairing works for a PC or an Android phone on the same Wi-Fi." The button help says "Send it to a PC or an Android phone." |
+| Title fit | PASS | The cold home grid draws folders and omits the header. With Panel settings open, "OFFGRID TERMINAL" is two lines at (137, 157, 241, 262), inside 1080×2400. |
+| P1-2 Kick flood | DEFERRED | Out of scope. Kick was not opened. |
+| P1-3 Red sweep | DEFERRED | Out of scope. |
+
+### (1) Splash — PASS
+
+`cold/offgrid_01_early.png` (1080×2400) is a black frame, status icons, and the gesture bar. The yellow-pixel sample on that frame is 0. `cold/offgrid_01.png` is the home grid of folders. No launcher-icon splash and no yellow diamond before the folders.
+
+### (2) Ten cold starts and the suite — PASS
+
+Each start was force-stop, then `am start -W`. `ActivityTaskManager` `Displayed` times, all `Status: ok`, all `LaunchState: COLD`, no ANR dialog:
+
+| Series | Displayed (ms) |
+| --- | --- |
+| Settings | 7785, 3272, 3736, 3619, 2942, 3183, 2584, 3012, 3561, 3142 |
+| Empty activity `com.qa.empty/.EmptyActivity` | 1905, 1982, 2163, 2809, 2015, 1930, 1453, 1830, 1515, 1485 |
+| OFFGRID `MainActivity` | 3552, 2812, 3027, 2795, 2970, 2937, 2922, 2855, 2965, 2827 |
+
+Settings' first start is 7.8 s. The rest are a few seconds. The empty activity is about 1.5–2.8 s. OFFGRID is about 2.8–3.6 s, the same band as Settings, with no "isn't responding" dialog. The captured `OffgridStartup` line on these starts is `onCreate_done`. A `first_frame` line was not in that slice.
+
+The rule from calibration: baselines under 2 s with OFFGRID far behind would blame the app, and baselines of tens of seconds or ANR would mark the runner unfit. This runner is neither. KVM is usable, and OFFGRID displays in a few seconds beside Settings. Cold start passes.
+
+The fixer's `RoyaltyPhoneFixTest` ran once in the same job after the walk: 15 tests, 0 failures, 0 errors, 0 skipped, 174.6 s (`TEST-emulator-5554 - 15-_app-.xml`). The host log was seeded with `cold_ok=10` only after the ten OFFGRID starts above had no ANR. That suite result is a second data point from this job. The pictures in this section are from the independent taps.
+
+### (3) White skin — PASS
+
+`steps/white_after_tap.png`. Skin color is the open folder (breadcrumb ends in Skin color, heading "Skin color"). The status line is "Locked: white typewriter text on a white background can't be read." The hex box is `#FFFFFF`. Lock glyphs are on the swatches.
+
+### (4) Night, then one black tap — PASS
+
+`steps/night_chosen.png`: the panel is dark, Night's radio is selected, status "Theme mode is now Night."
+
+`steps/black_after_2.png`: Typewriter text color is open, status "Locked: black typewriter text on a black background can't be read." The dump taken right after the tap (`black_after_1`) carries the same sentence, and this later frame still shows it. The hex box is still `#FFFFFF`.
+
+### (5) Click sounds — FAIL
+
+`steps/reel_before.png`: Size is open, both drums on 100, header W 100 H 100, status "Size is open."
+
+The first swipe traveled up the Width drum and the wheel stayed at 100 (`steps/reel_after.png`, status "Width is now 100."). The second swipe traveled down the same drum. `steps/reel_after_2.png` shows the Width drum and the box under it on 96, header W 96, status "Width is now 96." Height stays 100.
+
+`adb logcat -c` ran at 17:01:29Z, before either swipe. The read `adb logcat -d -v time -s OffgridClicker:I` ran at 17:01:44Z, about three seconds after the wheel showed 96. `evidence/reel_clicker.log` is empty. No `SoundPool play` line, including the skipped and queued forms, was in that buffer.
+
+The suite's own reel test, later in the same job, did log `OffgridClicker: SoundPool play streamId=129` (and 137, 145, 153, 161, 169) at 17:06:16Z. That is the instrumented test, not this gesture.
+
+### (6) Manifest — PASS
+
+`evidence/static_checks.txt`, from the merged debug manifest of `6c7936e`:
+
+- `android.permission.RECORD_AUDIO=absent`
+- `android.permission.FOREGROUND_SERVICE_MICROPHONE=absent`
+
+Permissions that are present include `CAMERA` and `FOREGROUND_SERVICE_CAMERA`.
+
+### (7) View menu — PASS
+
+`steps/menu_open.png`. Status "> Choose how folders look." The card under it has VIEW (List, Big tiles, Grid 2, Grid 3), SORT, FOLDER SIZE, and Done. Measured status bottom is y=399. Measured card top is y=413. They do not overlap.
+
+### (8) Sliders — PASS
+
+`static_checks.txt` records `slider_grep=absent` for `SeekBar`, `RangeSlider`, and `BioSliderView` under the app source. `steps/title_fit_pass.png` shows the Panel settings guidance: "No sliders here. Only typed numbers and toggles."
+
+### Reconfirm
+
+- Edit lock. `steps/lock_locked.png` keeps the folder grid and says the panel is locked. `steps/lock_unlocked.png` says "The panel is unlocked. You can edit again."
+- Broadcast Lock. `steps/broadcast_armed.png` is a black stage, the armed immersive cling at the top, and LOCKED plus Unlock at the bottom. The cling does not cover the strip. `steps/broadcast_unlocked.png` is the folder grid again.
+- Minus. `steps/minus_hidden.png` is the large OFFGRID tab and the "Panel hidden" note. `steps/minus_restored.png` is the folder grid, status "The panel is open again."
+- Copy pairing key and the PC-or-Android sentence are the Live and Remote frames above. The app stayed on that folder.
+
+### Title
+
+`cold/offgrid_01.png` is the home grid with no "OFFGRID TERMINAL" header. `steps/title_fit_pass.png` opens Panel settings, and the header draws "OFFGRID TERMINAL" on two lines at (137, 157, 241, 262). That box sits inside 1080×2400, under the status bar, and the words are fully on screen.
+
+### Non-blocking startup note
+
+On the unfit nested emulator, the startup trace before the first frame showed main-thread work in `AppCompatTextView` class verification (`art::ClassLinker::VerifyClass` / `art::verifier::MethodVerifier::VerifyMethod` inside `AppCompatTextView.<init>`, reached from `setContentView`) and in `ResourcesCompat.getFont` / `loadFont` / `TypefaceCompat.createFromResourcesFamilyXml` via `AppCompatTextHelper.updateTypefaceAndStyle`. This KVM run did not repeat that trace. The note is recorded here and is not a Round 4 failure. On this runner OFFGRID's `Displayed` time is a few seconds and there is no ANR dialog.
+
+### Evidence
+
+Artifact `independent-qa-api-35` from run 39146533836. Stills used above live under `docs/qa/independent_qa/evidence/steps/` and `evidence/cold/`. Also in that artifact: `verdict.json`, `progress.log`, `kvm.txt`, `device.txt`, `static_checks.txt`, `reel_clicker.log` (empty), five `video/qa_r*.mp4` clips, and the instrument reports. `walk_exit=1` because the click item failed. `instrument_exit=0`.
+
