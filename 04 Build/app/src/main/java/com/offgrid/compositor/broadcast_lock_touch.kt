@@ -32,6 +32,7 @@ internal class LockTouch(
     private val closePlayback: () -> Unit,
     private val tick: () -> Boolean,
     private val haptic: (Int) -> Unit,
+    private val unlockHit: (x: Float, y: Float) -> Boolean = { _, _ -> false },
 ) {
     private val main = Handler(Looper.getMainLooper())
     private val lockHold = FingerHoldRecognizer(2, slopPx) { x, y, w, h -> LockGestureMap.inCenterZone(x, y, w, h) }
@@ -69,6 +70,9 @@ internal class LockTouch(
             HoldEvent.NONE -> Unit
         }
         if (locked) {
+            // Unlock strip must still receive taps. The sink would recreate Royalty's freeze:
+            // Unlock is on screen, but no finger can reach it.
+            if (unlockHit(event.x, event.y)) return false
             // The sink. A finger down here never reaches a view, and never draws.
             if (kind == TouchKind.UP || kind == TouchKind.CANCEL) main.removeCallbacks(panelTimer)
             return true

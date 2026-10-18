@@ -258,6 +258,16 @@ class MainActivity : AppCompatActivity() {
             closePlayback = { hidePlayback() },
             tick = { terminalPanel.look.tick },
             haptic = { kind -> window.decorView.performHapticFeedback(kind) },
+            unlockHit = { x, y ->
+                if (!::unlockStrip.isInitialized || unlockStrip.visibility != View.VISIBLE) {
+                    false
+                } else {
+                    val loc = IntArray(2)
+                    unlockStrip.getLocationInWindow(loc)
+                    x >= loc[0] && x < loc[0] + unlockStrip.width &&
+                        y >= loc[1] && y < loc[1] + unlockStrip.height
+                }
+            },
         )
         coachMark = CoachMark(root, CoachMark.prefs(this))
         terminalPanel.onShrunkByTap = {

@@ -248,8 +248,15 @@ class RoyaltyPhoneFixTest {
         val label = "$name folder"
         var view = waitUntilView(2_000) { findOnScreen { findDescContains(label) } }
         if (view == null) {
-            repeat(12) {
-                swipePanelUp()
+            repeat(20) {
+                swipePanel(up = true)
+                view = findOnScreen { findDescContains(label) }
+                if (view != null) return@repeat
+            }
+        }
+        if (view == null) {
+            repeat(20) {
+                swipePanel(up = false)
                 view = findOnScreen { findDescContains(label) }
                 if (view != null) return@repeat
             }
@@ -335,12 +342,14 @@ class RoyaltyPhoneFixTest {
         return view!!
     }
 
-    private fun swipePanelUp() {
+    private fun swipePanel(up: Boolean) {
         val w = device.displayWidth
         val h = device.displayHeight
-        device.swipe(w / 2, (h * 0.68f).toInt(), w / 2, (h * 0.30f).toInt(), 24)
+        val start = if (up) (h * 0.62f).toInt() else (h * 0.38f).toInt()
+        val end = if (up) (h * 0.48f).toInt() else (h * 0.52f).toInt()
+        device.swipe(w / 2, start, w / 2, end, 18)
         device.waitForIdle()
-        SystemClock.sleep(200)
+        SystemClock.sleep(180)
     }
 
     private fun waitDesc(desc: String): View? =

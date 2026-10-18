@@ -6,6 +6,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import android.os.PersistableBundle
 import java.security.GeneralSecurityException
 import java.util.concurrent.Executors
 
@@ -94,7 +95,9 @@ class PairingWorkflow(context: Context) : AutoCloseable {
     fun copyCurrentKey() {
         val key = checkNotNull(currentKey) { "Make a pairing key first." }
         val clip = ClipData.newPlainText("OFFGRID pairing key", key)
-        clip.description.extras.putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true)
+        clip.description.extras = PersistableBundle().apply {
+            putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true)
+        }
         clipboard.setPrimaryClip(clip)
         mainHandler.postDelayed({
             val active = clipboard.primaryClip
