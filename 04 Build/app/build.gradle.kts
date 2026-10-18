@@ -15,6 +15,7 @@ android {
         targetSdk = 36
         versionCode = 6
         versionName = "0.3.3"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
@@ -24,6 +25,7 @@ android {
     }
 
     testOptions {
+        animationsDisabled = true
         unitTests {
             // The settings tests run the real Android settings code on the computer that builds the app.
             isIncludeAndroidResources = true
@@ -67,4 +69,10 @@ dependencies {
     implementation("com.google.mediapipe:tasks-vision:0.10.35")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.robolectric:robolectric:4.17")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:core:1.6.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test:rules:1.6.1")
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
+    androidTestImplementation("androidx.test.uiautomator:uiautomator:2.3.0")
 }

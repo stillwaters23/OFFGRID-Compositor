@@ -36,7 +36,7 @@ internal fun TerminalPanel.applyLook() {
     expanded.alpha = contentAlpha
     pill.alpha = contentAlpha
     scanLine.isVisible = current.scanLine && !minimized
-    pillRing.isVisible = current.ring
+    pillRing.isVisible = minimized && current.ring
     pillRing.spinning = minimized && current.ring
     headingRing?.let {
         it.isVisible = current.ring

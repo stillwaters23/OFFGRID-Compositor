@@ -5,7 +5,6 @@ import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.InsetDrawable
 import android.text.InputFilter
 import android.text.InputType
-import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -39,7 +38,7 @@ internal class TopBar(
     val heightReel: DrumReelView
     private val widthControl: FrameLayout
     private val heightControl: FrameLayout
-    private val titleView: TextView
+    private val titleView: FitTextView
     private val camera = QuickToggleView(context, false, prefs.toggle(FxKeys.CAMERA_ON, true))
     private val microphone = QuickToggleView(context, true, prefs.toggle(FxKeys.MIC_ON, false))
     private val moreButton: View
@@ -66,16 +65,17 @@ internal class TopBar(
 
         backOrb.layoutParams = LayoutParams(controlWidth, Hud.dpi(context, CONTROL_HEIGHT_DP))
         addView(backOrb)
-        titleView = TextView(context).apply {
+        titleView = FitTextView(context).apply {
             text = context.getString(R.string.terminal_title)
             typeface = Hud.monoBold(context)
             textSize = 12f
             includeFontPadding = false
             letterSpacing = 0.08f
-            maxLines = 1
-            ellipsize = TextUtils.TruncateAt.END
+            fitWholeLine = false
+            maxLines = 2
             setShadowLayer(Hud.dp(context, 1.5f), 0f, 0f, Hud.withAlpha(NeonPalette.ELECTRIC_PURPLE, 0.2f))
             gravity = Gravity.CENTER_VERTICAL
+            contentDescription = context.getString(R.string.terminal_title)
         }
         addView(titleView, LayoutParams(0, Hud.dpi(context, CONTROL_HEIGHT_DP), 1f).apply {
             marginStart = sideGap
@@ -338,7 +338,7 @@ internal class TopBar(
     private companion object {
         const val CONTROL_HEIGHT_DP = 40f
         const val FIXED_CONTROLS = 6
-        const val MIN_TITLE_DP = 36f
+        const val MIN_TITLE_DP = 72f
         const val MIN_CONTROL_DP = 28f
     }
 }

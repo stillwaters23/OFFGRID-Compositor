@@ -131,14 +131,56 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
-    <!-- Step 2. The floating terminal panel. Royalty's private control, not painted into the video.
-         Phase 1.3: it starts GONE. The Broadcast Lock gate reveals it only after the stage has
-         drawn and no screen share is reported, so nothing flashes on a cold start or a resume. -->
+    <!-- Unlock strip: the guaranteed way out of a Broadcast Lock when a share is not live. -->
+    <LinearLayout
+        android:id="@+id/unlock_strip"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|end"
+        android:layout_marginTop="20dp"
+        android:layout_marginEnd="12dp"
+        android:background="@drawable/hud_bar"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="12dp"
+        android:paddingTop="8dp"
+        android:paddingEnd="12dp"
+        android:paddingBottom="8dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/unlock_strip_label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/jetbrains_mono"
+            android:text="@string/terminal_locked_label"
+            android:textColor="@color/hud_text"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/unlock_button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:background="@drawable/hud_button"
+            android:contentDescription="@string/terminal_unlock"
+            android:fontFamily="@font/jetbrains_mono"
+            android:paddingStart="12dp"
+            android:paddingTop="8dp"
+            android:paddingEnd="12dp"
+            android:paddingBottom="8dp"
+            android:text="@string/terminal_unlock"
+            android:textColor="@color/hud_button_text"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <!-- The floating terminal panel. Royalty's private control, not painted into the video.
+         Unlocked, it shows at once so the camera and diamond never flash before the folders. -->
     <com.offgrid.compositor.terminal.TerminalPanel
         android:id="@+id/terminal_panel"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="top|start"
-        android:visibility="gone" />
+        android:visibility="visible" />
 
 </FrameLayout>

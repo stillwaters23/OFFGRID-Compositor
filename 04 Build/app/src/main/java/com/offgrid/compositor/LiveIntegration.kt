@@ -201,6 +201,7 @@ internal class LiveIntegration(
                 lock.arm()
             }
             LiveActions.OPEN_PAIRING -> launch(PairingActivity::class.java)
+            LiveActions.COPY_PAIRING_KEY -> copyPairingKey()
             LiveActions.OPEN_PREVIEW -> launch(RemotePreviewActivity::class.java)
             LiveActions.SEND_TO_PC -> pc.startFromSettings()
             PanelAction.AR_PICK_CLIP.name -> pickArVideo?.launch(ArDeckCatalog.pickIntent())
@@ -231,6 +232,33 @@ internal class LiveIntegration(
         if (lock.unlock() == UnlockResult.REFUSED_SHARE_VISIBLE) {
             tellPhone2Status("Unlock refused. A screen share is live.")
         }
+    }
+
+    /** Copies the pairing key and stays on Live and Remote. Works for a PC or an Android phone. */
+    private fun copyPairingKey() {
+        pairing.loadKey(
+            onLoaded = { _, _ ->
+                try {
+                    pairing.copyCurrentKey()
+                    tellPhone2Status("Pairing key copied. Paste it on a PC or an Android phone.")
+                } catch (error: IllegalStateException) {
+                    tellPhone2Status(error.message ?: "Make a pairing key first.")
+                }
+            },
+            onFailure = {
+                pairing.makeKey(
+                    onCreated = { _, _ ->
+                        try {
+                            pairing.copyCurrentKey()
+                            tellPhone2Status("Pairing key made and copied. Paste it on a PC or an Android phone.")
+                        } catch (error: IllegalStateException) {
+                            tellPhone2Status(error.message ?: "Could not copy the pairing key.")
+                        }
+                    },
+                    onFailure = { reason -> tellPhone2Status(reason) },
+                )
+            },
+        )
     }
 
     /** No OFFGRID screen opens over the stage while it is locked, whoever asked (panel or Phone 2). */

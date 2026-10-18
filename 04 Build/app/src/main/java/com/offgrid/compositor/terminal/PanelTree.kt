@@ -103,6 +103,7 @@ internal enum class PanelAction {
     REMOTE_OPEN_PAIRING,
     REMOTE_OPEN_PREVIEW,
     LIVE_SEND_TO_PC,
+    COPY_PAIRING_KEY,
     OPEN_EFFECT_LINK,
 
     /** Opens the system file picker for one local AR clip. No library permission. */
@@ -597,12 +598,12 @@ internal object PanelTree {
     )
 
     private val PART_HELP = mapOf(
-        ColorPart.SKIN to "This colors the panel glass.",
+        ColorPart.SKIN to "This colors the panel glass. A color that hides text is locked.",
         ColorPart.NUMBER_DARK to "This colors numbers on dark panels. Keep at least 4.5 to 1 contrast.",
         ColorPart.NUMBER_LIGHT to "This colors numbers on light panels. Keep at least 4.5 to 1 contrast.",
         ColorPart.EDGE to "This colors the thin line around the panel.",
         ColorPart.OUTER_GLOW to "This colors the soft glow outside the panel.",
-        ColorPart.TEXT to "This colors the typed guidance text.",
+        ColorPart.TEXT to "This colors the typed guidance text. A color that fails 4.5 to 1 contrast on the skin is locked.",
         ColorPart.CURSOR to "This colors the laser cursor. It is one solid color.",
         ColorPart.FOLDER to "This colors the folder icons.",
         ColorPart.STATUS to "This colors the status line at the top.",

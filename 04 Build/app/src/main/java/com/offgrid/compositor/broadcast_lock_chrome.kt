@@ -1,6 +1,5 @@
 package com.offgrid.compositor
 
-import android.animation.ValueAnimator
 import android.graphics.Rect
 import android.os.Build
 import android.os.Handler
@@ -49,20 +48,32 @@ internal class BroadcastLockChrome(
         store.addListener(listener)
     }
 
-    /** onCreate: nothing shows until the gate opens. */
+    /** onCreate: unlocked chrome shows at once so folders never flash in after the camera. */
     fun onCreate() {
-        hideChrome()
         activity.terminalPanel.setLockWord(store.state.word)
+        if (store.locked) hideChrome() else {
+            gateOpen = true
+            showChrome()
+        }
+        activity.showUnlockStrip(store.locked && !store.state.recordingVisible)
     }
 
     fun onStart() {
-        gateOpen = false
         frameSeen = false
-        hideChrome()
         val initial = register()
         store.onStart(initial)
-        main.removeCallbacks(fallbackTask)
-        main.postDelayed(fallbackTask, FALLBACK_MS)
+        if (store.locked) {
+            gateOpen = false
+            hideChrome()
+            activity.showUnlockStrip(!store.state.recordingVisible)
+            main.removeCallbacks(fallbackTask)
+            main.postDelayed(fallbackTask, FALLBACK_MS)
+        } else {
+            gateOpen = true
+            showChrome()
+            activity.showUnlockStrip(false)
+            main.removeCallbacks(fallbackTask)
+        }
     }
 
     fun onResume() = store.onResume()
@@ -145,6 +156,7 @@ internal class BroadcastLockChrome(
     private fun apply(state: LockState) {
         activity.terminalPanel.setLockWord(state.word)
         if (state.locked || !gateOpen) hideChrome() else showChrome()
+        activity.showUnlockStrip(state.locked && !state.recordingVisible)
         activity.onLockApplied(state)
     }
 
@@ -161,12 +173,7 @@ internal class BroadcastLockChrome(
         chromeShown = true
         val panel = activity.terminalPanel
         panel.setHiddenForLock(false)
-        if (ValueAnimator.areAnimatorsEnabled()) {
-            panel.alpha = 0f
-            panel.animate().alpha(1f).setDuration(FADE_MS).start()
-        } else {
-            panel.alpha = 1f
-        }
+        panel.alpha = 1f
     }
 
     /**

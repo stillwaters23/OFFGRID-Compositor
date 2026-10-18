@@ -26,7 +26,7 @@ class PairingActivity : Activity() {
         val scroll = ScrollView(this).apply { addView(content) }
         setContentView(scroll)
         content.addView(label("OFFGRID / PAIRING", 20, true))
-        content.addView(label("Use a private key only on phones you control.", 14))
+        content.addView(label("Use a private key only on a PC or Android phone you control.", 14))
         keyText = label("No key is shown.", 13)
         keyText.setTextIsSelectable(true)
         content.addView(keyText, marginTop(20))
@@ -35,7 +35,7 @@ class PairingActivity : Activity() {
         addressText = label("Looking up this phone's Wi-Fi address.", 13)
         addressText.setTextIsSelectable(true)
         content.addView(addressText, marginTop(16))
-        content.addView(label("On the remote phone, type this address if searching does not find the camera phone.", 12), marginTop(4))
+        content.addView(label("On the other Android phone or on a PC, type this address if searching does not find the camera phone.", 12), marginTop(4))
         showLocalAddress()
         pastedKey = EditText(this).apply {
             hint = "Paste the 100+ character key"

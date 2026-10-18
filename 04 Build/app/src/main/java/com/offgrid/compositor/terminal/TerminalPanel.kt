@@ -88,7 +88,14 @@ class TerminalPanel @JvmOverloads constructor(
     /** The saved video plays over the whole stage, so the panel steps off it. */
     internal var hiddenForPlayback = false
 
-    /** Called when the top bar's Lock glyph is tapped (lock now) or held (arm or disarm). */
+    /**
+     * Edit lock from the top-right lock glyph. The panel stays on screen. Back, the menu,
+     * and Unlock still work. This is never written to prefs, so a restart cannot trap Royalty.
+     */
+    internal var editLocked = false
+    internal val editLockVeil = View(context)
+
+    /** Called when the top bar's Lock glyph is tapped (edit lock) or held (arm or disarm). */
     var onLockTapped: (() -> Unit)? = null
     var onLockHeld: (() -> Unit)? = null
 
@@ -311,10 +318,18 @@ class TerminalPanel @JvmOverloads constructor(
     /** True when the Step 1 test diamond is painted into the video. It starts off. */
     val testDiamondOn: Boolean get() = store.toggle(LookKeys.TEST_DIAMOND)
 
-    /** The phone's Back key closes the ⋮ menu first, then goes up one folder at a time. */
+    /** How many reel clicks were asked to play. For instrumented tests. */
+    fun clickPlayCount(): Int = clickerSounds.playCount
+
+    /** Plays one click if the sound toggle is on. For instrumented tests. */
+    fun playTestClick() = playWheelClick(50)
+
+    /** The phone's Back key unlocks, restores a hidden panel, closes the menu, then goes up. */
     val backCallback = object : OnBackPressedCallback(false) {
         override fun handleOnBackPressed() {
             when {
+                editLocked -> setEditLocked(false)
+                minimized && !hiddenForLock && !hiddenForPlayback -> showMinimized(false, animate = true)
                 menu.isOpen -> menu.close(animate = true)
                 else -> goUp()
             }
@@ -380,7 +395,17 @@ class TerminalPanel @JvmOverloads constructor(
         )
         body.orientation = LinearLayout.HORIZONTAL
         body.addView(buildMainArea(), LinearLayout.LayoutParams(0, MATCH, 1f))
-        expanded.addView(body, LinearLayout.LayoutParams(MATCH, 0, 1f))
+        val bodyHost = FrameLayout(context)
+        bodyHost.addView(body, LayoutParams(MATCH, MATCH))
+        editLockVeil.isClickable = true
+        editLockVeil.isFocusable = true
+        editLockVeil.visibility = GONE
+        editLockVeil.contentDescription = context.getString(R.string.terminal_edit_locked)
+        editLockVeil.setOnClickListener {
+            say(context.getString(R.string.terminal_unlock_to_edit))
+        }
+        bodyHost.addView(editLockVeil, LayoutParams(MATCH, MATCH))
+        expanded.addView(bodyHost, LinearLayout.LayoutParams(MATCH, 0, 1f))
         addView(expanded, LayoutParams(MATCH, MATCH))
 
         addView(scanLine, LayoutParams(MATCH, dpi(22f), Gravity.TOP).apply {
@@ -388,10 +413,10 @@ class TerminalPanel @JvmOverloads constructor(
             rightMargin = dpi(18f)
         })
 
-        // Phase 1.2 (V2 section 7.2): the floating OFFGRID pill is built but never attached. A
-        // shrunk panel is simply off the stage. A one-finger hold near the top-left corner, or
-        // Phone 2, opens it again.
+        // Restore tab: the existing OFFGRID pill is the guaranteed way back after Minus.
+        // It is never persisted as a trap. A restart opens the panel.
         buildPill()
+        addView(pill, LayoutParams(WRAP, WRAP, Gravity.TOP or Gravity.START))
 
         ViewCompat.addAccessibilityAction(this, context.getString(R.string.terminal_bigger)) { _, _ ->
             resizeBy(dp(STEP_DP))
@@ -526,8 +551,8 @@ class TerminalPanel @JvmOverloads constructor(
         applyHidden()
     }
 
-    /** True while the lock, playback, or the shrink keeps the panel off the stage. */
-    val hiddenFromStage: Boolean get() = hiddenForLock || hiddenForPlayback || minimized
+    /** True while the broadcast lock or playback keeps the panel off the stage. Shrink keeps a restore tab. */
+    val hiddenFromStage: Boolean get() = hiddenForLock || hiddenForPlayback
 
     internal fun applyHidden() {
         val hidden = hiddenFromStage
@@ -537,8 +562,41 @@ class TerminalPanel @JvmOverloads constructor(
             PanelPopups.dismissAll()
         }
         visibility = if (hidden) GONE else VISIBLE
+        pill.isVisible = minimized && !hidden
         refreshBack()
         refreshCoveredBars()
+    }
+
+    /** Tap the lock glyph: lock only blocks edits. Back and Unlock always clear it. */
+    fun toggleEditLock() {
+        setEditLocked(!editLocked)
+    }
+
+    fun setEditLocked(locked: Boolean) {
+        if (editLocked == locked) {
+            refreshLockGlyph()
+            refreshBack()
+            return
+        }
+        editLocked = locked
+        editLockVeil.visibility = if (locked) VISIBLE else GONE
+        if (locked) {
+            hideKeyboard()
+            menu.close(animate = false)
+            PanelPopups.dismissAll()
+            say(context.getString(R.string.terminal_edit_locked))
+        } else {
+            say(context.getString(R.string.terminal_edit_unlocked))
+        }
+        refreshLockGlyph()
+        refreshBack()
+    }
+
+    private var broadcastLockWord = "unlocked"
+
+    private fun refreshLockGlyph() {
+        if (!::topBar.isInitialized) return
+        topBar.setLockWord(if (editLocked && broadcastLockWord == "unlocked") "locked" else broadcastLockWord)
     }
 
     /**
@@ -560,14 +618,19 @@ class TerminalPanel @JvmOverloads constructor(
 
     /** The top bar's Lock glyph follows the lock word: "unlocked", "armed", "locked", or "live". */
     fun setLockWord(word: String) {
-        if (::topBar.isInitialized) topBar.setLockWord(word)
+        broadcastLockWord = word
+        refreshLockGlyph()
     }
 
-    /** Back is on only while there is something to close. */
+    /** Back is on while there is a way out: unlock, restore, close a menu, or go up a folder. */
     internal fun refreshBack() {
-        backCallback.isEnabled = visibility == VISIBLE && !minimized &&
-            (menu.isOpen || openFolder != null)
-        backOrb.enabledState = visibility == VISIBLE && !minimized && openFolder != null
+        backCallback.isEnabled = visibility == VISIBLE && (
+            editLocked ||
+                (minimized && !hiddenForLock && !hiddenForPlayback) ||
+                menu.isOpen ||
+                openFolder != null
+            )
+        backOrb.enabledState = visibility == VISIBLE && !minimized && (editLocked || openFolder != null)
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
@@ -797,8 +860,12 @@ class TerminalPanel @JvmOverloads constructor(
             height = store.number(LookKeys.HEIGHT),
             backOrb = backOrb,
             onShrink = {
-                showMinimized(true, animate = true)
-                onShrunkByTap?.invoke()
+                if (editLocked) {
+                    say(context.getString(R.string.terminal_unlock_to_edit))
+                } else {
+                    showMinimized(true, animate = true)
+                    onShrunkByTap?.invoke()
+                }
             },
             onToggle = { key, on, label ->
                 if (key == FxKeys.MIC_ON && store.toggle(FxKeys.MIC_BLOCKED)) {
@@ -810,7 +877,10 @@ class TerminalPanel @JvmOverloads constructor(
                 }
             },
             onDimensionChanged = { key, value -> setSizePercent(key, value, announce = false) },
-            onLockTapped = { onLockTapped?.invoke() },
+            onLockTapped = {
+                toggleEditLock()
+                onLockTapped?.invoke()
+            },
             onLockHeld = { onLockHeld?.invoke() },
             onNotch = ::playWheelClick,
             laserSource = { auricLaserColor() to store.number(PanelTree.AURIC_LASER_DIMMER) },
@@ -921,6 +991,7 @@ class TerminalPanel @JvmOverloads constructor(
 
 
     internal fun say(message: String) {
+        statusLine.contentDescription = message
         statusLine.type(PanelText.line(message))
     }
 

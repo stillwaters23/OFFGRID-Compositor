@@ -88,6 +88,8 @@ class MainActivity : AppCompatActivity() {
     internal lateinit var playbackHint: TextView
     private lateinit var backButton: Button
     internal lateinit var terminalPanel: TerminalPanel
+    internal lateinit var unlockStrip: View
+    internal lateinit var unlockButton: View
 
     internal var cameraProvider: ProcessCameraProvider? = null
     internal var processor: CompositorProcessor? = null
@@ -167,6 +169,12 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    internal val unlockBackCallback = object : OnBackPressedCallback(false) {
+        override fun handleOnBackPressed() {
+            lockChrome.unlock()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -185,8 +193,12 @@ class MainActivity : AppCompatActivity() {
         playbackHint = findViewById(R.id.playback_hint)
         backButton = findViewById(R.id.back_button)
         terminalPanel = findViewById(R.id.terminal_panel)
+        unlockStrip = findViewById(R.id.unlock_strip)
+        unlockButton = findViewById(R.id.unlock_button)
+        unlockButton.setOnClickListener { lockChrome.unlock() }
 
         onBackPressedDispatcher.addCallback(this, terminalPanel.backCallback)
+        onBackPressedDispatcher.addCallback(this, unlockBackCallback)
         // Phase 1.2: with no Back to camera button on the stage, the phone's Back key ends playback.
         onBackPressedDispatcher.addCallback(this, playbackBackCallback)
         terminalPanel.matchLook(
@@ -200,7 +212,8 @@ class MainActivity : AppCompatActivity() {
         lockChrome = BroadcastLockChrome(this, lockStore)
         lockChrome.onCreate()
         terminalPanel.renderProbeMayOpen = { !recording && !lockStore.locked }
-        terminalPanel.onLockTapped = { lockChrome.lock(LockSource.MANUAL) }
+        // Tap is the escapable edit lock on the panel. Hold still arms the Broadcast Lock.
+        terminalPanel.onLockTapped = null
         terminalPanel.onLockHeld = { lockChrome.toggleArmed() }
         val engine = EffectEngine()
         mic = MicPipeline()
@@ -299,6 +312,13 @@ class MainActivity : AppCompatActivity() {
     internal fun onLockApplied(state: LockState) {
         if (state.locked && playRequested) hidePlayback()
         if ((state.locked || state.armed) && ::coachMark.isInitialized) coachMark.hide()
+    }
+
+    /** Visible Unlock control whenever the Broadcast Lock hid the panel and a share is not live. */
+    internal fun showUnlockStrip(show: Boolean) {
+        if (!::unlockStrip.isInitialized) return
+        unlockStrip.visibility = if (show) View.VISIBLE else View.GONE
+        unlockBackCallback.isEnabled = show
     }
 
     /** One line for the panel's status line and for Phone 2. Nothing is drawn on the stage. */

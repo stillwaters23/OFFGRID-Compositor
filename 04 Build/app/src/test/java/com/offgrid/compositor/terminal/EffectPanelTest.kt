@@ -171,13 +171,19 @@ class EffectPanelTest {
         assertTrue(PanelAction.LIVE_OPEN_OVERLAY_SETTINGS in actions)
         assertTrue(PanelAction.LIVE_CLEAN_OUTPUT in actions)
         assertTrue(PanelAction.REMOTE_OPEN_PAIRING in actions)
+        assertTrue(PanelAction.COPY_PAIRING_KEY in actions)
         assertTrue(PanelAction.LIVE_SEND_TO_PC in actions)
+        val copyHelp = folder.items.filterIsInstance<ActionItem>().single { it.action == PanelAction.COPY_PAIRING_KEY }.help
+        assertTrue(copyHelp.contains("PC or an Android phone"))
+        val pairingHelp = folder.items.filterIsInstance<ActionItem>().single { it.action == PanelAction.REMOTE_OPEN_PAIRING }.help
+        assertTrue(pairingHelp.contains("PC or an Android phone"))
         assertTrue(PanelAction.REMOTE_OPEN_PREVIEW in actions)
         assertFalse(folder.items.filterIsInstance<ToggleItem>().single { it.key == FxKeys.LIVE_OVERLAY }.default)
         assertEquals("off", folder.items.filterIsInstance<ChoiceItem>().first { it.key == FxKeys.REMOTE_ROLE }.default)
         assertEquals(LiveActions.OPEN_OVERLAY, PanelAction.LIVE_OPEN_OVERLAY_SETTINGS.name)
         assertEquals(LiveActions.CLEAN_OUTPUT, PanelAction.LIVE_CLEAN_OUTPUT.name)
         assertEquals(LiveActions.OPEN_PAIRING, PanelAction.REMOTE_OPEN_PAIRING.name)
+        assertEquals(LiveActions.COPY_PAIRING_KEY, PanelAction.COPY_PAIRING_KEY.name)
         assertEquals(LiveActions.OPEN_PREVIEW, PanelAction.REMOTE_OPEN_PREVIEW.name)
         assertEquals(LiveActions.SEND_TO_PC, PanelAction.LIVE_SEND_TO_PC.name)
     }

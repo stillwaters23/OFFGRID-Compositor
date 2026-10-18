@@ -3,7 +3,6 @@ package com.offgrid.compositor
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 
 /**
  * Opens a platform's own app with one tap, so Royalty can ask to join again herself
@@ -30,10 +29,11 @@ internal object PlatformLinks {
         "google_meet" to "com.google.android.apps.tachyon",
         "discord" to "com.discord",
         "microsoft_teams" to "com.microsoft.teams",
+        "kick" to "com.kick.mobile",
     )
 
-    /** What happened, so the panel can say it in plain words. */
-    enum class Opened { APP, STORE, NOTHING }
+    /** What happened, so the panel can say it in plain words. Never opens the Play Store. */
+    enum class Opened { APP, MISSING, NOTHING }
 
     fun open(context: Context, id: String, title: String): Opened {
         val app = PACKAGES[id]?.let { context.packageManager.getLaunchIntentForPackage(it) }
@@ -41,13 +41,7 @@ internal object PlatformLinks {
             app.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             if (start(context, app)) return Opened.APP
         }
-        val query = Uri.encode(title)
-        val store = Intent(Intent.ACTION_VIEW, Uri.parse("market://search?q=$query&c=apps"))
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        if (start(context, store)) return Opened.STORE
-        val web = Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/search?q=$query&c=apps"))
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        return if (start(context, web)) Opened.STORE else Opened.NOTHING
+        return if (PACKAGES[id] == null) Opened.NOTHING else Opened.MISSING
     }
 
     private fun start(context: Context, intent: Intent): Boolean = try {

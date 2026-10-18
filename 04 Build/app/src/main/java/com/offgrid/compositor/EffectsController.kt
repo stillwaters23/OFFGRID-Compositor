@@ -254,7 +254,7 @@ internal class EffectsController(
         val title = panel.folderTitle(platform) ?: platform
         val message = when (PlatformLinks.open(context, platform, title)) {
             PlatformLinks.Opened.APP -> R.string.fx_opened_app
-            PlatformLinks.Opened.STORE -> R.string.fx_opened_store
+            PlatformLinks.Opened.MISSING -> R.string.fx_app_missing
             PlatformLinks.Opened.NOTHING -> R.string.fx_open_failed
         }
         panel.announce(context.getString(message, title))

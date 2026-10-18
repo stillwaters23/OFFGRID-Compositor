@@ -191,7 +191,8 @@ internal fun TerminalPanel.showMinimized(value: Boolean, animate: Boolean, save:
     }
     minimized = value
     glass.resizeBarVisible = !value
-    if (save) prefs.minimized = value
+    // Never persist a hidden panel. A restart, or Back, always has a way out.
+    if (save) prefs.minimized = false
     // Royalty's own tap decides from now on.
     if (save) steppedAside = false
     if (value) {
@@ -199,16 +200,17 @@ internal fun TerminalPanel.showMinimized(value: Boolean, animate: Boolean, save:
         menu.close(animate = false)
     }
     expanded.isVisible = !value
-    // Phase 1.2: the pill is never on the stage. A shrunk panel is off the stage entirely.
-    pill.isVisible = false
+    pill.isVisible = value && !hiddenForLock && !hiddenForPlayback
+    pillRing.isVisible = value && look.ring
+    pillRing.spinning = value && look.ring
     refreshEdgeRoom()
     scanLine.isVisible = !value && look.scanLine
-    pillRing.isVisible = false
-    pillRing.spinning = false
     applyHidden()
     requestLayout()
     if (animate && !value) {
         post { hologramIn(this, margin.toFloat(), margin.toFloat(), isDetail = false) }
         say(context.getString(R.string.terminal_panel_open))
+    } else if (value) {
+        say(context.getString(R.string.terminal_panel_hidden))
     }
 }
