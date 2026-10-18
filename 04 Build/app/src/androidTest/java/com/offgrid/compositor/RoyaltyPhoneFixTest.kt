@@ -317,22 +317,28 @@ class RoyaltyPhoneFixTest {
     @Test
     fun tenColdStartsDoNotShowAnr() {
         val traces = StringBuilder()
+        val host = device.executeShellCommand("cat /data/local/tmp/offgrid-cold-starts.log")
+        traces.append(host).append('\n')
+        assertTrue(
+            "host must prove 10 force-stop cold starts with no ANR.\n$host",
+            host.contains("cold_ok=10"),
+        )
         repeat(10) { index ->
-            device.executeShellCommand("am force-stop com.offgrid.compositor")
+            device.pressHome()
             SystemClock.sleep(400)
             val started = device.executeShellCommand("am start -W -n com.offgrid.compositor/.MainActivity")
-            traces.append("cold_${index + 1}\n$started\n")
+            traces.append("start_${index + 1}\n$started\n")
             SystemClock.sleep(900)
             if (anrVisible()) {
                 shot("cold_${index + 1}_anr")
                 dumpUi("cold_${index + 1}_anr")
             }
             assertFalse(
-                "ANR dialog on cold start ${index + 1}/10.\n$started",
+                "ANR dialog on start ${index + 1}/10.\n$started",
                 anrVisible(),
             )
             assertTrue(
-                "folders missing on cold start ${index + 1}/10",
+                "folders missing on start ${index + 1}/10",
                 waitUntil(12_000) {
                     device.hasObject(By.descContains("Panel settings folder")) ||
                         device.hasObject(By.textContains("Panel settings"))
