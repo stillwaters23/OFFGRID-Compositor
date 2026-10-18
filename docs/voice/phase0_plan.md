@@ -22,11 +22,11 @@ Gate G1 is an on-device spike on the Galaxy S25. It is a standalone spike, outsi
 
 Every BIGO call in this matrix uses a **second BIGO account**. Royalty's main account is not the test account.
 
-**Auto-cutoff** means the injected path cuts itself off when the helper dies or a check is not green. The other app receives silence, or the documented cutoff tone. It does not receive the physical microphone.
+**Auto-cutoff** means that when the helper dies, the injected path cuts itself off. The other app receives silence, or the documented cutoff tone. The physical microphone stays closed.
 
 **Watchdog** means the spike observes binder death of the helper and records that observation with the auto-cutoff result. The later product bar, from the review's Phase 3, is a route-lost notification within 2 seconds. G1 records whether death was detected fast enough to support that bar. Undetected death fails the watchdog row.
 
-**Muted until all checks are green** means arming stays off, and the far side stays muted, until every row below is green. One red row keeps the mute. An unscoped-only result is a red row.
+**Muted until green** means Royalty's real microphone stays off the far side until every safety row is green. The safety rows are UID scoping (row 4), auto-cutoff (row 9), the watchdog (row 10), and the fail-safe that a failed path leaves the physical microphone closed. A red safety row keeps the real microphone held. Once those rows are green, the far side hears Rex. Row 12 is the 5-minute second-account hearing test, and it runs after that. An unscoped mix leaves UID scoping red, so the real microphone stays held.
 
 Gate rule, from the review: a pass opens the later Route A product work. A fail shelves Shizuku. The hardware route (Route B) and the in-app mux (Route C) stay available either way.
 
@@ -42,7 +42,7 @@ Gate rule, from the review: a pass opens the later Route A product work. A fail 
 | 8 | 30-minute stability | The tone stays above the RMS gate for 30 minutes. | Dropouts, or the helper dies without the watchdog row recording it. |
 | 9 | Auto-cutoff | The helper is killed mid-capture. The harness goes silent, or plays the documented cutoff tone. The physical microphone is not the source. | The harness falls open to the live microphone. |
 | 10 | Watchdog | The spike log records binder death of the helper in the same run as row 9, and records the time from kill to cutoff. Undetected death fails. The log notes whether that time can support the later 2-second route-lost notification. | Death is invisible, or the log has no time. |
-| 11 | Muted until all checks are green | Rows 1–10 and row 12 are green before anything is unmuted. The spike log contains one explicit "muted until green" line that stays muted while any row is red. | Audio is released while any row is red, or the line is missing. |
+| 11 | Muted until green | While UID scoping, auto-cutoff, the watchdog, or the fail-safe is red, the physical microphone does not reach the far side. The spike log records that hold. Once those safety rows are green, the far side hears Rex, and row 12 is the 5-minute second-account hearing test that runs after that. | The physical microphone reaches the far side while a safety row is red, or the safety rows are green and the far side still does not hear Rex. |
 | 12 | Second BIGO account | A second account, not Royalty's main account, hears the Rex tone for at least 5 minutes. BIGO does not crash. The pass/fail decision is written down. | The call uses the main account, the far side never hears the tone, BIGO crashes, or no decision is written down. |
 
 Rows 9, 10, and 11 are the fail-open protection from the review's finding E6. They are part of the gate, so Route A product code is not written ahead of them.
