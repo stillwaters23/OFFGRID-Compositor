@@ -7,6 +7,8 @@ api="${1:?api level}"
 root="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$root"
 chmod +x "04 Build/gradlew"
+adb shell mkdir -p /data/local/tmp/royalty-fix-evidence
+adb shell chmod 777 /data/local/tmp/royalty-fix-evidence
 
 set +e
 (

@@ -75,6 +75,18 @@ class RoyaltyLockHideTest {
         assertEquals(View.VISIBLE, second.expanded.visibility)
     }
 
+    @Test
+    fun topBarTitleDoesNotKeepRequestingLayout() {
+        val panel = attachedPanel()
+        assertFalse(panel.topBar.isLayoutRequested)
+        panel.topBar.measure(
+            View.MeasureSpec.makeMeasureSpec(panel.topBar.width, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(panel.topBar.height, View.MeasureSpec.EXACTLY),
+        )
+        panel.topBar.layout(0, 0, panel.topBar.width, panel.topBar.height)
+        assertFalse("title textSize in onLayout must not request another pass", panel.topBar.isLayoutRequested)
+    }
+
     private fun attachedPanel(): TerminalPanel {
         val panel = TerminalPanel(context)
         val host = FrameLayout(context)

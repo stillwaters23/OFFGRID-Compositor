@@ -162,7 +162,9 @@ internal class TopBar(
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         super.onLayout(changed, left, top, right, bottom)
         laidOutWidth = right - left
-        titleView.textSize = if (laidOutWidth < Hud.dpi(context, 480f)) 9f else 12f
+        // Never change textSize here. TextView.textSize is px, the setter is sp,
+        // so assigning 9f/12f every pass asks for another layout forever.
+        // FitTextView already shrinks the title to the reserved width.
     }
 
     fun setDimensions(width: Int, height: Int) {
