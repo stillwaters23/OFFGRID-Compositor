@@ -30,25 +30,49 @@ HEIGHT = 2400
 results: dict = {"items": {}, "cold": {}}
 
 
-def adb(args: list[str], timeout: int = 50) -> subprocess.CompletedProcess:
+def progress(message: str) -> None:
+    line = f"PROGRESS {time.strftime('%H:%M:%S', time.gmtime())} {message}"
+    print(line, flush=True)
     try:
-        return subprocess.run(
-            ["adb", *args],
+        EVID.mkdir(parents=True, exist_ok=True)
+        with (EVID / "progress.log").open("a", encoding="utf-8") as handle:
+            handle.write(line + "\n")
+    except OSError:
+        pass
+
+
+def adb(args: list[str], timeout: int = 120) -> subprocess.CompletedProcess:
+    shown = " ".join(args)
+    progress(f"adb({timeout}s) {shown}")
+    try:
+        completed = subprocess.run(
+            ["timeout", "--signal=KILL", str(timeout), "adb", *args],
             capture_output=True,
             text=True,
-            timeout=timeout,
+            timeout=timeout + 15,
         )
     except subprocess.TimeoutExpired as error:
+        progress(f"TIMEOUT adb {shown}")
         return subprocess.CompletedProcess(args, 124, error.stdout or "", error.stderr or "timeout")
+    if completed.returncode in (124, 137):
+        progress(f"TIMEOUT({timeout}s) adb {shown}")
+    return completed
 
 
 def shot(name: str) -> None:
     path = STEPS / f"{name}.png"
     path.parent.mkdir(parents=True, exist_ok=True)
+    progress(f"screencap {name}")
     try:
         with path.open("wb") as handle:
-            subprocess.run(["adb", "exec-out", "screencap", "-p"], stdout=handle, timeout=30, check=False)
+            subprocess.run(
+                ["timeout", "--signal=KILL", "20", "adb", "exec-out", "screencap", "-p"],
+                stdout=handle,
+                timeout=30,
+                check=False,
+            )
     except subprocess.TimeoutExpired:
+        progress(f"TIMEOUT screencap {name}")
         path.write_bytes(b"")
 
 
@@ -57,7 +81,7 @@ def logcat(*filters: str) -> str:
     if filters:
         args.append("-s")
         args.extend(filters)
-    return adb(args, timeout=40).stdout or ""
+    return adb(args, timeout=20).stdout or ""
 
 
 def parse_nodes(path: Path) -> list[dict]:
@@ -90,14 +114,16 @@ def dump(name: str) -> list[dict]:
     DUMPS.mkdir(parents=True, exist_ok=True)
     remote = "/data/local/tmp/qa_ui.xml"
     local = DUMPS / f"{name}.xml"
+    progress(f"uiautomator dump {name}")
     adb(["shell", "rm", "-f", remote], timeout=15)
-    for _ in range(5):
-        ran = adb(["shell", "uiautomator", "dump", remote], timeout=40)
+    for attempt in range(2):
+        ran = adb(["shell", "uiautomator", "dump", remote], timeout=25)
         text = f"{ran.stdout}\n{ran.stderr}"
         if "hierchary dumped" in text or "hierarchy dumped" in text:
             break
-        time.sleep(0.8)
-    adb(["pull", remote, str(local)], timeout=30)
+        progress(f"uiautomator dump {name} retry {attempt + 1}")
+        time.sleep(0.5)
+    adb(["pull", remote, str(local)], timeout=20)
     return parse_nodes(local)
 
 
@@ -221,7 +247,12 @@ def read_screen() -> tuple[int, int]:
 
 def yellow_sample() -> int | None:
     try:
-        raw = subprocess.run(["adb", "exec-out", "screencap"], capture_output=True, timeout=30).stdout
+        progress("screencap raw yellow sample")
+        raw = subprocess.run(
+            ["timeout", "--signal=KILL", "20", "adb", "exec-out", "screencap"],
+            capture_output=True,
+            timeout=30,
+        ).stdout
     except subprocess.TimeoutExpired:
         return None
     if len(raw) < 16:
@@ -242,13 +273,15 @@ def yellow_sample() -> int | None:
 
 def cold_one(kind: str, index: int, start_args: list[str], displayed_prefix: str, early_yellow: bool) -> dict:
     name = f"{kind}_{index:02d}"
+    progress(f"cold {name} begin")
     adb(["shell", "am", "force-stop", start_args[0]], timeout=20)
     time.sleep(0.5)
     adb(["logcat", "-c"], timeout=20)
     yellow = None
     if early_yellow:
+        progress(f"cold {name} am start")
         proc = subprocess.Popen(
-            ["adb", "shell", "am", "start", "-W", *start_args[1:]],
+            ["timeout", "--signal=KILL", "45", "adb", "shell", "am", "start", "-W", *start_args[1:]],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
@@ -257,15 +290,16 @@ def cold_one(kind: str, index: int, start_args: list[str], displayed_prefix: str
         yellow = yellow_sample()
         shot(f"../cold/{name}_early")
         try:
-            out, err = proc.communicate(timeout=70)
+            out, err = proc.communicate(timeout=55)
         except subprocess.TimeoutExpired:
             proc.kill()
             out, err = proc.communicate()
+            progress(f"TIMEOUT cold {name} am start")
         started = f"{out}\n{err}"
     else:
-        ran = adb(["shell", "am", "start", "-W", *start_args[1:]], timeout=70)
+        ran = adb(["shell", "am", "start", "-W", *start_args[1:]], timeout=45)
         started = f"{ran.stdout}\n{ran.stderr}"
-    deadline = time.time() + 45
+    deadline = time.time() + 20
     shown = ""
     while time.time() < deadline:
         log = logcat("ActivityTaskManager:I", "ActivityManager:E", "OffgridStartup:I")
@@ -385,7 +419,7 @@ def ensure_home(tag: str) -> list[dict]:
         time.sleep(0.6)
     adb(["shell", "am", "force-stop", PACKAGE], timeout=20)
     time.sleep(0.4)
-    adb(["shell", "am", "start", "-W", "-n", ACTIVITY], timeout=70)
+    adb(["shell", "am", "start", "-W", "-n", ACTIVITY], timeout=45)
     deadline = time.time() + 30
     while time.time() < deadline:
         nodes = dump(f"{tag}_relaunch")

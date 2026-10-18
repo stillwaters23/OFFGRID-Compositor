@@ -21,7 +21,7 @@ jobs:
   independent-qa:
     name: API 35 KVM walk
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 60
     steps:
       - name: Enable KVM
         run: |
@@ -122,7 +122,7 @@ jobs:
           ram-size: 3072
           force-avd-creation: true
           disable-animations: false
-          emulator-boot-timeout: 900
+          emulator-boot-timeout: 360
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -no-boot-anim -no-metrics -accel on
           pre-emulator-launch-script: bash docs/qa/independent_qa/host_kvm.sh
           script: bash docs/qa/independent_qa/run_on_emulator.sh
