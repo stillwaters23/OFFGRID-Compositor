@@ -251,6 +251,46 @@ class RoyaltyPhoneFixTest {
     }
 
     @Test
+    fun widthReelSwipePlaysClickerLog() {
+        device.executeShellCommand("logcat -c")
+        tapFolder("Panel settings")
+        tapFolder("Size")
+        val reel = waitDescContains("Width,")
+        assertTrue("Width drum must be on the Size folder. seen=${visibleLabels()}", reel != null)
+        val loc = IntArray(2)
+        var width = 0
+        var height = 0
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            reel!!.getLocationOnScreen(loc)
+            width = reel.width
+            height = reel.height
+        }
+        val x = loc[0] + width / 2
+        val startY = loc[1] + (height * 3 / 4)
+        val endY = (loc[1] - height / 4).coerceAtLeast(40)
+        device.swipe(x, startY, x, endY, 18)
+        device.waitForIdle()
+        SystemClock.sleep(700)
+        val moved = waitUntil(8_000) {
+            val status = statusDescription()
+            val desc = findDescContains("Width,")?.contentDescription?.toString().orEmpty()
+            (status.contains("Width is now") && !status.contains("Width is now 100")) ||
+                (desc.contains("Width,") && !desc.contains("Width, 100"))
+        }
+        assertTrue(
+            "a swipe up on the Width drum must leave 100. status=${statusDescription()} seen=${visibleLabels()}",
+            moved,
+        )
+        var log = ""
+        val played = waitUntil(5_000) {
+            log = shellOutput("logcat -d -s OffgridClicker:I")
+            log.contains("SoundPool play streamId=")
+        }
+        assertTrue("a real drum swipe must log SoundPool play. log=$log", played)
+        shot("15b_width_reel_swiped")
+    }
+
+    @Test
     fun titleFitsOnScreen() {
         val title = waitTextContains("OFFGRID TERMINAL")
         assertTrue(title != null)

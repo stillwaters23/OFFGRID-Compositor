@@ -132,6 +132,8 @@ class TerminalPanel @JvmOverloads constructor(
     internal var clickerStyle = CLICKER_STYLES.indexOf(store.choice(PanelTree.CLICKER_STYLE)).coerceAtLeast(0)
     internal var clickerVariant = store.number(PanelTree.CLICKER_VARIANT)
     internal var clickerVolume = store.number(PanelTree.CLICKER_VOLUME)
+    internal var lastWheelClickAt = 0L
+    internal var lastWheelClickValue = Int.MIN_VALUE
     internal var sizeBank: SizeReelBank? = null
     internal val sizeReels = ArrayList<Pair<String, WheelNumberRow>>()
     internal val sizeRows = ArrayList<Pair<String, NumberBox>>()

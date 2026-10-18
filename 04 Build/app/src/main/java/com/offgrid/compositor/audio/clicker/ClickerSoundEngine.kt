@@ -81,9 +81,8 @@ internal class ClickerSoundEngine {
     }
 
     fun play(style: Int, value: Int, volume: Int) {
-        if (!active) {
-            Log.i(TAG, "SoundPool play skipped engine off")
-            return
+        if (!active || handler == null) {
+            activate()
         }
         val safeStyle = style.coerceIn(0, ClickerSoundSynth.STYLE_COUNT - 1)
         val variant = ClickerSoundSynth.variantFor(value)
@@ -95,7 +94,10 @@ internal class ClickerSoundEngine {
             return
         }
         audioHandler.post {
-            if (!active) return@post
+            if (!active) {
+                Log.i(TAG, "SoundPool play skipped engine off")
+                return@post
+            }
             if (safeVolume <= 0f) {
                 Log.i(TAG, "SoundPool play skipped volume=0")
                 return@post
@@ -195,7 +197,7 @@ internal class ClickerSoundEngine {
         }
     }
 
-    private companion object {
+    internal companion object {
         const val TAG = "OffgridClicker"
     }
 }

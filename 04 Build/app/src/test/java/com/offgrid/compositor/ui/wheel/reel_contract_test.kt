@@ -58,19 +58,19 @@ class ReelContractTest {
     }
 
     @Test
-    fun dragUpRaisesTheNumberAndKeysStayInRange() {
+    fun dragUpLowersTheNumberAndKeysStayInRange() {
         val (delta, velocity) = WheelPhysics.dragDelta(dyPixels = -56.0, dtMs = 16.0)
-        assertTrue(delta > 0.0)
-        assertTrue(velocity > 0.0)
+        assertTrue(delta < 0.0)
+        assertTrue(velocity < 0.0)
         val down = WheelPhysics.dragDelta(dyPixels = 28.0, dtMs = 16.0).first
-        assertTrue(down < 0.0)
+        assertTrue(down > 0.0)
         assertEquals(0, WheelPhysics.keyTarget(4, WheelPhysics.Key.HOME))
         assertEquals(100, WheelPhysics.keyTarget(4, WheelPhysics.Key.END))
         assertEquals(14, WheelPhysics.keyTarget(4, WheelPhysics.Key.PAGE_UP))
         assertEquals(0, WheelPhysics.keyTarget(4, WheelPhysics.Key.PAGE_DOWN))
         assertEquals(100, WheelPhysics.keyTarget(99, WheelPhysics.Key.UP))
         val fling = WheelPhysics.flingNotchesPerFrame(-2800.0, 28.0)
-        assertTrue(fling > 0.0)
+        assertTrue(fling < 0.0)
     }
 
     @Test
