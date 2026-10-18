@@ -21,7 +21,7 @@ A calibration section follows Round 3. Same nested emulator. The environment ver
 
 Round 4 is the KVM retest of head `6c7936e`. Its overall verdict is **FAIL**: the Width reel moved from 100 to 96 and the click log stayed empty. The Round 3 cold-start ANR did not repeat on that runner.
 
-Round 5 retests head `2fea30e` on the same kind of KVM runner. That section is the current verdict. Its overall verdict is **BLOCKED**: the emulator left adb after the first Width swipe, before the click log and before Broadcast Lock, Minus, edit lock, the view menu, and copy pairing.
+Round 5 retests head `2fea30e` on the same kind of KVM runner. The first attempt (run 39150242408) is **BLOCKED**: the emulator left adb after the first Width swipe. The Round 5 retry is the current verdict. Device loss on that swipe was a runner flake. The completing job's phone verdict is **PASS**.
 
 **Overall verdict (Round 1): FAIL.**
 
@@ -970,4 +970,96 @@ Unchanged from Round 4. On the unfit nested emulator, startup main-thread work b
 ### Evidence
 
 Artifact `independent-qa-api-35` from run 39150242408. Usable stills are the cold-start PNGs and the step PNGs through `reel_width_up_before.png`. `progress.log` has the swipe command, the two dump timeouts, `adb: device offline`, and `emulator-5554` not found. `reel_clicker.log` contains only the header `Width up 100 -> None`. `logcat.txt` is empty because the end-of-job `logcat -d` hit its 120 second cap on a missing device. `walk_exit=1`. `instrument_exit=1`.
+
+## Round 5 retry — device loss is a runner flake
+
+Current verdict. Head under test: `2fea30ec71f29cfce4c20531d66f6ee15a759b70`. QA workflow commit: `718671e`.
+
+Run: https://github.com/stillwaters23/OFFGRID-Compositor/actions/runs/39152608207
+
+Three jobs, `fail-fast: false`, logs uploaded with `if: always()`:
+
+| Job | SHA | Result | What the swipe did |
+| --- | --- | --- | --- |
+| candidate-1 | `2fea30e` | walk_exit=0, instrument_exit=0 | `adb get-state` stayed `device` through Width up, Width down, Height up, and Height down. Full walk finished. |
+| candidate-2 | `2fea30e` | walk_exit=1, instrument_exit=1 | Swipe at 18:19:55Z. `get-state` was `device` at 18:19:56Z and again at 18:21:08Z. `logcat -d` then printed `adb: device offline`. |
+| control-6c7936e | `6c7936e` | walk_exit=1, instrument_exit=1 | `get-state` stayed `device` through all four drum swipes. The click log stayed empty, which matches Round 4 on this older head. |
+
+The app-linked rule was: both `2fea30e` jobs lose the device at the drum swipe, and `6c7936e` does not. That pattern did not happen. One `2fea30e` job finished the walk. The control survived the same swipe. The loss on candidate-2 is a runner flake. Phone verdicts below are from candidate-1, artifact `independent-qa-candidate-1`.
+
+### Why candidate-2 is a flake
+
+`input swipe 277 1488 277 1249 350` ran at 18:19:55Z. The continuous `adb logcat -v time` stream, started at boot, shows three click lines from pid 7945 and then ordinary system chatter. There is no `FATAL EXCEPTION` and no `ANR in` anywhere in that stream.
+
+```
+10-18 18:19:55.975 I/OffgridClicker( 7945): SoundPool play streamId=121
+10-18 18:19:56.061 I/OffgridClicker( 7945): SoundPool play streamId=129
+10-18 18:19:56.724 I/OffgridClicker( 7945): SoundPool play streamId=137
+```
+
+The last lines of the stream, about two seconds later:
+
+```
+10-18 18:19:57.749 I/AiAiEcho( 1401): #postPredictionTargets: Sending updates to UISurface home with targets# 0 (types=[])
+10-18 18:19:58.317 D/EGL_emulation( 7945): app_time_stats: avg=121.97ms min=112.21ms max=133.87ms count=8
+10-18 18:19:58.440 D/BufferPoolAccessor2.0(  514): bufferpool2 0x79a50b6b8cb8 : 2(7776000 size) total buffers - 1(3888000 size) used buffers - 274/276 (recycle/alloc) - 8/276 (fetch/transfer)
+```
+
+`AudioFlinger` lines in that stream are from boot (`18:09:57`), when the audio HAL came up. Host `dmesg` grep in `host-diagnostics.txt` is `no oom lines`. Emulator stderr is one munmap warning (`cannnot unmap ptr ... protected range`). The qemu process was still sampled at 18:21:38Z (rss about 7.2 GiB on a 15989 MB host) and was gone by the 18:21:48Z sample, the same window as `adb: device offline`. The Width dump after the hang did not contain the reel, so the script recorded `100 -> None` and skipped the other three swipes. The plays above were already in the stream.
+
+The control on `6c7936e` kept `get-state: device` for Width up (`100 -> 100`, empty `OffgridClicker` log), Width down (`100 -> 99`, empty), Height up (`100 -> 100`, empty), and Height down (`100 -> 98`, empty). Later on that same control job the Minus restore tap failed and the edit-lock and menu dumps were missing. That gap is after the swipes, on the older head, and is the same class of runner drop.
+
+### Phone verdicts from candidate-1
+
+**Overall phone verdict: PASS.** P1-2 and P1-3 stay DEFERRED.
+
+| Item | Verdict | Evidence on candidate-1 |
+| --- | --- | --- |
+| Splash | PASS | `cold/offgrid_01_early.png` is a black 1080×2400 frame with status icons and the gesture bar. Yellow samples: 0. |
+| Ten cold starts | PASS | No ANR dialog and no `ANR in` line. OFFGRID Displayed times sit next to Settings. |
+| White skin | PASS | "Locked: white typewriter text on a white background can't be read." Hex `#FFFFFF`. |
+| Night, then one black tap | PASS | Black panel. "Locked: black typewriter text on a black background can't be read." The sentence stayed. |
+| Click sounds | PASS | Width up 100→98, Width down 98→100, Height up 100→96, Height down 96→100. Each gesture added new `SoundPool play` lines. Header, drums, and number boxes stayed laid out. |
+| Manifest | PASS | `RECORD_AUDIO` absent. `FOREGROUND_SERVICE_MICROPHONE` absent. HEAD=`2fea30e`. |
+| View menu | PASS | Status (14, 283, 1066, 399), card (231, 413, 1019, 1962), overlap 0. "Choose how folders look." sits above the menu. |
+| Sliders | PASS | `slider_grep=absent`. The Panel settings note says "No sliders here. Only typed numbers and toggles." |
+| Edit lock | PASS | "Panel is locked. Back, the menu, and Unlock still work." The folder grid stayed up. |
+| Broadcast Lock | PASS | Unlock at (524, 2134, 738, 2242). The immersive cling stayed on screen. LOCKED and Unlock are at the bottom. |
+| Minus | PASS | Restore tab (126, 262, 563, 441). "Panel hidden. Tap the OFFGRID tab, or press Back." |
+| Copy pairing | PASS | "Pairing key made and copied. Paste it on a PC or an Android phone." Live and Remote stayed open. `clipboard_dump=False`. |
+| PC or Android text | PASS | "Pairing works for a PC or an Android phone on the same Wi-Fi." |
+| Title fit | PASS | "OFFGRID TERMINAL" at (137, 157, 241, 262) on 1080×2400 with Panel settings open. |
+| P1-2 Kick flood | DEFERRED | Out of scope. |
+| P1-3 Red sweep | DEFERRED | Out of scope. |
+
+`verdict.json` repeats `SoundPool play streamId=129` in every gesture's detail string. The filtered `logcat -d` buffer is cumulative, and the script quotes the first play line it finds. The per-gesture sections of `reel_clicker.log` show the new ids:
+
+- Width up, 100→98, status "Width is now 98.": streamId 129 at 18:21:33.607, 137 at 18:21:34.483.
+- Width down, 98→100, status "Width is now 100.": 145, 153, 161 at 18:21:44.
+- Height up, 100→96, status "Height is now 96.": 169, 177, 185, 193 from 18:21:49.312 to 18:21:50.595.
+- Height down, 96→100, status "Height is now 100.": 201, 209, 217, 225 from 18:21:54.804 to 18:21:55.108.
+
+`adb get-state` after each of those four swipes, and after each dump, was `device`.
+
+### (2) Ten cold starts — numbers
+
+Each start was force-stop, then `am start -W`. `Status: ok` on all thirty. Displayed times below are the `TotalTime` values.
+
+| Series | Displayed (ms) | LaunchState |
+| --- | --- | --- |
+| Settings | 5332, 5553, 3142, 4311, 3366, 2801, 3333, 2980, 3303, 3634 | COLD, except start 9 which is WARM |
+| Empty activity | 1848, 2363, 2171, 1893, 1719, 2232, 1887, 2068, 3148, 1543 | all COLD |
+| OFFGRID | 4626, 3319, 3096, 3167, 3021, 3101, 3189, 3075, 2819, 2861 | all COLD |
+
+OFFGRID’s few seconds sit in the same band as Settings. This runner is fit to time the app.
+
+The instrument suite on this job finished. `RoyaltyPhoneFixTest` reports `tests="16" failures="0" errors="0"` in 188 seconds. `instrument_exit=0`.
+
+### Non-blocking startup note
+
+Unchanged. On the unfit nested emulator, startup main-thread work before the first frame included `AppCompatTextView` class verification during `setContentView` and `ResourcesCompat.loadFont`. This KVM run did not repeat that trace. It is not a failure.
+
+### Evidence
+
+Artifacts `independent-qa-candidate-1`, `independent-qa-candidate-2`, and `independent-qa-control-6c7936e` from run 39152608207. Candidate-1 stills used for the phone verdict include `cold/offgrid_01_early.png`, `steps/title_fit_pass.png`, `steps/white_skin_pass.png`, `steps/night_black_pass.png`, the four `steps/reel_*.png` frames, `steps/broadcast_armed.png`, `steps/minus_hidden.png`, `steps/copy_after.png`, `steps/menu_open.png`, and `steps/lock_locked.png`. Candidate-2 diagnostics are `logcat-stream.txt`, `device-state.log`, `progress.log`, `emulator-memory.log`, `emulator-process.stderr`, and `host-diagnostics.txt`.
 
