@@ -26,6 +26,7 @@ internal class MoreButton(context: Context) : View(context), Styled {
     init {
         isClickable = true
         isFocusable = true
+        importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
     }
 
     override fun applyLook(look: PanelLook) {

@@ -43,6 +43,7 @@ internal class LockGlyphButton(context: Context) : View(context), Styled {
         isClickable = true
         isFocusable = true
         isLongClickable = true
+        importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
         contentDescription = describe(word)
         setOnClickListener {
             if (tick) performHapticFeedback(HapticFeedbackConstants.CONFIRM)

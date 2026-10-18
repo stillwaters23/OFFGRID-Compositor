@@ -61,7 +61,8 @@ internal class TopBar(
         clipChildren = false
         clipToPadding = false
         setPadding(Hud.dpi(context, 8f), 0, Hud.dpi(context, 8f), 0)
-        contentDescription = context.getString(R.string.terminal_drag)
+        // A group description hides Lock, Minus, and the menu from TalkBack and UI tests.
+        importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
 
         backOrb.layoutParams = LayoutParams(controlWidth, Hud.dpi(context, CONTROL_HEIGHT_DP))
         addView(backOrb)

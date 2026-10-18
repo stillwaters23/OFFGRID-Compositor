@@ -172,7 +172,17 @@ class RoyaltyPhoneFixTest {
     }
 
     private fun waitForPanel() {
-        assertTrue("panel lock control should appear", waitDesc("Lock the panel"))
+        device.waitForIdle()
+        val ready = waitDesc("Lock the panel") ||
+            waitText("OFFGRID TERMINAL") ||
+            waitDesc("OFFGRID TERMINAL") ||
+            waitDescContains("Panel settings")
+        if (!ready) {
+            shot("fail_panel_missing")
+            val dump = File(evidenceDir(), "fail-hierarchy.xml")
+            device.dumpWindowHierarchy(dump)
+        }
+        assertTrue("panel lock control should appear", waitDesc("Lock the panel") || ready)
     }
 
     private fun openFolder(name: String) {
