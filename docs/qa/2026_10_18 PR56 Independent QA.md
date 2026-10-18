@@ -13,7 +13,9 @@ Tester: independent of the fixer. The fixer's log and CI screenshots were not tr
 - Taps were `adb shell input tap` / `input motionevent` / `input keyevent`. `performClick` was not used. `uiautomator dump` exits 137 (killed) whenever the folder panel is up, so hierarchy dumps were not usable. Coordinates came from `dumpsys activity top` view bounds and from pixels in screenshots.
 - Date of this run: 2026-10-18.
 
-**Overall verdict: FAIL.**
+Round 2 retested head `ffaec30` on the same phone. That section is at the bottom. Its overall verdict is **FAIL**, and it replaces the verdict below. The table in this section is Round 1 only.
+
+**Overall verdict (Round 1): FAIL.**
 
 P1-7 still shows a splash before the folders. P1-2 and P1-3 do not deliver the kick behavior Royalty asked for. Several other items could not be finished because the emulator's GPU and input services died under load. A known product limitation is not counted as a pass.
 
@@ -267,3 +269,185 @@ Saved under `/opt/cursor/artifacts/qa-pr56/` (and the working copies under `/tmp
 8. **Unused `BioSliderView`.** Not on screen. It is still a slider-shaped view class in the tree.
 
 9. **Emulator limits that affected this report, and are not app bugs.** 1080×2340 override dropped all touches. UI Automator dump was SIGKILL 137. No front camera. No PulseAudio. GL context loss turned later screenshots black while the window was still focused. Bluetooth aborted repeatedly (`SIGABRT` in `bt_stack_manage`).
+
+## Round 2 — head ffaec30
+
+Retest of the fixer's FAIL list. The Round 1 section above is unchanged except for the pointer at the top.
+
+- Head built and installed: `ffaec301d83433693f408eb0003386bbdc7c9a12` ("Lift Theme mode and keep lock reason on one tap"), from a detached worktree at `/tmp/offgrid-ffaec30`. The QA branch was not used as the build tree.
+- Debug APK: `04 Build/app/build/outputs/apk/debug/app-debug.apk`, `assembleDebug` succeeded. Android test APK: `assembleDebugAndroidTest` succeeded, then `adb install -r -t`.
+- Same device as Round 1: AVD `qa_phone_35`, API 35, 1080×2400 at 420 dpi, `emulator -accel off` (nested KVM is broken). `settings get secure immersive_mode_confirmations` stayed empty. `hide_error_dialogs` was 0 so the ANR dialog stayed on screen. Animator, window, and transition scales were 0.
+- Taps were `adb shell input tap` and `input keyevent`. `performClick` was not used. `uiautomator dump` still dies with 137 while the panel is up.
+- CI run 39117461291 was not treated as evidence. Its artifacts were not downloaded.
+- Date: 2026-10-18.
+
+**Overall verdict: FAIL.**
+
+Splash, white-skin lock text, the view menu, the merged microphone permissions, slider classes, the edit lock, and the title fit are fixed or still holding on this phone. The activity can go idle, and the instrument suite now finishes. The phone still shows "OFFGRID isn't responding" on a cold start. Click sounds do not log a play. Minus does not leave a tappable restore tab the test can see. The one-tap black typewriter lock was not shown. Copy pairing was not shown.
+
+### Verdict table
+
+| Item | Verdict | What was shown on this device |
+| --- | --- | --- |
+| (1) Splash / diamond | PASS | Cold and warm frames after force-stop have no green disc, no white launcher circle, and no yellow diamond. First content is the folder grid. A black lead-in comes first, and the ANR dialog is often already up. |
+| (2) Idle, ANR, instrument | FAIL | `activityReachesIdleSoEspressoCanSync` passed, and a debuggerd dump showed the main thread in `MessageQueue.nativePollOnce`. The suite finished (14 tests, 742.7 s) and did not hang. Cold start still ANRs: waited 5003 ms for `FocusEvent(hasFocus=true)`. |
+| (3) White skin | PASS | Status line types "Locked: white typewriter text on a white background can't be read." The white swatch shows a lock. Hex stayed `#000000`. |
+| (4) Night + one black tap | FAIL | Night was set by hand: "Theme mode is now Night." The one tap on black typewriter text, and a reason that stays, were not reached. The instrumented test never left the home grid. |
+| (5) Click sounds | FAIL | The width reel moved 100 → 93. logcat has no `SoundPool play streamId=` and no `OffgridClicker` play line. |
+| (6) Manifest | PASS | Merged debug manifest has no `RECORD_AUDIO` and no `FOREGROUND_SERVICE_MICROPHONE`. |
+| (7) View menu vs status | PASS | Menu open, status fully readable above the card: "Choose how folders look." |
+| (8) No slider classes | PASS | No `SeekBar`, `RangeSlider`, or `BioSliderView` under `04 Build/app/src`. Size uses typed boxes and drum wheels. |
+| Lock (edit) | PASS | Closed padlock and the lock sentence. Back / menu path returns "The panel is unlocked. You can edit again." Instrumented lock test passed. |
+| Broadcast Lock | FAIL | Not walked by hand this round. Instrumented test: "Broadcast Lock must leave an on-screen Unlock. hint=null". |
+| Minus | FAIL | Stage below the status bar is black. A small OFFGRID chip sits in the status-bar band. The test did not find "Open the panel". |
+| Copy pairing key | FAIL | `copyPairingKeyStaysOnLiveAndRemote` stayed on the home grid. Copy was not completed. Clipboard was not checked. |
+| PC or Android text | FAIL | No still shows the sentence. The mention test returned code 0 after a home-grid screenshot. The copy test's same wait failed on the home grid. |
+| Title fit | PASS | "OFFGRID TERMINAL" wraps on two lines inside the header, below the status bar. `titleFitsOnScreen` passed. |
+| P1-2 Kick flood | DEFERRED | Out of scope. Not a pass. The kick-toggle test failed ("Red sweep must say it cannot change TikTok"). |
+| P1-3 Red sweep | DEFERRED | Out of scope. Not a pass. Same suite failure. The "Test diamond" toggle was not turned on. |
+
+### (1) Splash — PASS
+
+Force-stop, then start `MainActivity`, then screenshot.
+
+- `cold_0` through `cold_2`: about 8,000 non-black pixels, all in the status bar. Green pixels 0. Yellow pixels 0.
+- `warm_0` through `warm_4` after another force-stop: black stage plus the "OFFGRID isn't responding" dialog. Green 0. Yellow 0. No launcher icon.
+- `warm_5`: folder grid, status "The front camera is starting.", ANR dialog on top of the folders.
+
+`foldersShowBeforeAnyDiamondFlash` passed (code 0). Shots `08_no_splash_folders.png` and `09_no_splash_after_resume.png` are the folder grid.
+
+### (2) Idle and ANR — FAIL
+
+The constant-redraw failure from Round 1 is not what this run showed. `activityReachesIdleSoEspressoCanSync` passed. `debuggerd -b` of the app process, taken while the ANR dialog was up, has the main thread in `android::android_os_MessageQueue_nativePollOnce`.
+
+The suite no longer hangs. Command:
+
+`adb shell am instrument -w -r -e class com.offgrid.compositor.RoyaltyPhoneFixTest com.offgrid.compositor.test/androidx.test.runner.AndroidJUnitRunner`
+
+Result: Time 742.746 s, Tests run 14, Failures 7, `INSTRUMENTATION_CODE: -1`, process exit 0. Log: `/tmp/qa-evidence/r2_instrument.txt`. Round 1 sat in `startActivitySync` for more than 25 minutes.
+
+The ANR is still real, so this item fails.
+
+- ANR subject in `/tmp/qa-evidence/r2/anr_cold.txt`: `Input dispatching timed out (... MainActivity (server) is not responding. Waited 5003ms for FocusEvent(hasFocus=true)).`
+- `warm_0.png` is the dialog on a black stage, before the folders. `warm_5.png` is the same dialog over the folder grid.
+- `logcat_tail.txt` records HWUI Davey frames from 808 ms to 3116 ms.
+- Tapping Wait at (330, 1366) returns focus for about a second. The dialog comes back. Taps outside the dialog are eaten.
+
+### (3) White skin — PASS
+
+Evidence is the instrumented screenshot `18_white_skin_locked.png`, not a hand walk. `contrastLockBlocksInvisibleWhiteSkin` passed (code 0).
+
+The status line reads: "Locked: white typewriter text on a white background can't be read." The breadcrumb is Colors → Skin color. The white swatch in the UV row has a lock. The hex field stayed `#000000`. The panel skin on that shot is still black.
+
+### (4) Night, then one black tap — FAIL
+
+Hand path that did complete:
+
+1. Open Panel settings.
+2. Open Theme mode (left tile under the ANR dialog).
+3. Tap Night at about (420, 1170).
+
+`night_top.png` shows "Theme mode is now Night." on a black panel. The header is still readable.
+
+The rest of the requested path did not complete. Colors sat under the ANR dialog. Taps meant for Colors opened Display and Auric wheel instead. One tap on the black typewriter swatch was not made, so a staying "Locked:" reason for black-on-black was not seen.
+
+`contrastLockBlocksBlackTypewriterOnBlack` failed before any of that. Assertion: "Theme mode folder is off-screen on a phone-sized display after swiping the folder list." The `seen=` tree is the home grid (Panel settings, Camera, AR Video Deck, …). Panel settings never opened in that test. `offscreen_Theme_mode.png` is that home grid. This is a navigation miss while the dialog is up, and it is also a fail of the one-tap check.
+
+### (5) Click sounds — FAIL
+
+Size folder drum wheels are on screen (`size2_wheels.png`, value 100, typed boxes 100, no slider). A finger-down swipe on the width reel changed the value. Later headers show W 93 (`night_top.png`, `18_white_skin_locked.png`).
+
+Cleared logcat across those swipes, including while `mCurrentFocus` was `MainActivity`, never contained `SoundPool play streamId=`, an `OffgridClicker` play line, or "Clicker audio could not start". An `OffgridClicker` thread exists in the ANR trace. That is not a play log.
+
+`reelClickSoundsFireWhenTheToggleIsOn` failed the same way as the Theme mode test: "Clicker Sounds folder is off-screen", `seen=` still the home grid. The manual notch without the log line is the fail.
+
+The emulator has no PulseAudio. The required evidence was the log line, which did not appear.
+
+### (6) Manifest — PASS
+
+Merged file: `04 Build/app/build/intermediates/merged_manifest/debug/processDebugMainManifest/AndroidManifest.xml`.
+
+Permissions present: `CAMERA`, `INTERNET`, `DETECT_SCREEN_RECORDING`, `SYSTEM_ALERT_WINDOW`, `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_SPECIAL_USE`, `FOREGROUND_SERVICE_CAMERA`, `POST_NOTIFICATIONS`, and the app's dynamic-receiver permission.
+
+`RECORD_AUDIO` is absent. `FOREGROUND_SERVICE_MICROPHONE` is absent.
+
+### (7) View menu — PASS
+
+`theme_open.png`: status line "> Choose how folders look." sits fully above the menu card. The card lists List, Big tiles, Grid 2 (selected), Grid 3, sort, and folder size. The card does not cover that sentence.
+
+`viewMenuDoesNotCoverTheStatusLine` failed with "view menu must open". The hand screenshot is the evidence for this item.
+
+### (8) Sliders — PASS
+
+Search of `04 Build/app/src` for `SeekBar`, `RangeSlider`, and `BioSliderView` returned no matches. `bio_slider_view.kt` is not in this tree. The Size folder is two drum wheels plus typed number boxes (`size2_wheels.png`).
+
+### Reconfirm
+
+**Edit lock — PASS.** Tap of the lock at about (801, 202) closed the padlock. Status: "Panel is locked. Back, the menu, and Unlock still work. Tap the lock or press Back to unlock." (`lock_tap_top.png`). A later Back path opened the padlock and typed "The panel is unlocked. You can edit again." (`unlock3_top.png`). `lockBackAndUnlockWorkAndRestartDoesNotTrap` passed (code 0).
+
+**Broadcast Lock — FAIL.** Not repeated by hand. `broadcastLockImmersiveUnlockIsOnScreen` failed: "Broadcast Lock must leave an on-screen Unlock. hint=null". `immersive_mode_confirmations` was still empty, and the "Viewing full screen / Got it" card still never drew. Round 1 had a visible Unlock strip. This round did not show one.
+
+**Minus — FAIL.** After the minus tap at about (1009, 202), `minus.png` is black from about y=180 to the nav hint (brightest stage pixel about (7, 0, 12)). A glowing chip with a folder glyph and the word OFFGRID occupies the status-bar band, y 0–123 (`minus_top_crop.png`). `minusAlwaysHasARestorePathIncludingAfterRestart` failed: "minus must leave a restore tab" (`Open the panel` was null). A later shot, `minus_restore_top.png`, says "The panel is open again." That frame came after a tap at the old tab point plus Back. Those two inputs were not separated, so the chip was not shown to be the restore control.
+
+**Copy pairing key — FAIL.** `copyPairingKeyStaysOnLiveAndRemote` failed. The seen tree is the home grid and the status is "This phone has no front camera." `10_live_and_remote.png` is that home grid. The copy row was not tapped. The clipboard was not read.
+
+**PC or Android text — FAIL.** `pairingCopyMentionsPcOrAndroidPhone` returned code 0, so its wait reported the string. `shot()` runs before that wait, and `10b_pairing_pc_or_phone.png` is still the home grid. The copy test uses the same wait and failed while the home grid was still showing. No frame in this round shows "PC or an Android phone".
+
+**Title fit — PASS.** The header in `lock_tap_top.png`, `theme_open.png`, and `16_title_default.png` shows "OFFGRID TERMINAL" on two lines, under the status bar, with camera, microphone, W, H, lock, menu, and minus beside it. `titleFitsOnScreen` passed. Early blank-header frames were the ANR dim or the pre-inset black lead-in.
+
+### Suite, one run
+
+| Test | Code |
+| --- | --- |
+| lockBackAndUnlockWorkAndRestartDoesNotTrap | 0 pass |
+| broadcastLockImmersiveUnlockIsOnScreen | -2 fail |
+| minusAlwaysHasARestorePathIncludingAfterRestart | -2 fail |
+| foldersShowBeforeAnyDiamondFlash | 0 pass |
+| copyPairingKeyStaysOnLiveAndRemote | -2 fail |
+| pairingCopyMentionsPcOrAndroidPhone | 0 pass (no still of the sentence) |
+| openKickStaysInAppAndNeverOpensPlayStore | 0 pass (not used to change the P1-1 verdict) |
+| kickTogglesStayOnOffgridAndNeverClaimTikTok | -2 fail (P1-2 and P1-3 stay DEFERRED) |
+| reelClickSoundsFireWhenTheToggleIsOn | -2 fail |
+| viewMenuDoesNotCoverTheStatusLine | -2 fail |
+| titleFitsOnScreen | 0 pass |
+| activityReachesIdleSoEspressoCanSync | 0 pass |
+| contrastLockBlocksBlackTypewriterOnBlack | -2 fail |
+| contrastLockBlocksInvisibleWhiteSkin | 0 pass |
+
+`FAILURES!!! Tests run: 14, Failures: 7`. The run ended. It did not hang.
+
+### New bugs
+
+1. **FocusEvent ANR on launch.** Force-stop, start `MainActivity`. Within a few seconds the system dialog "OFFGRID isn't responding" is up, including before the folders draw (`warm_0.png`) and on top of them (`warm_5.png`). Subject: waited 5001–5003 ms for `FocusEvent(hasFocus=true)`. Wait dismisses it for about a second, then it returns. The main thread can be idle in the looper while the dialog is up. The suite finishing does not clear this.
+
+2. **Minus has no restore tab the UI test can find.** Tap minus. The stage is black. A small OFFGRID chip is drawn in the status-bar band. Content description "Open the panel" was null. Restoring the panel was not isolated to a tap on that chip.
+
+3. **Width reel notches do not log a click.** Swipe the Size width wheel off 100 (100 → 93). No `SoundPool play streamId=` line.
+
+4. **Black-on-black one tap was not shown.** Night can be selected. The instrumented Theme mode path never left the home grid, and the hand path never opened Colors for the single black typewriter tap.
+
+5. **Broadcast Lock left no on-screen Unlock in the suite.** `hint=null`. Not hand-walked this round.
+
+6. **Copy pairing never left the home grid in its test.** The live page, the copy sentence, and the clipboard were not shown.
+
+### Evidence
+
+Stills and the recording are under `/opt/cursor/artifacts/qa-pr56-r2/`. Working copies are under `/tmp/qa-evidence/r2/`.
+
+| File | What it shows |
+| --- | --- |
+| `warm_0.png` | ANR dialog on a black stage. No splash icon. |
+| `warm_5.png` | Folder grid under the same dialog. |
+| `18_white_skin_locked.png` | White-skin lock reason and locked white swatch. |
+| `night_top.png` | "Theme mode is now Night." Width box reads 93. |
+| `theme_open.png` | View menu below the full status line. |
+| `lock_tap_top.png` | Edit-lock sentence, closed padlock. |
+| `unlock3_top.png` | Unlock sentence, open padlock. |
+| `minus.png` / `minus_top_crop.png` | Black stage, OFFGRID chip in the status bar. |
+| `minus_restore_top.png` | "The panel is open again." after a mixed tap and Back. |
+| `size2_wheels.png` | Drum wheels at 100. No slider. |
+| `16_title_default.png` | Title fits. ANR dialog is also in the frame. |
+| `10b_pairing_pc_or_phone.png` | Home grid. Not the pairing sentence. |
+| `r2_lock_menu.mp4` | 12.4 s, 1080×2400. The captured frames are the Android launcher at 11:09, not the panel. The lock and menu evidence is the stills. |
+
+P1-2 and P1-3 are DEFERRED. They are not passes.
