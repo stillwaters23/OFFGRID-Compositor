@@ -19,12 +19,8 @@ set -e
 
 dest="$root/docs/bugs/screenshots/api-${api}"
 mkdir -p "$dest"
-for path in \
-  /sdcard/Android/data/com.offgrid.compositor/files/Pictures/royalty-fix-evidence \
-  /storage/emulated/0/Android/data/com.offgrid.compositor/files/Pictures/royalty-fix-evidence
-do
-  adb pull "$path/." "$dest" && break
-done || true
+adb shell mkdir -p /data/local/tmp/royalty-fix-evidence || true
+adb pull /data/local/tmp/royalty-fix-evidence/. "$dest" || true
 echo "Pulled emulator screenshots into $dest"
 ls -la "$dest" || true
 exit "$status"

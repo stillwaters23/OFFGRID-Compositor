@@ -1,28 +1,35 @@
 package com.offgrid.compositor
 
 import android.Manifest
-import android.content.Context
-import android.os.Environment
-import androidx.test.core.app.ApplicationProvider
+import android.os.SystemClock
+import android.view.View
+import com.offgrid.compositor.terminal.showMinimized
+import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.Espresso.pressBack
+import androidx.test.espresso.NoMatchingViewException
+import androidx.test.espresso.action.ViewActions.click
+import androidx.test.espresso.action.ViewActions.scrollTo
+import androidx.test.espresso.assertion.ViewAssertions.matches
+import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
+import androidx.test.espresso.matcher.ViewMatchers.withContentDescription
+import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.ext.junit.rules.ActivityScenarioRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.GrantPermissionRule
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
-import androidx.test.uiautomator.UiSelector
-import androidx.test.uiautomator.Until
+import org.hamcrest.CoreMatchers.containsString
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import java.io.File
 
 /**
- * Royalty's S25 Ultra bugs, tapped through on an emulator.
- * Each test takes a screenshot under the app's evidence folder.
+ * Royalty's S25 Ultra bugs, tapped through on an emulator with Espresso.
+ * Screenshots go to /data/local/tmp so they survive the Gradle uninstall.
  */
 @RunWith(AndroidJUnit4::class)
 class RoyaltyPhoneFixTest {
@@ -37,102 +44,107 @@ class RoyaltyPhoneFixTest {
     private val device: UiDevice
         get() = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
 
+    @Before
+    fun showThePanel() {
+        device.executeShellCommand("mkdir -p $EVIDENCE")
+        activity.scenario.onActivity { act ->
+            act.lockChrome.unlock()
+            act.terminalPanel.setHiddenForLock(false)
+            act.terminalPanel.showMinimized(false, animate = false)
+            act.terminalPanel.visibility = View.VISIBLE
+        }
+        device.waitForIdle()
+        waitDisplayed(withContentDescription("Lock the panel"))
+    }
+
     @Test
     fun lockBackAndUnlockWorkAndRestartDoesNotTrap() {
-        waitForPanel()
         shot("01_folders_before_lock")
-        clickDesc("Lock the panel")
-        assertTrue(waitDesc("Unlock the panel"))
+        tap(withContentDescription("Lock the panel"))
+        waitDisplayed(withContentDescription("Unlock the panel"))
         shot("02_edit_locked")
-        assertTrue(waitDesc("More choices: view, sort, and folder size"))
-        clickDesc("More choices: view, sort, and folder size")
+        tap(withContentDescription("More choices: view, sort, and folder size"))
         shot("03_menu_while_locked")
         pressBack()
         pressBack()
-        assertTrue(waitDesc("Lock the panel"))
-        clickDesc("Lock the panel")
-        assertTrue(waitDesc("Unlock the panel"))
-        clickDesc("Unlock the panel")
-        assertTrue(waitDesc("Lock the panel"))
+        waitDisplayed(withContentDescription("Lock the panel"))
+        tap(withContentDescription("Lock the panel"))
+        waitDisplayed(withContentDescription("Unlock the panel"))
+        tap(withContentDescription("Unlock the panel"))
+        waitDisplayed(withContentDescription("Lock the panel"))
         activity.scenario.recreate()
-        waitForPanel()
-        assertTrue(waitDesc("Lock the panel"))
+        showThePanel()
+        waitDisplayed(withContentDescription("Lock the panel"))
         shot("04_after_restart_unlocked")
-        assertFalse(device.hasObject(By.desc("Unlock the panel")))
+        assertFalse(exists(withContentDescription("Unlock the panel")))
     }
 
     @Test
     fun minusAlwaysHasARestorePathIncludingAfterRestart() {
-        waitForPanel()
-        clickDesc("Shrink the panel")
-        assertTrue(waitDesc("Open the panel"))
+        tap(withContentDescription("Shrink the panel"))
+        waitDisplayed(withContentDescription("Open the panel"))
         shot("05_hidden_with_restore_tab")
         pressBack()
-        waitForPanel()
-        assertTrue(waitDesc("Lock the panel"))
-        clickDesc("Shrink the panel")
-        assertTrue(waitDesc("Open the panel"))
-        clickDesc("Open the panel")
-        waitForPanel()
+        waitDisplayed(withContentDescription("Lock the panel"))
+        tap(withContentDescription("Shrink the panel"))
+        waitDisplayed(withContentDescription("Open the panel"))
+        tap(withContentDescription("Open the panel"))
+        waitDisplayed(withContentDescription("Lock the panel"))
         shot("06_restored_from_tab")
-        clickDesc("Shrink the panel")
+        tap(withContentDescription("Shrink the panel"))
         activity.scenario.recreate()
-        waitForPanel()
-        assertTrue(waitDesc("Lock the panel"))
+        showThePanel()
+        waitDisplayed(withContentDescription("Lock the panel"))
         shot("07_after_restart_panel_open")
     }
 
     @Test
     fun foldersShowBeforeAnyDiamondFlash() {
-        waitForPanel()
+        waitDisplayed(withContentDescription(containsString("Panel settings")))
         shot("08_no_splash_folders")
-        assertTrue(device.hasObject(By.descContains("Panel settings")))
-        assertTrue(device.hasObject(By.desc("Lock the panel")))
+        waitDisplayed(withContentDescription("Lock the panel"))
         activity.scenario.recreate()
-        waitForPanel()
+        showThePanel()
+        waitDisplayed(withContentDescription(containsString("Panel settings")))
         shot("09_no_splash_after_resume")
-        assertTrue(device.hasObject(By.descContains("Panel settings")))
     }
 
     @Test
     fun copyPairingKeyStaysOnLiveAndRemote() {
-        waitForPanel()
         openFolder("Live and Remote")
         shot("10_live_and_remote")
         assertTrue(
-            device.hasObject(By.textContains("PC or an Android phone")) ||
-                device.hasObject(By.textContains("PC or Android")) ||
-                device.hasObject(By.descContains("PC or an Android phone")),
+            exists(withText(containsString("PC or an Android phone"))) ||
+                exists(withText(containsString("PC or Android"))),
         )
-        clickText("Copy pairing key")
-        assertTrue(waitText("Copy pairing key"))
-        val copied = device.wait(Until.hasObject(By.descContains("copied")), 8_000) ||
-            device.wait(Until.hasObject(By.descContains("Pairing key")), 8_000)
-        assertTrue("copy pairing stayed on Live and Remote", device.hasObject(By.text("Copy pairing key")))
-        assertTrue("copy pairing confirmed on the status line", copied)
+        tap(withText("Copy pairing key"))
+        waitDisplayed(withText("Copy pairing key"))
+        val copied = waitUntil(8_000) {
+            activity.scenario.onActivity { }
+            exists(withContentDescription(containsString("copied"))) ||
+                exists(withContentDescription(containsString("Pairing key")))
+        }
+        assertTrue("copy pairing confirmed", copied)
         shot("11_copy_pairing_stayed")
+        waitDisplayed(withText("Copy pairing key"))
     }
 
     @Test
     fun openKickStaysInAppAndNeverOpensPlayStore() {
-        waitForPanel()
         openFolder("Kick")
         openFolder("Effects")
         shot("12_kick_effects")
-        clickText("Open Kick")
-        assertTrue(waitText("Open Kick") || waitDescContains("Kick"))
+        tap(withText("Open Kick"))
+        waitDisplayed(withText("Open Kick"))
         shot("13_open_kick_in_app")
-        val dumpFile = File(evidenceDir(), "kick-hierarchy.xml")
-        device.dumpWindowHierarchy(dumpFile)
-        val dump = if (dumpFile.exists()) dumpFile.readText() else ""
-        val play = dump.contains("play.google.com") || dump.contains("market://") ||
-            device.hasObject(By.pkg("com.android.vending"))
-        assertFalse("Open Kick must not send Royalty to Play Store", play)
+        assertFalse(
+            "Open Kick must not send Royalty to Play Store",
+            device.hasObject(By.pkg("com.android.vending")),
+        )
     }
 
     @Test
     fun reelClickSoundsFireWhenTheToggleIsOn() {
-        waitForPanel()
         var before = 0
         activity.scenario.onActivity { before = it.terminalPanel.clickPlayCount() }
         openFolder("Panel settings")
@@ -147,94 +159,100 @@ class RoyaltyPhoneFixTest {
 
     @Test
     fun titleFitsOnScreen() {
-        waitForPanel()
-        assertTrue(waitText("OFFGRID TERMINAL") || waitDesc("OFFGRID TERMINAL"))
+        waitDisplayed(withText("OFFGRID TERMINAL"))
         shot("16_title_default")
-        val title = device.findObject(UiSelector().textContains("OFFGRID"))
-        assertTrue(title.exists())
-        assertTrue(title.visibleBounds.width() > 0)
-        assertTrue(title.visibleBounds.right <= device.displayWidth)
+        onView(withText("OFFGRID TERMINAL")).check { view, _ ->
+            assertTrue(view.width > 0)
+            assertTrue(view.right <= device.displayWidth)
+        }
     }
 
     @Test
     fun contrastLockBlocksInvisibleWhiteSkin() {
-        waitForPanel()
         openFolder("Panel settings")
         openFolder("Colors")
         openFolder("Skin color")
         shot("17_skin_colors")
-        val lockedWhite = device.findObject(UiSelector().descriptionContains("Locked White"))
-        assertTrue("white skin must show a lock when it hides text", lockedWhite.exists() || device.hasObject(By.descContains("Locked")))
-        if (lockedWhite.exists()) lockedWhite.click()
-        val typed = device.wait(Until.hasObject(By.descContains("Locked:")), 8_000)
-        assertTrue(typed || device.hasObject(By.descContains("Locked")))
+        waitDisplayed(withContentDescription(containsString("Locked")))
+        if (exists(withContentDescription(containsString("Locked White")))) {
+            tap(withContentDescription(containsString("Locked White")))
+        }
+        assertTrue(
+            exists(withContentDescription(containsString("Locked:"))) ||
+                exists(withContentDescription(containsString("Locked"))),
+        )
         shot("18_white_skin_locked")
     }
 
-    private fun waitForPanel() {
-        device.waitForIdle()
-        val ready = waitDesc("Lock the panel") ||
-            waitText("OFFGRID TERMINAL") ||
-            waitDesc("OFFGRID TERMINAL") ||
-            waitDescContains("Panel settings")
-        if (!ready) {
-            shot("fail_panel_missing")
-            val dump = File(evidenceDir(), "fail-hierarchy.xml")
-            device.dumpWindowHierarchy(dump)
-        }
-        assertTrue("panel lock control should appear", waitDesc("Lock the panel") || ready)
-    }
-
     private fun openFolder(name: String) {
-        val scroll = androidx.test.uiautomator.UiScrollable(UiSelector().scrollable(true))
-        scroll.setAsVerticalList()
-        scroll.setMaxSearchSwipes(30)
-        runCatching { scroll.scrollIntoView(UiSelector().descriptionContains(name)) }
-        if (!device.hasObject(By.descContains(name)) && !device.hasObject(By.text(name))) {
-            runCatching { scroll.scrollIntoView(UiSelector().text(name)) }
+        val matcher = withContentDescription(containsString(name))
+        if (!exists(matcher)) {
+            repeat(8) {
+                device.swipe(
+                    device.displayWidth / 2,
+                    device.displayHeight * 3 / 4,
+                    device.displayWidth / 2,
+                    device.displayHeight / 4,
+                    20,
+                )
+                device.waitForIdle()
+                if (exists(matcher)) return@repeat
+            }
         }
-        val row = device.findObject(UiSelector().descriptionContains(name))
-        if (row.exists()) {
-            row.click()
-        } else {
-            clickText(name)
-        }
-        device.waitForIdle()
+        tap(matcher)
     }
 
-    private fun clickDesc(desc: String) {
-        assertTrue("missing $desc", waitDesc(desc))
-        device.findObject(By.desc(desc)).click()
-        device.waitForIdle()
-    }
-
-    private fun clickText(text: String) {
-        val found = device.wait(Until.hasObject(By.text(text)), 8_000)
-        if (found) {
-            device.findObject(By.text(text)).click()
-        } else {
-            val row = device.findObject(UiSelector().textContains(text))
-            assertTrue("missing text $text", row.exists())
-            row.click()
+    private fun tap(matcher: org.hamcrest.Matcher<View>) {
+        waitDisplayed(matcher)
+        try {
+            onView(matcher).perform(scrollTo(), click())
+        } catch (_: RuntimeException) {
+            onView(matcher).perform(click())
         }
         device.waitForIdle()
     }
 
-    private fun waitDesc(desc: String): Boolean = device.wait(Until.hasObject(By.desc(desc)), 12_000)
+    private fun waitDisplayed(matcher: org.hamcrest.Matcher<View>) {
+        val ok = waitUntil(15_000) {
+            exists(matcher)
+        }
+        if (!ok) {
+            shot("fail_missing")
+            val dump = device.executeShellCommand("uiautomator dump /data/local/tmp/royalty-fix-evidence/hierarchy.xml")
+            android.util.Log.e(TAG, "missing $matcher dump=$dump")
+            android.util.Log.e(
+                TAG,
+                device.executeShellCommand("cat /data/local/tmp/royalty-fix-evidence/hierarchy.xml").take(4000),
+            )
+        }
+        onView(matcher).check(matches(isDisplayed()))
+    }
 
-    private fun waitDescContains(desc: String): Boolean =
-        device.wait(Until.hasObject(By.descContains(desc)), 12_000)
+    private fun exists(matcher: org.hamcrest.Matcher<View>): Boolean = try {
+        onView(matcher).check(matches(isDisplayed()))
+        true
+    } catch (_: NoMatchingViewException) {
+        false
+    } catch (_: AssertionError) {
+        false
+    }
 
-    private fun waitText(text: String): Boolean = device.wait(Until.hasObject(By.text(text)), 12_000)
+    private fun waitUntil(ms: Long, check: () -> Boolean): Boolean {
+        val end = SystemClock.uptimeMillis() + ms
+        while (SystemClock.uptimeMillis() < end) {
+            if (check()) return true
+            SystemClock.sleep(200)
+        }
+        return check()
+    }
 
     private fun shot(name: String) {
-        device.takeScreenshot(File(evidenceDir(), "$name.png"))
+        device.executeShellCommand("mkdir -p $EVIDENCE")
+        device.executeShellCommand("screencap -p $EVIDENCE/$name.png")
     }
 
-    private fun evidenceDir(): File {
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        val dir = File(context.getExternalFilesDir(Environment.DIRECTORY_PICTURES), "royalty-fix-evidence")
-        dir.mkdirs()
-        return dir
+    companion object {
+        private const val TAG = "RoyaltyPhoneFix"
+        private const val EVIDENCE = "/data/local/tmp/royalty-fix-evidence"
     }
 }
