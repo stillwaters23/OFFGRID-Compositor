@@ -711,6 +711,16 @@ internal object PanelTree {
 
     private val PLATFORMS = listOf(
         Platform(
+            "kick",
+            "Kick",
+            Guide(
+                canDo = "Kick's help says phone apps can go live with a stream key.",
+                cantDo = "Never paste your stream key in chat. Other limits: UNCONFIRMED.",
+                where = "Copy the stream key from the Kick dashboard in a browser. Exact address: UNCONFIRMED.",
+                browser = "UNCONFIRMED.",
+            ),
+        ),
+        Platform(
             "bigo_live",
             "Bigo Live",
             Guide(
@@ -753,16 +763,6 @@ internal object PanelTree {
             ),
         ),
         Platform("twitch", "Twitch", KEY_NOT_CHECKED),
-        Platform(
-            "kick",
-            "Kick",
-            Guide(
-                canDo = "Kick's help says phone apps can go live with a stream key.",
-                cantDo = "Never paste your stream key in chat. Other limits: UNCONFIRMED.",
-                where = "Copy the stream key from the Kick dashboard in a browser. Exact address: UNCONFIRMED.",
-                browser = "UNCONFIRMED.",
-            ),
-        ),
         Platform(
             "youtube_live",
             "YouTube Live",

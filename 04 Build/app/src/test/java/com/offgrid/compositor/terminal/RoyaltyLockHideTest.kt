@@ -77,6 +77,17 @@ class RoyaltyLockHideTest {
     }
 
     @Test
+    fun kickFolderSitsOnTheFirstPhoneScreen() {
+        val home = PanelTree.build()
+        val index = home.folders.indexOfFirst { it.id == "kick" }
+        assertTrue("Kick folder must exist", index >= 0)
+        assertTrue(
+            "Kick was below the fold at index $index. Keep it in the first 12 home folders.",
+            index < 12,
+        )
+    }
+
+    @Test
     fun systemBarsStayUpUnlessBroadcastLockHidThePanel() {
         assertFalse(shouldHideSystemBars(false))
         assertTrue(shouldHideSystemBars(true))
