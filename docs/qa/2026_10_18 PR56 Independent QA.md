@@ -17,6 +17,8 @@ Round 2 retested head `ffaec30` on the same phone. That section is at the bottom
 
 Round 3 retested head `6c7936e`. That section follows Round 2. Its overall verdict is **FAIL**, and it is the current verdict. Round 1 and Round 2 stay in this file as written.
 
+A calibration section follows Round 3. Same emulator, same flags. The environment verdict there is **UNFIT**.
+
 **Overall verdict (Round 1): FAIL.**
 
 P1-7 still shows a splash before the folders. P1-2 and P1-3 do not deliver the kick behavior Royalty asked for. Several other items could not be finished because the emulator's GPU and input services died under load. A known product limitation is not counted as a pass.
@@ -634,3 +636,115 @@ Stills and the recordings are under `/opt/cursor/artifacts/qa-pr56-r3/`. Working
 | `r3_panel2.mp4` | 179.4 s, 1080×2400. Size folder, drum wheels, then the later panel walk. |
 
 P1-2 and P1-3 stay DEFERRED. They are not passes.
+
+## Round 3 calibration — same emulator
+
+This section only separates the device from the app. No app code was changed. Head on the device was still `6c7936e`. The AVD, flags, size, density, animation scales, and immersive hint match Round 3.
+
+**Environment verdict: UNFIT.**
+
+Settings and an empty activity do not start in under 2 seconds. When Android records a Displayed time, it is 13–29 seconds, and several starts had no Displayed line within 40 seconds. System UI, Phone, the keyboard, and search ANR during those starts. A 53-second OFFGRID first frame on this emulator is not evidence that a normal phone would do the same.
+
+### 1. Acceleration, GPU, CPU, RAM
+
+| Check | Result |
+| --- | --- |
+| `emulator -accel-check` | Exit 0. Prints `KVM (version 12) is installed and usable.` |
+| `/dev/kvm` | Present, mode `crw-rw-rw-`, major 10 minor 232. |
+| KVM vCPU | Not usable. `KVM_GET_API_VERSION` ioctl returns `EINVAL`. `dmesg` has `kernel BUG at arch/x86/kvm/x86.c:702` in `kvm_arch_vcpu_create`. Nested KVM on this host faults when a vCPU is created. |
+| Process that was measured | `qemu-system-x86_64-headless -avd qa_phone_35 -no-snapshot -no-window -gpu guest -no-boot-anim -no-metrics -accel off -memory 3072 -cores 2 -port 5554` |
+| Hardware acceleration inside that process | Off. The log says `x86_64 emulation may not work without hardware acceleration` and TCG rejects AVX and F16C. |
+| GPU | `-gpu guest` was requested. The system image cannot do guest rendering. Fallback: `vulkan_mode_selected:lavapipe`, `gles_mode_selected:swangle`. |
+| CPU cores given to the AVD | 2. Guest `nproc` is 2. Host has 4. |
+| RAM given to the AVD | 3072 MB. Guest `MemTotal` is 3,048,516 kB. |
+| Display | `1080x2400`, 420 dpi. Confirmed with `wm size` and `wm density`. |
+| Boot | `Boot completed in 235099 ms`. |
+| Animations | `animator_duration_scale=1`, `window_animation_scale=1`, `transition_animation_scale=1`. |
+| Immersive hint | `settings get secure immersive_mode_confirmations` is `null`. |
+
+### 2. Baseline cold starts
+
+`am start -W` on this image prints `LaunchState: UNKNOWN (0)` and `WaitTime`. It does not print `TotalTime`. On the traced OFFGRID start, that WaitTime returned in 4.2 s, and `OffgridStartup: first_frame` was 52 s after the process fork. WaitTime is not time-to-first-frame here. The numbers below are ActivityTaskManager `Displayed` times, which are.
+
+Fresh-boot `am start -W` WaitTime, force-stop then start, no FocusEvent on the target window:
+
+| Start | Settings WaitTime | Empty WaitTime | OFFGRID WaitTime |
+| --- | --- | --- | --- |
+| 1 | 16157 ms | 5007 ms | 5929 ms |
+| 2 | 3862 ms | 5297 ms | 5127 ms |
+| 3 | 3900 ms | 3960 ms | 4449 ms |
+| 4 | 3481 ms | 6051 ms | 5141 ms |
+| 5 | 3934 ms | 5949 ms | 3799 ms |
+
+A second set with `am start -W -S` was the same shape: Settings 3584–6776 ms, Empty 3436–5904 ms, OFFGRID 3394–4023 ms. Still no `TotalTime` line.
+
+Displayed times after the emulator had been up long enough to ANR system processes. Each start was force-stop, then `am start -S`. The watch stopped at 40 s for the baselines.
+
+| Start | Settings `Displayed` | Empty `Displayed` | Notes |
+| --- | --- | --- | --- |
+| 1 | none within 40 s | none within 40 s | Phone ANR (`failed to complete startup`). Search and System UI ANR on the empty start. |
+| 2 | none within 40 s | none within 40 s | System UI ANR. Empty start also ANR'd the keyboard and search. |
+| 3 | none within 40 s | none within 40 s | System UI and keyboard ANR on the empty start. |
+| 4 | `+18s193ms` | none within 40 s | Keyboard ANR during Settings. |
+| 5 | `+28s624ms` | `+13s224ms` | System UI `FocusEvent(hasFocus=true)` took 2648 ms and was logged as Application Not Responding. That FocusEvent is System UI, not Settings. |
+
+No baseline Displayed time was under 2 seconds. The ones Android did report are 13 s, 18 s, and 29 s.
+
+### 3. OFFGRID cold starts and one startup trace
+
+`am start -W` WaitTime for five force-stop starts is the table above (3.8–5.9 s) and does not match the first frame.
+
+Traced start, simpleperf attached for the first 18 s (`simpleperf record --app com.offgrid.compositor -g --duration 18 -f 100 --trace-offcpu --call-graph dwarf -e cpu-clock`):
+
+| Marker | Time |
+| --- | --- |
+| `am_proc_start` pid 5813 | 13:50:07.066 |
+| `OffgridStartup: onCreate_done` | 13:50:55.737 (48.7 s after the fork) |
+| `OffgridStartup: first_frame` | 13:50:59.302 (52.2 s) |
+| `OffgridStartup: heavy_ready` | 13:51:05.312 (58.2 s) |
+| `am start -W` WaitTime on that same start | 4224 ms |
+
+A later start, after the baseline Displayed run, logged `Displayed com.offgrid.compositor/.MainActivity ... +1m2s512ms` and `onCreate_done`. The emulator's qemu process exited during the next start (`adb: no devices/emulators found`), so starts 2–5 of that set were not recorded. The renderer log already had `Failed to find ColorBuffer` / `Failed to bind to texture`.
+
+Main thread for pid 5813, tid 5813, first 18 s (1,741 cpu-clock samples, 18.9 s of thread time). About 96% of the self time is one kernel address. `kptr_restrict` blocked kallsyms, so that address stays unnamed. `--trace-offcpu` puts the off-cpu sample on that kernel frame. The user stack under it is the interpreter. The hottest Java path, about two thirds of the launch samples:
+
+`android.app.ActivityThread.main` → `android.os.Looper.loop` → `android.app.servertransaction.LaunchActivityItem.execute` → `android.app.ActivityThread.handleLaunchActivity` → `android.app.ActivityThread.performLaunchActivity` → `android.app.Instrumentation.callActivityOnCreate` → `com.offgrid.compositor.MainActivity.onCreate` → `androidx.appcompat.app.AppCompatActivity.setContentView` → `androidx.appcompat.app.AppCompatDelegateImpl.setContentView` → `android.view.LayoutInflater.inflate` → `android.view.LayoutInflater.rInflate` → `android.view.LayoutInflater.createViewFromTag` → `androidx.appcompat.app.AppCompatViewInflater.createView` → `androidx.appcompat.app.AppCompatViewInflater.createTextView` → `androidx.appcompat.widget.AppCompatTextView.<init>` → `art::ClassLinker::VerifyClass` → `art::verifier::MethodVerifier::VerifyMethod`
+
+The other large branch under the same inflate is `androidx.appcompat.widget.AppCompatTextHelper.loadFromAttributes` → `androidx.appcompat.widget.AppCompatTextHelper.updateTypefaceAndStyle` → `androidx.core.content.res.ResourcesCompat.loadFont` → `androidx.core.graphics.TypefaceCompat.createFromResourcesFamilyXml`.
+
+Log lines from that main thread while those samples were taken:
+
+- `Verification of void androidx.activity.ComponentActivity.<init>() took 121.199ms`
+- `Verification of void com.offgrid.compositor.MainActivity.startAfterFirstFrame() took 117.947ms`
+- `Verification of void com.offgrid.compositor.MainActivity.bindCamera$app_debug(...) took 193.868ms`
+- `Verification of java.lang.String com.offgrid.compositor.MainActivity.describePreviewView$app_debug() took 116.837ms`
+- `Verification of void com.offgrid.compositor.MainActivity.onCreate(android.os.Bundle) took 129.027ms`
+- `Choreographer: Skipped 52 frames`
+
+Inside the process, the other big sample owners over those 18 s are `Jit thread pool` (25.8%), `Profile Saver` (20.5%), and `HeapTaskDaemon` (20.0%). The main thread is 26.1%.
+
+### 4. Instrument run that ended in `Process crashed`
+
+Saved log: `/tmp/qa-evidence/r3/log_crash.txt`, matching `/tmp/qa-evidence/r3_instrument2.txt` and `r3_instrument3.txt` (`INSTRUMENTATION_RESULT: shortMsg=Process crashed`).
+
+There is no `AndroidRuntime: FATAL EXCEPTION` for `com.offgrid.compositor`. tombstoned did not keep a file:
+
+`tombstoned: received crash request for pid 2601` (the app process) → `found intercept fd 513 for pid 2601 and type kDebuggerdJavaBacktrace` → `grid.compositor: Wrote stack traces to tombstoned` → `skipping tombstone file creation due to intercept`.
+
+What ActivityManager recorded, and then acted on:
+
+```
+ANR in com.offgrid.compositor
+PID: 2601
+Reason: Process ProcessRecord{6c1ee7d 2601:com.offgrid.compositor/u0a209} failed to complete startup
+```
+
+Then `Killing 2601:com.offgrid.compositor/u0a209 (adj 0): bg anr`, `Zygote: Process 2601 exited due to signal 9 (Killed)`, and `Crash of app com.offgrid.compositor running instrumentation ComponentInfo{com.offgrid.compositor.test/androidx.test.runner.AndroidJUnitRunner}` followed by `Force stopping com.offgrid.compositor`.
+
+On the way there the main thread logged `Choreographer: Skipped 250 frames` and ART verification of `androidx.test.runner.MonitoringInstrumentation` methods (148 ms, 100 ms, 350 ms). The same minute has startup ANRs for Phone, Google search, and System UI. CPU pressure in that ANR dump is `some avg10=85.15`.
+
+### How the rule applies
+
+Baselines do not start in under 2 seconds, so this run does not support "the phone is fine and only OFFGRID is slow." Baselines do take tens of seconds, or they never display within 40 seconds, and the emulator ANRs System UI, Phone, the keyboard, and search while those starts are in progress. One of those ANRs is a System UI `FocusEvent(hasFocus=true)`.
+
+That is the UNFIT case. Round 3's 53–57 s `first_frame` and its FocusEvent ANRs were measured on this same unfit emulator. The trace still shows OFFGRID's main thread inside `MainActivity.onCreate` inflating `AppCompatTextView` and verifying classes for the first 18 seconds of a 52-second first frame. That work is real. It was not timed on a device where Settings and an empty activity start in under 2 seconds.
