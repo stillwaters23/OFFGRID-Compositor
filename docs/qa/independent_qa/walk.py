@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Independent adb walk for PR 56 head 6c7936e.
+"""Independent adb walk for PR 56 head 2fea30e.
 
 Taps use centers from `uiautomator dump`. This is not RoyaltyPhoneFixTest.
 Cold starts record ActivityTaskManager Displayed lines and any ANR dialog.
@@ -681,24 +681,73 @@ def check_night_black() -> None:
         mark("night_black", "FAIL", f"first={first_reason} second={second_reason}")
 
 
-def find_width_reel(nodes: list[dict]) -> dict | None:
-    hits = [node for node in nodes if "Width," in node["desc"] and on_screen(node)]
+def find_reel(nodes: list[dict], label: str) -> dict | None:
+    needle = f"{label},"
+    hits = [node for node in nodes if needle in node["desc"] and on_screen(node)]
     if not hits:
         return None
     hits.sort(key=lambda node: node["bounds"][3] - node["bounds"][1], reverse=True)
     return hits[0]
 
 
-def reel_value(node: dict | None) -> int | None:
+def reel_value(node: dict | None, label: str) -> int | None:
     if node is None:
         return None
-    match = re.search(r"Width,\s*(\d+)", node["desc"])
+    match = re.search(rf"{label},\s*(\d+)", node["desc"])
     return int(match.group(1)) if match else None
+
+
+def play_lines(log: str) -> list[str]:
+    return [line.strip() for line in log.splitlines() if "SoundPool play streamId=" in line]
+
+
+def positive_play(lines: list[str]) -> str:
+    return next((line for line in lines if re.search(r"streamId=([1-9]\d*)", line)), "")
+
+
+def swipe_reel(label: str, direction: str, nodes: list[dict]) -> tuple[list[dict], str]:
+    """One real input swipe on a drum, then logcat -s OffgridClicker."""
+    node = find_reel(nodes, label)
+    if node is None:
+        return nodes, f"{label} {direction}: reel missing"
+    if covered_by_hint(node, nodes):
+        return nodes, f"{label} {direction}: fullscreen hint covers the reel"
+    before = reel_value(node, label)
+    x1, y1, x2, y2 = node["bounds"]
+    cx = (x1 + x2) // 2
+    top = y1 + 40
+    bottom = y2 - 40
+    if bottom - top < 80:
+        return nodes, f"{label} {direction}: reel bounds {(x1, y1, x2, y2)} are too short to swipe"
+    # Screen y grows downward. Swipe up travels toward the top of the drum.
+    y_start, y_end = (bottom, top) if direction == "up" else (top, bottom)
+    tag = f"reel_{label.lower()}_{direction}"
+    shot(f"{tag}_before")
+    adb(["logcat", "-c"], timeout=20)
+    time.sleep(0.3)
+    adb(
+        ["shell", "input", "swipe", str(cx), str(y_start), str(cx), str(y_end), "350"],
+        timeout=20,
+    )
+    time.sleep(0.8)
+    after_nodes = dump(tag)
+    shot(tag)
+    after = reel_value(find_reel(after_nodes, label), label)
+    click = logcat("OffgridClicker")
+    played = positive_play(play_lines(click))
+    with (EVID / "reel_clicker.log").open("a", encoding="utf-8") as handle:
+        handle.write(f"\n===== {label} {direction} {before} -> {after} =====\n")
+        handle.write(click)
+        if click and not click.endswith("\n"):
+            handle.write("\n")
+    if before is None or after is None or before == after or not played:
+        return after_nodes, f"{label} {direction}: {before} -> {after}; log={play_lines(click)[:4]}"
+    return after_nodes, f"{label} {direction}: {before} -> {after}; {played}"
 
 
 def check_reel() -> None:
     home = ensure_home("reel")
-    node = find_width_reel(home)
+    node = find_reel(home, "Width")
     if node is None:
         size, detail = open_folder("Panel settings")
         if size is None:
@@ -708,50 +757,28 @@ def check_reel() -> None:
         if size is None:
             mark("reel_click", "BLOCKED", detail)
             return
-        node = find_width_reel(size)
         home = size
-    if node is None:
-        mark("reel_click", "BLOCKED", "Width reel not in the dump")
+    if find_reel(home, "Width") is None or find_reel(home, "Height") is None:
+        mark("reel_click", "BLOCKED", "Width and Height reels were not both on the Size screen")
         return
-    if on_home(home) is False and "Width," not in node["desc"]:
-        mark("reel_click", "FAIL", "reel screen was not the expected Width reel")
-        return
-    before = reel_value(node)
-    if covered_by_hint(node, home):
-        mark("reel_click", "FAIL", "fullscreen hint covers the Width reel")
-        return
-    shot("reel_before")
-    adb(["logcat", "-c"], timeout=20)
-    x1, y1, x2, y2 = node["bounds"]
-    cx = (x1 + x2) // 2
-    # Travel most of the drum. A short swipe on a wheel already at 100 snaps back to 100.
-    y_from = y2 - 20
-    y_to = y1 + 20
-    adb(["shell", "input", "swipe", str(cx), str(y_from), str(cx), str(y_to), "350"], timeout=20)
-    time.sleep(1.2)
-    after_nodes = dump("reel_after")
-    shot("reel_after")
-    after_node = find_width_reel(after_nodes)
-    after = reel_value(after_node)
-    if after == before:
-        # The wheel was already at the top. Drag downward so a lower number snaps in.
-        adb(
-            ["shell", "input", "swipe", str(cx), str(y1 + 30), str(cx), str(y2 - 30), "350"],
-            timeout=20,
-        )
-        time.sleep(1.2)
-        after_nodes = dump("reel_after_2")
-        shot("reel_after_2")
-        after_node = find_width_reel(after_nodes)
-        after = reel_value(after_node)
-    click = logcat("OffgridClicker:I")
-    (EVID / "reel_clicker.log").write_text(click, encoding="utf-8", errors="replace")
-    play = [line.strip() for line in click.splitlines() if "SoundPool play" in line]
-    stream = next((line for line in play if re.search(r"streamId=([1-9]\d*)", line)), "")
-    if before is not None and after is not None and before != after and stream:
-        mark("reel_click", "PASS", f"Width {before} -> {after}; {stream}")
+    (EVID / "reel_clicker.log").write_text("", encoding="utf-8")
+    notes = []
+    nodes = home
+    for label, direction in (
+        ("Width", "up"),
+        ("Width", "down"),
+        ("Height", "up"),
+        ("Height", "down"),
+    ):
+        nodes, note = swipe_reel(label, direction, nodes)
+        notes.append(note)
+        progress(note)
+    missed = [note for note in notes if "SoundPool play streamId=" not in note]
+    detail = " | ".join(notes)
+    if missed:
+        mark("reel_click", "FAIL", detail)
     else:
-        mark("reel_click", "FAIL", f"Width {before} -> {after}; log={play[:6]}")
+        mark("reel_click", "PASS", detail)
 
 
 def check_pairing() -> None:

@@ -1,6 +1,6 @@
 name: Independent QA
 
-# Independent of the fixer. Checks out PR 56 head 6c7936e, builds that
+# Independent of the fixer. Checks out PR 56 head 2fea30e, builds that
 # debug APK, and walks the panel with this branch's own adb taps.
 # GitHub-hosted ubuntu-latest provides /dev/kvm. This file does not change app code.
 
@@ -36,13 +36,13 @@ jobs:
       - name: Check out the QA branch
         uses: actions/checkout@v4
 
-      - name: Check out PR 56 head 6c7936e
+      - name: Check out PR 56 head 2fea30e
         run: |
           set -euo pipefail
-          git fetch --depth 1 origin 6c7936e5da9935305904b712fed10e9af287bcfa \
+          git fetch --depth 1 origin 2fea30ec71f29cfce4c20531d66f6ee15a759b70 \
             || git fetch --depth 1 origin cursor/royalty-v033-phone-fixes-1373
-          git worktree add --detach offgrid-head 6c7936e5da9935305904b712fed10e9af287bcfa
-          test "$(git -C offgrid-head rev-parse HEAD)" = "6c7936e5da9935305904b712fed10e9af287bcfa"
+          git worktree add --detach offgrid-head 2fea30ec71f29cfce4c20531d66f6ee15a759b70
+          test "$(git -C offgrid-head rev-parse HEAD)" = "2fea30ec71f29cfce4c20531d66f6ee15a759b70"
           git -C offgrid-head log -1 --oneline
 
       - name: Set up Java
@@ -65,7 +65,7 @@ jobs:
           yes | "$HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$HOME/android-sdk" --licenses >/dev/null || true
           "$HOME/android-sdk/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$HOME/android-sdk" --install "platforms;android-36" "build-tools;36.0.0" "platform-tools"
 
-      - name: Build debug and androidTest APKs from 6c7936e
+      - name: Build debug and androidTest APKs from 2fea30e
         working-directory: offgrid-head/04 Build
         run: |
           set -euo pipefail
@@ -92,7 +92,7 @@ jobs:
               if node.get(name)
           )
           out = pathlib.Path("docs/qa/independent_qa/evidence/static_checks.txt")
-          lines = ["HEAD=6c7936e5da9935305904b712fed10e9af287bcfa", "permissions:"]
+          lines = ["HEAD=2fea30ec71f29cfce4c20531d66f6ee15a759b70", "permissions:"]
           lines += [f"  {item}" for item in found]
           for banned in ("android.permission.RECORD_AUDIO", "android.permission.FOREGROUND_SERVICE_MICROPHONE"):
               lines.append(f"{banned}={'PRESENT' if banned in found else 'absent'}")
