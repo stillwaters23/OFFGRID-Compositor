@@ -13,8 +13,6 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.GrantPermissionRule
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
-import com.offgrid.compositor.terminal.ThemeMode
-import com.offgrid.compositor.terminal.refreshLook
 import com.offgrid.compositor.terminal.showMinimized
 import java.io.FileInputStream
 import org.junit.Assert.assertFalse
@@ -267,27 +265,29 @@ class RoyaltyPhoneFixTest {
 
     @Test
     fun contrastLockBlocksBlackTypewriterOnBlack() {
-        activity.scenario.onActivity { act ->
-            act.terminalPanel.store.setThemeMode(ThemeMode.NIGHT)
-            act.terminalPanel.refreshLook()
-        }
         tapFolder("Panel settings")
+        tapFolder("Theme mode")
+        val night = waitDescContains("Night. Use a black panel")
+        assertTrue("Night must be on screen in Theme mode. seen=${visibleLabels()}", night != null)
+        tapOnScreen(night!!, "Night")
+        device.pressBack()
+        device.waitForIdle()
+        SystemClock.sleep(400)
         tapFolder("Colors")
         tapFolder("Typewriter text color")
         val lockedBlack = waitDescContains("Locked Black")
         assertTrue("Black typewriter on black must show the lock. seen=${visibleLabels()}", lockedBlack != null)
-        repeat(3) {
-            tapOnScreen(lockedBlack!!, "Locked Black")
-            if (waitUntil(4_000) {
-                    statusDescription().contains("Locked:") && statusDescription().contains("black")
-                }
-            ) {
-                return@repeat
-            }
+        tapOnScreen(lockedBlack!!, "Locked Black")
+        val typed = waitUntil(8_000) {
+            statusDescription().contains("Locked:") && statusDescription().contains("black")
+        }
+        assertTrue("Termux must type the black-on-black reason: ${statusDescription()}", typed)
+        val overwritten = waitUntil(2_500) {
+            !statusDescription().contains("Locked:") || !statusDescription().contains("black")
         }
         assertTrue(
-            "Termux must type the black-on-black reason: ${statusDescription()}",
-            statusDescription().contains("Locked:") && statusDescription().contains("black"),
+            "Locked: must stay after the first tap. Status was overwritten: ${statusDescription()}",
+            !overwritten,
         )
         shot("18b_black_text_locked")
     }

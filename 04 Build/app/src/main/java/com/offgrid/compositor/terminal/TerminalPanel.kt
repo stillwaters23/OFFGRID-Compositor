@@ -1002,8 +1002,16 @@ class TerminalPanel @JvmOverloads constructor(
 
 
     internal fun say(message: String) {
+        val current = statusLine.contentDescription?.toString().orEmpty()
+        if (current.startsWith("Locked:") && cameraBindLine(message)) return
         statusLine.contentDescription = message
         statusLine.type(PanelText.line(message))
+    }
+
+    private fun cameraBindLine(message: String): Boolean {
+        return message == context.getString(R.string.camera_starting) ||
+            message == context.getString(R.string.camera_missing) ||
+            message == context.getString(R.string.camera_failed)
     }
 
 

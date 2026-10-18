@@ -264,7 +264,7 @@ internal object PanelTree {
 
     /**
      * Panel settings. Every control sits inside a folder. Nothing is loose here.
-     * The theme office is the Themes, Colors, and Glow effects folders.
+     * The theme office is Theme mode, Themes, Colors, and Glow effects.
      */
     private fun settingsFolder() = PanelFolder(
         id = "panel_settings",
@@ -276,6 +276,7 @@ internal object PanelTree {
             displayFolder(),
             glowFolder(),
             colorsFolder(),
+            themeModeFolder(),
             auricWheelFolder(),
             clickerSoundsFolder(),
             themesFolder(),
@@ -475,11 +476,11 @@ internal object PanelTree {
         title = "📁 Themes",
         tag = null,
         kind = FolderKind.OFFICE,
-        folders = listOf(themeModeFolder(), toggleStyleFolder(), presetsFolder()),
+        folders = listOf(toggleStyleFolder(), presetsFolder()),
         items = listOf(ThemeItem(Theme.SYSTEM)),
         notes = listOf(
             "System is the only built-in theme.",
-            "Its black and white colors follow Auto, Day, or Night.",
+            "Its black and white colors follow Auto, Day, or Night in Theme mode.",
         ),
     )
 
