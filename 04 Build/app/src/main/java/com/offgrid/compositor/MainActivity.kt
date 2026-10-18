@@ -170,6 +170,15 @@ class MainActivity : AppCompatActivity() {
         ActivityResultContracts.RequestPermission(),
     ) { granted -> onMicPermission(granted) }
 
+    /** Registered in onCreate. LiveIntegration is built after the first frame and cannot register then. */
+    internal val pickArVideo = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        if (result.resultCode != android.app.Activity.RESULT_OK) return@registerForActivityResult
+        val uri = result.data?.data ?: return@registerForActivityResult
+        if (::live.isInitialized) live.onArClipPicked(uri)
+    }
+
     internal val playbackBackCallback = object : OnBackPressedCallback(false) {
         override fun handleOnBackPressed() {
             hidePlayback()
@@ -302,7 +311,7 @@ class MainActivity : AppCompatActivity() {
         val engine = effects.engine
         faces = FaceTracker(this, engine)
         segmenter = PersonSegmenter(this, engine, masks)
-        live = LiveIntegration.install(this, effects, { processor }, lockStore, terminalPanel)
+        live = LiveIntegration.install(this, effects, { processor }, lockStore, terminalPanel, pickArVideo)
         effects.start()
         effects.attachInk(previewView)
         terminalPanel.useGuides(findViewById(R.id.snap_guides))
