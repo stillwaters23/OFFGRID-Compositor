@@ -179,7 +179,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        hideSystemBars()
+        hideSystemBarsForUser()
 
         previewView = findViewById(R.id.camera_view)
         playbackView = findViewById(R.id.playback_view)
@@ -327,11 +327,17 @@ class MainActivity : AppCompatActivity() {
         if (::live.isInitialized) live.tellPhone2(com.offgrid.live.RemoteMessage.STATUS_LINE_KEY, message)
     }
 
+    /** Immersive bars stay on for people. Tests keep them so the fullscreen hint never covers Lock. */
+    private fun hideSystemBarsForUser() {
+        if (intent.getBooleanExtra(EXTRA_KEEP_SYSTEM_BARS, false)) return
+        hideSystemBars()
+    }
+
     override fun onResume() {
         super.onResume()
         lockChrome.onResume()
         effects.resume()
-        hideSystemBars()
+        hideSystemBarsForUser()
         resumed = true
         applyCapture()
         if (hasCameraPermission()) {
@@ -576,8 +582,14 @@ class MainActivity : AppCompatActivity() {
         RECORDING,
     }
 
-    private companion object {
+    companion object {
         const val TAG = "OffgridCompositor"
+
+        /**
+         * Instrumented tests set this so Android 15 does not show the
+         * "Viewing full screen / Got it" overlay that covers Lock, Minus, and Back.
+         */
+        const val EXTRA_KEEP_SYSTEM_BARS = "com.offgrid.compositor.KEEP_SYSTEM_BARS"
 
         /** The panel-open hold zone starts this far in from the screen edges: no edge gestures (V2 7.3). */
         const val PANEL_OPEN_EDGE_INSET_DP = 48f
