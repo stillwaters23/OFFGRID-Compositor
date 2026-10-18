@@ -8,7 +8,7 @@ Reviewer: independent QA. This note did not change product code. Nothing was mer
 | Head reviewed | `387dd45c5b9e8d6d49b971b3d44fefd69cb5ae95` |
 | Base | `origin/final-build` at `541588cb9208e06a9a3292a91af70446abfbd05d` |
 | CI | [run 39084968489](https://github.com/stillwaters23/OFFGRID-Compositor/actions/runs/39084968489), conclusion success, head SHA matches |
-| Review time | 2026-10-18 UTC |
+| Review time | 2026-10-18 UTC. Check 5 rechecked the same day against the attached GLM review. |
 
 `git log origin/final-build..387dd45` is one commit: `387dd45 Add voice Phase 0 hygiene files and asset guard.`
 
@@ -20,7 +20,7 @@ Reviewer: independent QA. This note did not change product code. Nothing was mer
 | 2 | `repo_hygiene.py` fails on a new `.wav`, `.gguf`, `.onnx`, `.pt`, or `.safetensors`, and on a fake private key or API key. Allowlist is the 3 Rex WAV paths by exact path. Output does not contain the fixture secrets. | **PASS** |
 | 3 | The workflow still builds and keeps every existing check. | **PASS** |
 | 4 | `THIRD_PARTY_NOTICES.md` covers every Gradle dependency with the published license. `LICENSE` is proprietary, all rights reserved, stillwaters23 2026. | **PASS** |
-| 5 | `phase0_plan.md` matches GLM's top 5 and the Gate G1 matrix (on-device spike, second BIGO account, auto-cutoff, watchdog, muted until green), with no Route A code and no sliders. | **BLOCKED** |
+| 5 | `phase0_plan.md` matches GLM's top 5 and the Gate G1 matrix (on-device spike, second BIGO account, auto-cutoff, watchdog, muted until green), with no Route A code and no sliders. | **FAIL** |
 | 6 | `./gradlew testDebugUnitTest lintDebug assembleDebug` in `04 Build`. | **PASS** |
 
 ## 1. Product code and manifests — PASS
@@ -138,23 +138,48 @@ The `camera-core` POM description says: "This library includes code from libyuv,
 
 `LICENSE` is 11 lines. It says `Copyright © 2026 stillwaters23`, `All rights reserved.`, and `OFFGRID Compositor is proprietary.`
 
-## 5. Phase 0 plan against GLM and Gate G1 — BLOCKED
+## 5. Phase 0 plan against GLM and Gate G1 — FAIL
 
-The named Gate G1 pieces are in `docs/voice/phase0_plan.md`:
+Rechecked against the attached review `uploads/GLM_5.3_Voice_Review.md` (read from `GLM_5.3_Voice_Review_fd81.md`). Section "6. Top Five Changes" is lines 68–75. Gate G1 is Phase 1, lines 56–58. Checks 1–4 and 6 were not rerun.
 
-| Required piece | Where |
+The five numbered changes in `docs/voice/phase0_plan.md:11-15` match GLM's five changes, in the same order:
+
+| # | GLM | Plan |
+| --- | --- | --- |
+| 1 | "Reframe live conversion around mix + own-UID exclusion and drop the AccessibilityService idea" | "Live conversion uses the mix plus OFFGRID's own UID exclusion. … The AccessibilityService idea is dropped." |
+| 2 | "Make UID scoping a hard arming requirement, and resolve the OBD container question first" | "UID scoping is a hard arming requirement. … The first spike task resolves which UID holds the capture … including the case where a container owns BIGO's UID." |
+| 3 | "Design the fail-open protection before any Route A code — dead-man's switch, watchdog, mute-until-green." | "Fail-open protection is designed before any Route A code. … dead-man's switch, a binder-death watchdog with a loud notification, and mute-until-green." |
+| 4 | "Formalize the spike into Gate G1 with a written matrix and a secondary BIGO account — shell grants, hidden APIs, scoping, exclusion, live-while-injecting, late registration, AEC, formats, BT/wired, kill fallback, real call" | The same list, plus "A partial pass, including 'works only when unscoped,' is a fail." |
+| 5 | "hidden-API compile/R8 strategy with a startup self-test; dumb-sink AIDL transport; do not inherit MicUp's MODE_IN_COMMUNICATION, focus ducking, or Runtime.exec patterns; no on-device FLAC-encode dependency; permission-free battery-optimization deep-link" | The same items, naming `ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS`. |
+
+GLM's closing constraints are in the plan: "non-root, no sliders, offline-first, no secrets" (`docs/voice/phase0_plan.md:17`). This diff adds no Route A code and no slider widget. The plan says this change adds no Route A code (`docs/voice/phase0_plan.md:3`).
+
+These Gate G1 acceptance tests match:
+
+| GLM | Plan |
 | --- | --- |
-| On-device spike | Opening of the matrix, and rows 1–3 (shell grant, target UID, hidden API) at lines 35–37 |
-| Second BIGO account | Prose before the table, and row 12 at line 46 |
-| Auto-cutoff | Definition before the table, and row 9 at line 43 |
-| Watchdog | Definition before the table, and row 10 at line 44 |
-| Muted until green | Definition before the table, and row 11 at line 45 ("Muted until all checks are green") |
+| "dumpsys package com.android.shell shows MODIFY_AUDIO_ROUTING on One UI 8" and "`shell_perms.txt`" | Row 1, line 35 |
+| "resolve BIGO UID — or the container's UID" with `ps -A` and `dumpsys media.audio_flinger`, log `target_uid.txt` | Row 2, line 36 |
+| "440 Hz tone", "VOICE_COMMUNICATION", "tone above RMS gate ≥10 s", "dumpsys media.audio_policy shows the mix", "symbols resolve" | Row 3, line 37 |
+| "UID-match to harness only" and "three-app log" | Row 4, line 38 |
+| "live-capture-while-injecting 60 s shows both streams non-silent" | Row 5, line 39 |
+| "late registration" | Row 6, line 40 |
+| "AEC on, 16 kHz mono client, BT/wired" | Row 7, line 41 |
+| "30-min stability" | Row 8, line 42 |
+| "forced kill mid-capture" and Phase 3.2 "silence not live mic (or documented fallback prompt + tone)" | Row 9, line 43: silence or the documented cutoff tone, and the physical microphone is not the source |
+| E6 "binder-death watchdog"; Phase 3.1 "route-lost ≤ 2 s + notification" | Row 10, line 44: binder death is logged with the time from kill to cutoff, and the log notes whether that time can support the later 2-second notification |
+| "BIGO live test on a secondary account — AT: other party hears Rex ≥5 min; no BIGO crash; G1 decision recorded." | Row 12, line 46 |
+| "Partial pass (e.g., works only unscoped) = FAIL" and "FAIL → … shelve Shizuku" | Lines 14, 31, and 38 |
 
-The plan says this change adds no Route A code (`docs/voice/phase0_plan.md:3`). The diff adds no Kotlin, manifest, or Gradle product file. The flavor snippet in the plan is documentation of a later `productFlavors` block. It is not in `04 Build/app/build.gradle.kts`.
+Mismatch, quoted:
 
-The plan states the fixed constraint "no sliders" (`docs/voice/phase0_plan.md:17`). This diff adds no slider widget. The workflow step "Check there are no sliders except BioSliderView" is unchanged, and CI printed `No slider other than BioSliderView is in the sources.`
+GLM Phase 1.5: "other party hears Rex ≥5 min".
 
-The match to GLM's own top 5 is blocked. The authoring run was given an upload named `GLM_5.3_Voice_Review.md` (read path `GLM_5.3_Voice_Review_3795.md`). That file is not in this checkout, not in git history, and not in the authoring transcript body. Slack and Google Drive searches for the review returned nothing. `docs/voice/phase0_plan.md` has a section titled "GLM top 5 changes" with five numbered paragraphs, and those paragraphs were written by the authoring agent. They could not be compared with GLM's text from here.
+Plan line 29: "the far side stays muted, until every row below is green."
+
+Plan row 11, line 45: "Rows 1–10 and row 12 are green before anything is unmuted."
+
+Row 12 is the row on which the second account hears the Rex tone. The mute rule keeps the far side muted until that row is already green, so the hearing test has no legal step under the rule that requires it. GLM's "keep-BIGO-muted-until-green" (finding E6 and top-5 change 3) holds Royalty's real voice until the safety checks are green. The 5-minute call is the moment the other party hears the Rex tone.
 
 ## 6. Gradle totals — PASS
 
@@ -185,4 +210,4 @@ Lint XML:
 
 ## One-line verdict
 
-BLOCKED: checks 1, 2, 3, 4, and 6 pass; check 5 is blocked because GLM's review text was not available to compare with the plan's top 5.
+FAIL: checks 1, 2, 3, 4, and 6 pass; check 5 fails because the plan keeps the far side muted until the second-account hearing test is already green, which contradicts GLM's Gate G1 requirement that the other party hears Rex for at least 5 minutes.
